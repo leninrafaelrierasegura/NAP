@@ -1,0 +1,327 @@
+## ---------------------------------------------------------------------------------------------------------------
+# remotes::install_github("davidbolin/rspde", ref = "devel")
+# remotes::install_github("davidbolin/metricgraph", ref = "devel")
+library(rSPDE)
+library(MetricGraph)
+library(grateful)
+
+library(ggplot2)
+library(reshape2)
+library(plotly)
+
+
+## ---------------------------------------------------------------------------------------------------------------
+myggsave <- function(plot,
+                     width = 9.22,
+                     height = 7.05,
+                     use_mathpazo = TRUE) {
+  
+  dir_to_save <- here::here("data_files/tikzpic")
+  obj_name <- deparse(substitute(plot))
+  
+  # --- Filename suffix ---
+  suffix <- if (use_mathpazo) "_with_mathpazo" else ""
+  
+  tex_name <- file.path(dir_to_save, paste0(obj_name, suffix, ".tex"))
+  pdf_name <- file.path(dir_to_save, paste0(obj_name, suffix, ".pdf"))
+  png_name <- file.path(dir_to_save, paste0(obj_name, suffix, ".png"))
+  
+  # Create directory if needed
+  if (!dir.exists(dir_to_save)) dir.create(dir_to_save, recursive = TRUE)
+
+  # --- TikZ + LaTeX options ---
+  tikz_packages <- c(
+    "\\usepackage{tikz}",
+    "\\usetikzlibrary{calc}",
+    "\\usepackage[T1]{fontenc}"
+  )
+  
+  if (use_mathpazo) {
+    tikz_packages <- c(tikz_packages, "\\usepackage[sc]{mathpazo}")
+  }
+
+  options(
+    tikzDocumentDeclaration = "\\documentclass[tikz,border=0pt]{standalone}",
+    tikzLatexPackages = tikz_packages
+  )
+
+  # Save TikZ plot
+  tikzDevice::tikz(tex_name, standAlone = TRUE, width = width, height = height)
+  print(plot)
+  dev.off()
+  
+  # Compile to PDF
+  system(
+    paste0("pdflatex -output-directory=", dir_to_save, " ", tex_name),
+    ignore.stdout = TRUE,
+    ignore.stderr = TRUE
+  )
+  
+  # --- Convert PDF to PNG (ImageMagick, no trimming) ---
+  cmd <- paste(
+    "convert -density 400",
+    shQuote(pdf_name),
+    shQuote(png_name)
+  )
+  
+  system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+  
+  if (!file.exists(png_name)) {
+    stop("PNG conversion failed. Likely ImageMagick PDF policy restriction.")
+  }
+  
+  # --- Clean auxiliary files ---
+  aux_ext <- c(".aux", ".log", ".tex")
+  for (ext in aux_ext) {
+    f <- file.path(dir_to_save, paste0(obj_name, suffix, ext))
+    if (file.exists(f)) file.remove(f)
+  }
+  
+  ras_files <- list.files(
+    dir_to_save,
+    pattern = paste0(obj_name, suffix, "_ras[0-9]+\\.png$"),
+    full.names = TRUE
+  )
+  if (length(ras_files) > 0) file.remove(ras_files)
+  
+  # --- Copy PNG to presentation folder ---
+  pres_dir <- path.expand("~/Desktop/leninPresentations/data_files")
+  if (!dir.exists(pres_dir)) dir.create(pres_dir, recursive = TRUE)
+  
+  pres_png <- file.path(pres_dir, basename(png_name))
+  file.copy(png_name, pres_png, overwrite = TRUE)
+  
+  # --- Output ---
+  cat("PDF saved at:", pdf_name, "\n",
+      "PNG saved at:", png_name, "\n",
+      "PNG copied to:", pres_png, "\n")
+}
+
+
+## ---------------------------------------------------------------------------------------------------------------
+#function to save
+save_dual_for_presentation <- function(obj) {
+  obj_name <- deparse(substitute(obj))
+  filename <- paste0(obj_name, ".RData")
+  
+  path1 <- here::here("data_files", filename)
+  path2 <- file.path("~", "Desktop", "leninPresentations", "data_files", filename)
+  
+  e <- new.env()
+  assign(obj_name, obj, envir = e)
+  
+  save(list = obj_name, file = path1, envir = e)
+  save(list = obj_name, file = path2, envir = e)
+  
+  cat("Saved file in:\n",
+      " -", path1, "\n",
+      " -", path2, "\n")
+}
+
+
+## ---------------------------------------------------------------------------------------------------------------
+reticulate::use_python(
+  "/home/rierasl/miniconda3/envs/phdenv/bin/python",
+  required = TRUE
+)
+
+reticulate::py_config()
+
+
+## ---------------------------------------------------------------------------------------------------------------
+save_plotly_figure_fixed <- function(fig,
+                                     dpi = 600,
+                                     scale = 2,
+                                     viewer_change = 1) {
+  
+  folder <- here::here("data_files/plotlypdf")
+  
+  if (!dir.exists(folder)) {
+    dir.create(folder, recursive = TRUE)
+  }
+  
+  fig_name <- deparse(substitute(fig))
+  
+  file_name_pdf <- file.path(folder, paste0(fig_name, ".pdf"))
+  file_name_png <- file.path(folder, paste0(fig_name, ".png"))
+  
+  ## ---- CAMERA (correct Plotly location) ----
+  cam <- fig$x$layoutAttrs[[1]]$scene$camera
+  
+  if (!is.null(cam)) {
+    
+    eye <- cam$eye
+    center <- cam$center
+    
+    if (is.null(eye)) eye <- list(x = 1, y = 1, z = 1)
+    if (is.null(center)) center <- list(x = 0, y = 0, z = 0)
+    
+    # vector center -> eye
+    vx <- eye$x - center$x
+    vy <- eye$y - center$y
+    vz <- eye$z - center$z
+    
+    # norm (distance from center)
+    norm_v <- sqrt(vx^2 + vy^2 + vz^2)
+    
+    if (norm_v > 0) {
+      
+      # normalize direction
+      vx <- vx / norm_v
+      vy <- vy / norm_v
+      vz <- vz / norm_v
+      
+      # apply zoom scaling on radius
+      norm_v <- norm_v * viewer_change
+      
+      fig$x$layoutAttrs[[1]]$scene$camera$eye <- list(
+        x = center$x + vx * norm_v,
+        y = center$y + vy * norm_v,
+        z = center$z + vz * norm_v
+      )
+    }
+  }
+  
+  
+  # Save PDF
+  plotly::save_image(
+    fig,
+    file_name_pdf,
+    width = NULL,
+    height = NULL,
+    scale = scale#,engine = "kaleido"
+  )
+  
+  # Convert PDF to PNG
+  cmd <- paste(
+    "convert -density", dpi,
+    "-background white -trim +repage",
+    "-bordercolor white -border 10",
+    shQuote(file_name_pdf),
+    shQuote(file_name_png)
+  )
+  
+  # use below in case
+  # label Loading[MathJax]/extensions/MathMenu.js appears
+  # cmd <- paste(
+  # "convert -density", dpi,
+  # "-background white -trim +repage",
+  # "-gravity southwest -chop 0x200", #200 it is the heigth of the cropped area
+  # "-trim +repage",
+  # "-bordercolor white -border 10",
+  # shQuote(file_name_pdf),
+  # shQuote(file_name_png)
+  # )
+  
+  system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+  
+  # Copy to presentation folder
+  pres_dir <- path.expand("~/Desktop/leninPresentations/data_files")
+  if (!dir.exists(pres_dir)) dir.create(pres_dir, recursive = TRUE)
+  
+  pres_png <- file.path(pres_dir, basename(file_name_png))
+  pres_pdf <- file.path(pres_dir, basename(file_name_pdf))
+  
+  file.copy(file_name_png, pres_png, overwrite = TRUE)
+  file.copy(file_name_pdf, pres_pdf, overwrite = TRUE)
+  
+  cat(
+    "Files saved:\n",
+    "  PDF:", file_name_pdf, "\n",
+    "  PNG:", file_name_png, "\n",
+    "  PDF copied to:", pres_pdf, "\n",
+    "  PNG copied to:", pres_png, "\n",
+    "  viewer change:", viewer_change, "\n"
+  )
+}
+
+
+
+## ---------------------------------------------------------------------------------------------------------------
+combine_pngs_with_gap <- function(png_files,
+                                  output_file,
+                                  gap = 20,
+                                  align = c("center", "top", "bottom")) {
+  
+  align <- match.arg(align)
+  
+  gravity <- switch(
+    align,
+    top = "north",
+    bottom = "south",
+    center = "center"
+  )
+  
+  pres_dir <- path.expand("~/Desktop/leninPresentations/data_files")
+  
+  if (!dir.exists(pres_dir)) {
+    dir.create(pres_dir, recursive = TRUE)
+  }
+  
+  parts <- c()
+  
+  for (i in seq_along(png_files)) {
+    parts <- c(parts, shQuote(png_files[i]))
+    
+    if (i < length(png_files)) {
+      parts <- c(parts, sprintf("\\( -size %dx1 xc:white \\)", gap))
+    }
+  }
+  
+  cmd <- paste(
+    "convert",
+    "-gravity", gravity,
+    paste(parts, collapse = " "),
+    "+append",
+    shQuote(output_file)
+  )
+  
+  system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+  
+  copied_file <- file.path(pres_dir, basename(output_file))
+  file.copy(output_file, copied_file, overwrite = TRUE)
+  
+  cat(
+    "Image created at:\n  ", output_file,
+    "\nCopied to:\n  ", copied_file, "\n"
+  )
+}
+
+combine_pngs_with_gap_vertical <- function(png_files, output_file, gap = 20) {
+  
+  pres_dir <- path.expand("~/Desktop/leninPresentations/data_files")
+  
+  if (!dir.exists(pres_dir)) {
+    dir.create(pres_dir, recursive = TRUE)
+  }
+  
+  parts <- c()
+  
+  for (i in seq_along(png_files)) {
+    parts <- c(parts, shQuote(png_files[i]))
+    
+    if (i < length(png_files)) {
+      # horizontal spacer (height = gap)
+      parts <- c(parts, sprintf("\\( -size 1x%d xc:white \\)", gap))
+    }
+  }
+  
+  cmd <- paste(
+    "convert",
+    paste(parts, collapse = " "),
+    "-append",
+    shQuote(output_file)
+  )
+  
+  system(cmd, ignore.stdout = TRUE, ignore.stderr = TRUE)
+  
+  copied_file <- file.path(pres_dir, basename(output_file))
+  file.copy(output_file, copied_file, overwrite = TRUE)
+  
+  cat(
+    "Image created at:\n  ", output_file,
+    "\nCopied to:\n  ", copied_file, "\n"
+  )
+}
+# sometimes
+

@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Convergence in 𝘩</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<script src="site_libs/navigation-1.1/sourceembed.js"></script>
+<link href="site_libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet" />
+<script src="site_libs/pagedtable-1.1/js/pagedtable.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+.sourceCode .row {
+  width: 100%;
+}
+.sourceCode {
+  overflow-x: auto;
+}
+.code-folding-btn {
+  margin-right: -30px;
+}
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+<style type="text/css">
+#rmd-source-code {
+  display: none;
+}
+</style>
+
+
+<link rel="stylesheet" href="visual.css" type="text/css" />
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">NAP</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Contents
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="functionality.html">Functionality</a>
+    </li>
+    <li>
+      <a href="exp1.html">Example</a>
+    </li>
+    <li>
+      <a href="conv_in_h_with_logtau_and_tauminustwo.html">Convergence in 𝘩</a>
+    </li>
+    <li>
+      <a href="conv_in_tau_with_logtau_and_tauminustwo.html">Convergence in τ</a>
+    </li>
+    <li>
+      <a href="conv_in_m_with_logtau_and_tauminustwo.html">Convergence in 𝑚</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://arxiv.org/abs/0000.00000">
+    <span class="fa fa-file-pdf"></span>
+     
+  </a>
+</li>
+<li>
+  <a href="https://github.com/leninrafaelrierasegura/NAP">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+<li role="separator" class="divider"></li>
+<li><a id="rmd-download-source" href="#">Download Rmd</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Convergence in 𝘩</h1>
+<h4 class="date">Last modified: 26-10-2026.</h4>
+
+</div>
+
+
+<p>Go back to the <a href="about.html">Contents</a> page.</p>
+<div style="color: #2c3e50; text-align: right;">
+<hr />
+<p><strong>Press Show to reveal the code chunks.</strong></p>
+<hr />
+</div>
+<p>The three notebooks share <code>fun/convergence_parameters.R</code>.
+The exact reference, physical data, quadrature and error norm are
+identical. Outputs use the original fixed filenames under
+<code>data_files/</code> and <code>data_files/tikzpic/</code>.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;sourceifupdated.R&quot;</span>))</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/fractional_evolution&quot;</span>)</span></code></pre></div>
+<pre><code>## Loading required package: Matrix</code></pre>
+<pre><code>## This is rSPDE 2.5.1.9000
+## - See https://davidbolin.github.io/rSPDE for vignettes and manuals.</code></pre>
+<pre><code>## This is MetricGraph 1.5.0.9000
+## - See https://davidbolin.github.io/MetricGraph for vignettes and manuals.</code></pre>
+<pre><code>## 
+## Attaching package: &#39;MetricGraph&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:stats&#39;:
+## 
+##     filter</code></pre>
+<pre><code>## 
+## Attaching package: &#39;plotly&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:ggplot2&#39;:
+## 
+##     last_plot</code></pre>
+<pre><code>## The following object is masked from &#39;package:stats&#39;:
+## 
+##     filter</code></pre>
+<pre><code>## The following object is masked from &#39;package:graphics&#39;:
+## 
+##     layout</code></pre>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/exact_solutions&quot;</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/tadpole_convergence&quot;</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/plotting&quot;</span>)</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/metafunctions&quot;</span>)</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="fu">library</span>(reshape2)</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">eval =</span> <span class="cn">FALSE</span>, <span class="at">cache =</span> <span class="cn">FALSE</span>, <span class="at">echo =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>fig_count <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>captioner <span class="ot">&lt;-</span> <span class="cf">function</span>(caption) {</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  fig_count <span class="ot">&lt;&lt;-</span> fig_count <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">&quot;Figure &quot;</span>, fig_count, <span class="st">&quot;: &quot;</span>, caption)</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Parameters: edit the one shared file, then rerun all three notebooks.</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;fun/convergence_parameters.R&quot;</span>), <span class="at">local =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>h_vector <span class="ot">&lt;-</span> <span class="fu">uniform_tadpole_h</span>(study_range)</span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>study_parameters <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">problem =</span> convergence_parameters, <span class="at">alpha =</span> alpha_vector,</span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>                         <span class="at">h =</span> h_vector, <span class="at">tau =</span> time_step_fixed, <span class="at">m =</span> m_fixed)</span></code></pre></div>
+<p>For these smooth finite-mode data, the spatial benchmark is second
+order. We vary h over two orders of magnitude, keeping tau=1e-10 and m=8
+fixed. The helper evaluates the discrete FEM/backward Euler recurrence
+in closed form; it does not allocate or step through the
+ten-billion-interval grid.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Compute the error matrix and save at the original main-branch location.</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>errors_projected <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="cn">NA_real_</span>, <span class="fu">length</span>(h_vector), <span class="fu">length</span>(alpha_vector))</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(h_vector)) {</span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_along</span>(alpha_vector)) {</span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>    errors_projected[i, j] <span class="ot">&lt;-</span> <span class="fu">tadpole_convergence_error</span>(</span>
+<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>      <span class="at">h =</span> h_vector[i], <span class="at">time_step =</span> time_step_fixed, <span class="at">m =</span> m_fixed,</span>
+<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>      <span class="at">alpha =</span> alpha_vector[j], <span class="at">parameters =</span> convergence_parameters</span>
+<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>    )</span>
+<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>  }</span>
+<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>}</span>
+<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a><span class="fu">save</span>(errors_projected, study_parameters,</span>
+<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>     <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/errors_projected_h.RData&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Verify that the fixed-name results belong to the parameters above.</span></span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>saved <span class="ot">&lt;-</span> <span class="fu">new.env</span>()</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">load</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/errors_projected_h.RData&quot;</span>), <span class="at">envir =</span> saved)</span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(saved<span class="sc">$</span>study_parameters, study_parameters))</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>errors_projected <span class="ot">&lt;-</span> saved<span class="sc">$</span>errors_projected</span></code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>observed_rates <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(alpha_vector))</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="cf">for</span> (u <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(alpha_vector)) {</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  observed_rates[u] <span class="ot">&lt;-</span> <span class="fu">coef</span>(<span class="fu">lm</span>(<span class="fu">log10</span>(errors_projected[, u]) <span class="sc">~</span> <span class="fu">log10</span>(h_vector)))[<span class="dv">2</span>]</span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>}</span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a></span>
+<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a><span class="co"># Smooth finite-mode data give the saturated second-order benchmark.</span></span>
+<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a>theoretical_rates <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">2</span>, <span class="fu">length</span>(alpha_vector))</span>
+<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a></span>
+<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a></span>
+<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>p_h_tadpole <span class="ot">&lt;-</span> <span class="fu">error.convergence.plotter</span>(<span class="at">x_axis_vector =</span> h_vector, </span>
+<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>                                 alpha_vector, </span>
+<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>                                 errors_projected, </span>
+<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>                                 theoretical_rates, </span>
+<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>                                 observed_rates,</span>
+<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>                                 <span class="at">line_equation_fun =</span> loglog_line_equation,</span>
+<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>                                 <span class="at">fig_title =</span> <span class="fu">expression</span>(<span class="st">&quot;Convergence in &quot;</span> <span class="sc">*</span> <span class="fu">italic</span>(h)),</span>
+<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a>                                 <span class="at">x_axis_label =</span> <span class="fu">expression</span>(<span class="fu">italic</span>(h)))</span>
+<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a></span>
+<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a>p_h_nicer_tadpole <span class="ot">&lt;-</span> <span class="fu">errorConvergencePlotterLatex</span>(<span class="at">x_axis_vector =</span> h_vector, </span>
+<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a>                                 alpha_vector, </span>
+<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a>                                 errors_projected, </span>
+<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a>                                 theoretical_rates, </span>
+<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a>                                 observed_rates,</span>
+<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a>                                 <span class="at">line_equation_fun =</span> loglog_line_equation,</span>
+<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a>                                 <span class="at">fig_title =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">mbox{Convergence in }h$&quot;</span>,</span>
+<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a>                                 <span class="at">x_axis_label =</span> <span class="st">&quot;$h</span><span class="sc">\\</span><span class="st">quad(</span><span class="sc">\\</span><span class="st">log_{10}</span><span class="sc">\\</span><span class="st">mbox{ scale})$&quot;</span>,</span>
+<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>                                 <span class="at">y_axis_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">|u-U_{h,m}^{</span><span class="sc">\\</span><span class="st">tau}</span><span class="sc">\\</span><span class="st">|_{L_2(</span><span class="sc">\\</span><span class="st">Gamma</span><span class="sc">\\</span><span class="st">times[0,T])}</span><span class="sc">\\</span><span class="st">quad(</span><span class="sc">\\</span><span class="st">log_{10}</span><span class="sc">\\</span><span class="st">mbox{ scale})$&quot;</span>,</span>
+<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a>                                 <span class="at">color_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">quad</span><span class="sc">\\</span><span class="st">quad</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">alpha</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">mathtt{theo}</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">mathtt{obs}</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">%</span><span class="sc">\\</span><span class="st">mathtt{re}$&quot;</span>)</span>
+<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a></span>
+<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a><span class="fu">ggsave</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/conv_rates_h_tadpole.png&quot;</span>), <span class="at">width =</span> <span class="dv">4</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">plot =</span> p_h_tadpole, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
+<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a><span class="fu">myggsave</span>(p_h_nicer_tadpole, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">use_mathpazo =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a><span class="fu">save</span>(p_h_tadpole, <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/p_h_tadpole.RData&quot;</span>))</span>
+<span id="cb15-33"><a href="#cb15-33" tabindex="-1"></a><span class="fu">save</span>(p_h_nicer_tadpole, <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/p_h_nicer_tadpole.RData&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">include_graphics</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/tikzpic/p_h_nicer_tadpole_with_mathpazo.pdf&quot;</span>))</span></code></pre></div>
+<div class="figure" style="text-align: center">
+<embed src="data_files/tikzpic/p_h_nicer_tadpole_with_mathpazo.pdf" title="Figure 1: Comparison between theoretical and observed convergence behavior for the $L_2(\Gamma\times(0,T))$-error with respect to $h$ on a $\text{log}_{10}$–$\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case." width="400px" height="500px" type="application/pdf" />
+<p class="caption">
+Figure 1: Comparison between theoretical and observed convergence
+behavior for the <span
+class="math inline">\(L_2(\Gamma\times(0,T))\)</span>-error with respect
+to <span class="math inline">\(h\)</span> on a <span
+class="math inline">\(\text{log}_{10}\)</span>–<span
+class="math inline">\(\text{log}_{10}\)</span> scale. Dashed lines
+indicate the theoretical rates, and solid lines represent the observed
+error curves. The legend below each plot shows the value of <span
+class="math inline">\(\alpha\)</span> along with the corresponding
+theoretical (‘theo’), and observed (‘obs’) rates for each case.
+</p>
+</div>
+<p>The helper derivation and its restrictions are in
+<code>fun/tadpole_convergence.Rmd</code>. Run
+<code>/usr/bin/Rscript --vanilla tests/check_convergence.R</code> to
+compare these errors against the preserved research results and check
+auxiliary accuracy.</p>
+
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiQ29udmVyZ2VuY2UgaW4g8J2YqSIKZGF0ZTogIkxhc3QgbW9kaWZpZWQ6IGByIGZvcm1hdChTeXMudGltZSgpLCAnJWQtJW0tJVkuJylgIgpvdXRwdXQ6CiAgaHRtbF9kb2N1bWVudDoKICAgIG1hdGhqYXg6ICJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvbnBtL21hdGhqYXhAMy9lczUvdGV4LW1tbC1jaHRtbC5qcyIKICAgIGhpZ2hsaWdodDogcHlnbWVudHMKICAgIHRoZW1lOiBmbGF0bHkKICAgIGNvZGVfZm9sZGluZzogaGlkZSAjIGNsYXNzLnNvdXJjZSA9ICJmb2xkLWhpZGUiIHRvIGhpZGUgY29kZSBhbmQgYWRkIGEgYnV0dG9uIHRvIHNob3cgaXQKICAgIGRmX3ByaW50OiBwYWdlZAogICAgdG9jOiB0cnVlCiAgICB0b2NfZmxvYXQ6CiAgICAgIGNvbGxhcHNlZDogdHJ1ZQogICAgICBzbW9vdGhfc2Nyb2xsOiB0cnVlCiAgICBudW1iZXJfc2VjdGlvbnM6IHRydWUKICAgIGZpZ19jYXB0aW9uOiB0cnVlCiAgICBjb2RlX2Rvd25sb2FkOiB0cnVlCiAgICBjc3M6IHZpc3VhbC5jc3MKYWx3YXlzX2FsbG93X2h0bWw6IHRydWUKYmlibGlvZ3JhcGh5OiAKICAtIHJlZmVyZW5jZXMuYmliCiAgLSBncmF0ZWZ1bC1yZWZzLmJpYgpoZWFkZXItaW5jbHVkZXM6CiAgLSBcbmV3Y29tbWFuZHtcYXJ9e1xtYXRoYmJ7Un19CiAgLSBcbmV3Y29tbWFuZHtcbGxhdn1bMV17XGxlZnRceyMxXHJpZ2h0XH19CiAgLSBcbmV3Y29tbWFuZHtccGFyZX1bMV17XGxlZnQoIzFccmlnaHQpfQogIC0gXG5ld2NvbW1hbmR7XE5jYWx9e1xtYXRoY2Fse059fQogIC0gXG5ld2NvbW1hbmR7XFZjYWx9e1xtYXRoY2Fse1Z9fQogIC0gXG5ld2NvbW1hbmR7XEVjYWx9e1xtYXRoY2Fse0V9fQogIC0gXG5ld2NvbW1hbmR7XFdjYWx9e1xtYXRoY2Fse1d9fQotLS0KCkdvIGJhY2sgdG8gdGhlIFtDb250ZW50c10oYWJvdXQuaHRtbCkgcGFnZS4KCjxkaXYgc3R5bGU9ImNvbG9yOiAjMmMzZTUwOyB0ZXh0LWFsaWduOiByaWdodDsiPgoqKioqKioqKiAgCjxzdHJvbmc+UHJlc3MgU2hvdyB0byByZXZlYWwgdGhlIGNvZGUgY2h1bmtzLjwvc3Ryb25nPiAgCgoqKioqKioqKgo8L2Rpdj4KCgpUaGUgdGhyZWUgbm90ZWJvb2tzIHNoYXJlIGBmdW4vY29udmVyZ2VuY2VfcGFyYW1ldGVycy5SYC4gVGhlIGV4YWN0CnJlZmVyZW5jZSwgcGh5c2ljYWwgZGF0YSwgcXVhZHJhdHVyZSBhbmQgZXJyb3Igbm9ybSBhcmUgaWRlbnRpY2FsLiBPdXRwdXRzCnVzZSB0aGUgb3JpZ2luYWwgZml4ZWQgZmlsZW5hbWVzIHVuZGVyIGBkYXRhX2ZpbGVzL2AgYW5kIGBkYXRhX2ZpbGVzL3Rpa3pwaWMvYC4KCmBgYHtyfQpzb3VyY2UoaGVyZTo6aGVyZSgic291cmNlaWZ1cGRhdGVkLlIiKSkKc291cmNlX2lmX3VwZGF0ZWQoImZ1bi9mcmFjdGlvbmFsX2V2b2x1dGlvbiIpCnNvdXJjZV9pZl91cGRhdGVkKCJmdW4vZXhhY3Rfc29sdXRpb25zIikKc291cmNlX2lmX3VwZGF0ZWQoImZ1bi90YWRwb2xlX2NvbnZlcmdlbmNlIikKc291cmNlX2lmX3VwZGF0ZWQoImZ1bi9wbG90dGluZyIpCnNvdXJjZV9pZl91cGRhdGVkKCJmdW4vbWV0YWZ1bmN0aW9ucyIpCmxpYnJhcnkoZ2dwbG90MikKbGlicmFyeShyZXNoYXBlMikKa25pdHI6Om9wdHNfY2h1bmskc2V0KGV2YWwgPSBGQUxTRSwgY2FjaGUgPSBGQUxTRSwgZWNobyA9IFRSVUUpCmZpZ19jb3VudCA8LSAwCmNhcHRpb25lciA8LSBmdW5jdGlvbihjYXB0aW9uKSB7CiAgZmlnX2NvdW50IDw8LSBmaWdfY291bnQgKyAxCiAgcGFzdGUwKCJGaWd1cmUgIiwgZmlnX2NvdW50LCAiOiAiLCBjYXB0aW9uKQp9CmBgYAoKYGBge3J9CiMgUGFyYW1ldGVyczogZWRpdCB0aGUgb25lIHNoYXJlZCBmaWxlLCB0aGVuIHJlcnVuIGFsbCB0aHJlZSBub3RlYm9va3MuCnNvdXJjZShoZXJlOjpoZXJlKCJmdW4vY29udmVyZ2VuY2VfcGFyYW1ldGVycy5SIiksIGxvY2FsID0gVFJVRSkKaF92ZWN0b3IgPC0gdW5pZm9ybV90YWRwb2xlX2goc3R1ZHlfcmFuZ2UpCnN0dWR5X3BhcmFtZXRlcnMgPC0gbGlzdChwcm9ibGVtID0gY29udmVyZ2VuY2VfcGFyYW1ldGVycywgYWxwaGEgPSBhbHBoYV92ZWN0b3IsCiAgICAgICAgICAgICAgICAgICAgICAgICBoID0gaF92ZWN0b3IsIHRhdSA9IHRpbWVfc3RlcF9maXhlZCwgbSA9IG1fZml4ZWQpCmBgYAoKRm9yIHRoZXNlIHNtb290aCBmaW5pdGUtbW9kZSBkYXRhLCB0aGUgc3BhdGlhbCBiZW5jaG1hcmsgaXMgc2Vjb25kIG9yZGVyLgpXZSB2YXJ5IGggb3ZlciB0d28gb3JkZXJzIG9mIG1hZ25pdHVkZSwga2VlcGluZyB0YXU9MWUtMTAgYW5kIG09OCBmaXhlZC4KVGhlIGhlbHBlciBldmFsdWF0ZXMgdGhlIGRpc2NyZXRlIEZFTS9iYWNrd2FyZCBFdWxlciByZWN1cnJlbmNlIGluIGNsb3NlZApmb3JtOyBpdCBkb2VzIG5vdCBhbGxvY2F0ZSBvciBzdGVwIHRocm91Z2ggdGhlIHRlbi1iaWxsaW9uLWludGVydmFsIGdyaWQuCgpgYGB7cn0KIyBDb21wdXRlIHRoZSBlcnJvciBtYXRyaXggYW5kIHNhdmUgYXQgdGhlIG9yaWdpbmFsIG1haW4tYnJhbmNoIGxvY2F0aW9uLgplcnJvcnNfcHJvamVjdGVkIDwtIG1hdHJpeChOQV9yZWFsXywgbGVuZ3RoKGhfdmVjdG9yKSwgbGVuZ3RoKGFscGhhX3ZlY3RvcikpCmZvciAoaSBpbiBzZXFfYWxvbmcoaF92ZWN0b3IpKSB7CiAgZm9yIChqIGluIHNlcV9hbG9uZyhhbHBoYV92ZWN0b3IpKSB7CiAgICBlcnJvcnNfcHJvamVjdGVkW2ksIGpdIDwtIHRhZHBvbGVfY29udmVyZ2VuY2VfZXJyb3IoCiAgICAgIGggPSBoX3ZlY3RvcltpXSwgdGltZV9zdGVwID0gdGltZV9zdGVwX2ZpeGVkLCBtID0gbV9maXhlZCwKICAgICAgYWxwaGEgPSBhbHBoYV92ZWN0b3Jbal0sIHBhcmFtZXRlcnMgPSBjb252ZXJnZW5jZV9wYXJhbWV0ZXJzCiAgICApCiAgfQp9CnNhdmUoZXJyb3JzX3Byb2plY3RlZCwgc3R1ZHlfcGFyYW1ldGVycywKICAgICBmaWxlID0gaGVyZTo6aGVyZSgiZGF0YV9maWxlcy9lcnJvcnNfcHJvamVjdGVkX2guUkRhdGEiKSkKYGBgCgpgYGB7cn0KIyBWZXJpZnkgdGhhdCB0aGUgZml4ZWQtbmFtZSByZXN1bHRzIGJlbG9uZyB0byB0aGUgcGFyYW1ldGVycyBhYm92ZS4Kc2F2ZWQgPC0gbmV3LmVudigpCmxvYWQoaGVyZTo6aGVyZSgiZGF0YV9maWxlcy9lcnJvcnNfcHJvamVjdGVkX2guUkRhdGEiKSwgZW52aXIgPSBzYXZlZCkKc3RvcGlmbm90KGlkZW50aWNhbChzYXZlZCRzdHVkeV9wYXJhbWV0ZXJzLCBzdHVkeV9wYXJhbWV0ZXJzKSkKZXJyb3JzX3Byb2plY3RlZCA8LSBzYXZlZCRlcnJvcnNfcHJvamVjdGVkCmBgYAoKYGBge3J9Cm9ic2VydmVkX3JhdGVzIDwtIG51bWVyaWMobGVuZ3RoKGFscGhhX3ZlY3RvcikpCmZvciAodSBpbiAxOmxlbmd0aChhbHBoYV92ZWN0b3IpKSB7CiAgb2JzZXJ2ZWRfcmF0ZXNbdV0gPC0gY29lZihsbShsb2cxMChlcnJvcnNfcHJvamVjdGVkWywgdV0pIH4gbG9nMTAoaF92ZWN0b3IpKSlbMl0KfQoKIyBTbW9vdGggZmluaXRlLW1vZGUgZGF0YSBnaXZlIHRoZSBzYXR1cmF0ZWQgc2Vjb25kLW9yZGVyIGJlbmNobWFyay4KdGhlb3JldGljYWxfcmF0ZXMgPC0gcmVwKDIsIGxlbmd0aChhbHBoYV92ZWN0b3IpKQoKCnBfaF90YWRwb2xlIDwtIGVycm9yLmNvbnZlcmdlbmNlLnBsb3R0ZXIoeF9heGlzX3ZlY3RvciA9IGhfdmVjdG9yLCAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYWxwaGFfdmVjdG9yLCAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZXJyb3JzX3Byb2plY3RlZCwgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRoZW9yZXRpY2FsX3JhdGVzLCAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb2JzZXJ2ZWRfcmF0ZXMsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGxpbmVfZXF1YXRpb25fZnVuID0gbG9nbG9nX2xpbmVfZXF1YXRpb24sCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZpZ190aXRsZSA9IGV4cHJlc3Npb24oIkNvbnZlcmdlbmNlIGluICIgKiBpdGFsaWMoaCkpLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB4X2F4aXNfbGFiZWwgPSBleHByZXNzaW9uKGl0YWxpYyhoKSkpCgpwX2hfbmljZXJfdGFkcG9sZSA8LSBlcnJvckNvbnZlcmdlbmNlUGxvdHRlckxhdGV4KHhfYXhpc192ZWN0b3IgPSBoX3ZlY3RvciwgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFscGhhX3ZlY3RvciwgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGVycm9yc19wcm9qZWN0ZWQsIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB0aGVvcmV0aWNhbF9yYXRlcywgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9ic2VydmVkX3JhdGVzLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBsaW5lX2VxdWF0aW9uX2Z1biA9IGxvZ2xvZ19saW5lX2VxdWF0aW9uLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmaWdfdGl0bGUgPSAiJFxcbWJveHtDb252ZXJnZW5jZSBpbiB9aCQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB4X2F4aXNfbGFiZWwgPSAiJGhcXHF1YWQoXFxsb2dfezEwfVxcbWJveHsgc2NhbGV9KSQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB5X2F4aXNfbGFiZWwgPSAiJFxcfHUtVV97aCxtfV57XFx0YXV9XFx8X3tMXzIoXFxHYW1tYVxcdGltZXNbMCxUXSl9XFxxdWFkKFxcbG9nX3sxMH1cXG1ib3h7IHNjYWxlfSkkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY29sb3JfbGFiZWwgPSAiJFxccXVhZFxccXVhZFxcO1xcO1xcYWxwaGFcXDt8XFw7XFxtYXRodHR7dGhlb31cXDt8XFw7XFw7XFxtYXRodHR7b2JzfVxcO1xcO3xcXCVcXG1hdGh0dHtyZX0kIikKCmdnc2F2ZShoZXJlOjpoZXJlKCJkYXRhX2ZpbGVzL2NvbnZfcmF0ZXNfaF90YWRwb2xlLnBuZyIpLCB3aWR0aCA9IDQsIGhlaWdodCA9IDUsIHBsb3QgPSBwX2hfdGFkcG9sZSwgZHBpID0gMzAwKQpteWdnc2F2ZShwX2hfbmljZXJfdGFkcG9sZSwgd2lkdGggPSA0LCBoZWlnaHQgPSA1LCB1c2VfbWF0aHBhem8gPSBUUlVFKQpzYXZlKHBfaF90YWRwb2xlLCBmaWxlID0gaGVyZTo6aGVyZSgiZGF0YV9maWxlcy9wX2hfdGFkcG9sZS5SRGF0YSIpKQpzYXZlKHBfaF9uaWNlcl90YWRwb2xlLCBmaWxlID0gaGVyZTo6aGVyZSgiZGF0YV9maWxlcy9wX2hfbmljZXJfdGFkcG9sZS5SRGF0YSIpKQpgYGAKCmBgYHtyLCBldmFsID0gVFJVRSwgZmlnLmFsaWduPSdjZW50ZXInLCBvdXQud2lkdGg9IjQwMHB4Iiwgb3V0LmhlaWdodD0iNTAwcHgiLCBmaWcuY2FwID0gY2FwdGlvbmVyKCJDb21wYXJpc29uIGJldHdlZW4gdGhlb3JldGljYWwgYW5kIG9ic2VydmVkIGNvbnZlcmdlbmNlIGJlaGF2aW9yIGZvciB0aGUgJExfMihcXEdhbW1hXFx0aW1lcygwLFQpKSQtZXJyb3Igd2l0aCByZXNwZWN0IHRvICRoJCBvbiBhICRcXHRleHR7bG9nfV97MTB9JOKAkyRcXHRleHR7bG9nfV97MTB9JCBzY2FsZS4gRGFzaGVkIGxpbmVzIGluZGljYXRlIHRoZSB0aGVvcmV0aWNhbCByYXRlcywgYW5kIHNvbGlkIGxpbmVzIHJlcHJlc2VudCB0aGUgb2JzZXJ2ZWQgZXJyb3IgY3VydmVzLiBUaGUgbGVnZW5kIGJlbG93IGVhY2ggcGxvdCBzaG93cyB0aGUgdmFsdWUgb2YgJFxcYWxwaGEkIGFsb25nIHdpdGggdGhlIGNvcnJlc3BvbmRpbmcgdGhlb3JldGljYWwgKCd0aGVvJyksIGFuZCBvYnNlcnZlZCAoJ29icycpIHJhdGVzIGZvciBlYWNoIGNhc2UuIil9CmtuaXRyOjppbmNsdWRlX2dyYXBoaWNzKGhlcmU6OmhlcmUoImRhdGFfZmlsZXMvdGlrenBpYy9wX2hfbmljZXJfdGFkcG9sZV93aXRoX21hdGhwYXpvLnBkZiIpKQpgYGAKClRoZSBoZWxwZXIgZGVyaXZhdGlvbiBhbmQgaXRzIHJlc3RyaWN0aW9ucyBhcmUgaW4gYGZ1bi90YWRwb2xlX2NvbnZlcmdlbmNlLlJtZGAuClJ1biBgL3Vzci9iaW4vUnNjcmlwdCAtLXZhbmlsbGEgdGVzdHMvY2hlY2tfY29udmVyZ2VuY2UuUmAgdG8gY29tcGFyZSB0aGVzZQplcnJvcnMgYWdhaW5zdCB0aGUgcHJlc2VydmVkIHJlc2VhcmNoIHJlc3VsdHMgYW5kIGNoZWNrIGF1eGlsaWFyeSBhY2N1cmFjeS4K</div>
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeSourceEmbed("conv_in_h.Rmd");
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

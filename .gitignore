@@ -1,0 +1,10 @@
+.Rproj.user
+.Rhistory
+.RData
+.Renviron
+.Rprofile
+.Ruserdata
+.DS_store
+README.html
+purl_log.txt
+keys.R

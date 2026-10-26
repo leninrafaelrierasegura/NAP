@@ -1,0 +1,77 @@
+name: "NAP"
+output_dir: "docs"
+navbar:
+  title: "NAP"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "Contents"
+      href: about.html
+    # - text: "More plots"
+    #   href: meshes_and_errors.html
+    # - text: "Preliminaries"
+    #   href: preliminaries.html
+    # - text: "Numerical Approximation"
+      menu:
+        - text: "Functionality"
+          href: functionality.html
+        - text: "Example"
+          href: exp1.html
+        - text: "Convergence in 𝘩"
+          href: conv_in_h_with_logtau_and_tauminustwo.html
+        - text: "Convergence in τ"
+          href: conv_in_tau_with_logtau_and_tauminustwo.html
+        - text: "Convergence in 𝑚"
+          href: conv_in_m_with_logtau_and_tauminustwo.html
+    # - text: "On a rectangle"
+    #   menu:
+    #     - text: "Example"
+    #       href: rectangle_exp1.html
+    #     - text: "Convergence in 𝘩"
+    #       href: rectangle_conv_in_h.html
+    #     - text: "Convergence in τ"
+    #       href: rectangle_conv_in_tau.html
+    #     - text: "Convergence in 𝑚"
+    #       href: rectangle_conv_in_m.html
+    # - text: "On a sphere"
+    #   menu:
+    #     - text: "Example"
+    #       href: sphere_exp1.html
+    #     - text: "Convergence in 𝘩"
+    #       href: sphere_conv_in_h.html
+    #     - text: "Convergence in τ"
+    #       href: sphere_conv_in_tau.html
+    #     - text: "Convergence in 𝑚"
+    #       href: sphere_conv_in_m.html
+    # - text: "Optimal Control"
+    #   menu:
+    #     - text: "Control functionality"
+    #       href: control_functionality.html
+    #     - text: "Optimal Control"
+    #       href: control2.html
+    #     - text: "Convergence in 𝘩"
+    #       href: control_conv_h_with_iteration.html
+    #     - text: "Convergence in τ"
+    #       href: control_conv_tau_with_iteration.html
+    #     - text: "Convergence in 𝑚"
+    #       href: control_conv_m_with_iteration.html
+    # - text: "Poster"
+    #   href: PosterLeninStatWorkshop2025.html
+    # - text: "Presentation"
+    #   href: https://leninrafaelrierasegura.github.io/leninPresentations/proposalPresentation.html#1
+  right:
+    - icon: fa-file-pdf
+      href: https://arxiv.org/abs/0000.00000
+    - icon: fa-github
+      href: https://github.com/leninrafaelrierasegura/NAP
+output:
+  html_document:
+    highlight: textmate
+    theme: flatly
+    css: style.css
+
+  
+  
+  
+  
+  

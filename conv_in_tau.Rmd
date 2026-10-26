@@ -1,0 +1,142 @@
+---
+title: "Convergence in τ"
+date: "Last modified: `r format(Sys.time(), '%d-%m-%Y.')`"
+output:
+  html_document:
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    highlight: pygments
+    theme: flatly
+    code_folding: hide # class.source = "fold-hide" to hide code and add a button to show it
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    fig_caption: true
+    code_download: true
+    css: visual.css
+always_allow_html: true
+bibliography: 
+  - references.bib
+  - grateful-refs.bib
+header-includes:
+  - \newcommand{\ar}{\mathbb{R}}
+  - \newcommand{\llav}[1]{\left\{#1\right\}}
+  - \newcommand{\pare}[1]{\left(#1\right)}
+  - \newcommand{\Ncal}{\mathcal{N}}
+  - \newcommand{\Vcal}{\mathcal{V}}
+  - \newcommand{\Ecal}{\mathcal{E}}
+  - \newcommand{\Wcal}{\mathcal{W}}
+---
+
+Go back to the [Contents](about.html) page.
+
+<div style="color: #2c3e50; text-align: right;">
+********  
+<strong>Press Show to reveal the code chunks.</strong>  
+
+********
+</div>
+
+
+The three notebooks share `fun/convergence_parameters.R`. The exact
+reference, physical data, quadrature and error norm are identical. Outputs
+use the original fixed filenames under `data_files/` and `data_files/tikzpic/`.
+
+```{r}
+source(here::here("sourceifupdated.R"))
+source_if_updated("fun/fractional_evolution")
+source_if_updated("fun/exact_solutions")
+source_if_updated("fun/tadpole_convergence")
+source_if_updated("fun/plotting")
+source_if_updated("fun/metafunctions")
+library(ggplot2)
+library(reshape2)
+knitr::opts_chunk$set(eval = FALSE, cache = FALSE, echo = TRUE)
+fig_count <- 0
+captioner <- function(caption) {
+  fig_count <<- fig_count + 1
+  paste0("Figure ", fig_count, ": ", caption)
+}
+```
+
+```{r}
+# Parameters: edit the one shared file, then rerun all three notebooks.
+source(here::here("fun/convergence_parameters.R"), local = TRUE)
+tau_vector <- vapply(study_range, function(tau)
+  experiment_grid(convergence_parameters$T_final, tau)$time_step, numeric(1))
+study_parameters <- list(problem = convergence_parameters, alpha = alpha_vector,
+                         h = h_fixed, tau = tau_vector, m = m_fixed)
+```
+
+The backward Euler time benchmark is first order. We vary the actual
+uniform time step over two orders of magnitude, keeping h=1e-5 and m=8 fixed.
+The helper uses interval averages of the physical sinusoidal forcing and the
+same right-constant reconstruction as the direct time-stepping solver.
+
+```{r}
+# Compute the error matrix and save at the original main-branch location.
+errors_projected <- matrix(NA_real_, length(tau_vector), length(alpha_vector))
+for (i in seq_along(tau_vector)) {
+  for (j in seq_along(alpha_vector)) {
+    errors_projected[i, j] <- tadpole_convergence_error(
+      h = h_fixed, time_step = tau_vector[i], m = m_fixed,
+      alpha = alpha_vector[j], parameters = convergence_parameters
+    )
+  }
+}
+save(errors_projected, study_parameters,
+     file = here::here("data_files/errors_projected_tau.RData"))
+```
+
+```{r}
+# Verify that the fixed-name results belong to the parameters above.
+saved <- new.env()
+load(here::here("data_files/errors_projected_tau.RData"), envir = saved)
+stopifnot(identical(saved$study_parameters, study_parameters))
+errors_projected <- saved$errors_projected
+```
+
+```{r}
+observed_rates <- numeric(length(alpha_vector))
+for (u in 1:length(alpha_vector)) {
+  observed_rates[u] <- coef(lm(log10(errors_projected[, u]) ~ log10(tau_vector)))[2]
+}
+
+theoretical_rates <- rep(1, length(alpha_vector))
+
+
+p_tau_tadpole <- error.convergence.plotter(x_axis_vector = tau_vector, 
+                                   alpha_vector, 
+                                   errors_projected, 
+                                   theoretical_rates, 
+                                   observed_rates,
+                                   line_equation_fun = loglog_line_equation,
+                                   fig_title = expression("Convergence in " * italic(tau)),
+                                   x_axis_label = expression(italic(tau)))
+
+p_tau_nicer_tadpole <- errorConvergencePlotterLatex(x_axis_vector = tau_vector, 
+                                 alpha_vector, 
+                                 errors_projected, 
+                                 theoretical_rates, 
+                                 observed_rates,
+                                 line_equation_fun = loglog_line_equation,
+                                 fig_title = "$\\mbox{Convergence in }\\tau$",
+                                 x_axis_label = "$\\tau\\quad(\\log_{10}\\mbox{ scale})$",
+                                 y_axis_label = "$\\|u-U_{h,m}^{\\tau}\\|_{L_2(\\Gamma\\times[0,T])}\\quad(\\log_{10}\\mbox{ scale})$",
+                                 color_label = "$\\quad\\quad\\;\\;\\alpha\\;|\\;\\mathtt{theo}\\;|\\;\\;\\mathtt{obs}\\;\\;|\\%\\mathtt{re}$")
+
+ggsave(here::here("data_files/conv_rates_tau_tadpole.png"), width = 4, height = 5, plot = p_tau_tadpole, dpi = 300)
+myggsave(p_tau_nicer_tadpole, width = 4, height = 5, use_mathpazo = TRUE)
+save(p_tau_tadpole, file = here::here("data_files/p_tau_tadpole.RData"))
+save(p_tau_nicer_tadpole, file = here::here("data_files/p_tau_nicer_tadpole.RData"))
+```
+
+```{r, eval = TRUE, fig.align='center', out.width="400px", out.height="500px", fig.cap = captioner("Comparison between theoretical and observed convergence behavior for the $L_2(\\Gamma\\times(0,T))$-error with respect to $\\tau$ on a $\\text{log}_{10}$–$\\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case.")}
+knitr::include_graphics(here::here("data_files/tikzpic/p_tau_nicer_tadpole_with_mathpazo.pdf"))
+```
+
+The helper derivation and its restrictions are in `fun/tadpole_convergence.Rmd`.
+Run `/usr/bin/Rscript --vanilla tests/check_convergence.R` to compare these
+errors against the preserved research results and check auxiliary accuracy.

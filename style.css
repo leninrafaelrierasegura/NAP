@@ -1,0 +1,39 @@
+p {
+  text-align: justify;
+  text-justify: inter-word;
+  line-height: 1.75;
+}
+
+li {
+  text-align: justify;
+  text-justify: inter-word;
+  line-height: 1.75;
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+h1.title {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+
+h4.author {
+  font-size: 18px;
+  margin-bottom: 24px;
+  font-weight: 300;
+}
+
+div.space {
+  height: 12px;
+}

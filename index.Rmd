@@ -1,0 +1,15 @@
+---
+title: "Numerical approximation and optimal control of fractional diffusion equations on metric graphs"
+---
+
+This website is a companion to the paper: 
+
+- *Numerical approximation of fractional diffusion equations on metric graphs*, available on [arXiv](https://arxiv.org/abs/0000.00000).
+
+by David Bolin, Lenin R. Riera-Segura, and Alexandre B. Simas.
+
+Visit this [GitHub](https://github.com/leninrafaelrierasegura/NAP) repository for all the necessary files to reproduce the results presented in this website and paper.
+
+Go to the [Contents](about.html) page for a brief description of the contents of this website.
+
+      
