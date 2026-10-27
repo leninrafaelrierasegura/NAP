@@ -1,5 +1,5 @@
 ---
-title: "Fractional Evolution Solvers and Operators"
+title: "Fractional rational coefficients"
 date: "Last modified: `r format(Sys.time(), '%d-%m-%Y.')`"
 output:
   html_document:
@@ -30,221 +30,85 @@ header-includes:
   - \newcommand{\Wcal}{\mathcal{W}}
 ---
 
-Go back to the [Contents](../about.html) page.
+These functions select and validate the rational coefficients used to
+approximate the inverse fractional spatial operator. Let
+\(L_h\) be the continuous piecewise linear finite element approximation of
+\(L=\kappa^2-\Delta_\Gamma\), and put \(\beta=\alpha/2\). For
+\(0<\beta<1\), the scalar function evaluated on normalized eigenvalues is
 
-<div style="color: #2c3e50; text-align: right;">
-********  
-<strong>Press Show to reveal the code chunks.</strong>  
+\[
+\mathcal R_{m,\beta}(z)
+=F_{m,\beta}
+\frac{\prod_{i=1}^{m}(1-\xi_{m,i}z)}
+     {\prod_{i=1}^{m+1}(1-\zeta_{m,i}z)}
+\approx z^{-\beta},\qquad z>0.
+\]
 
-********
-</div>
+To see the root convention, write
+\(q_1(x)=c_m\prod_{i=1}^m(x-\xi_{m,i})\) and
+\(q_2(x)=b_{m+1}\prod_{i=1}^{m+1}(x-\zeta_{m,i})\).
+Approximating \(x^{\beta-1}\) by \(q_1/q_2\), and then setting
+\(x=z^{-1}\), gives
 
+\[
+x\frac{q_1(x)}{q_2(x)}=\mathcal R_{m,\beta}(z),\qquad
+F_{m,\beta}=c_m/b_{m+1}.
+\]
 
-```{r, purl = FALSE, echo = FALSE}
-# Create a clipboard button on the rendered HTML page
-source(here::here("clipboard.R")); clipboard
-```
+The returned fields use this correspondence:
 
+| Mathematical quantity | List field | Computed CSV kind |
+|---|---|---|
+| Positive factor \(F_{m,\beta}\) | `factor` | `factor`, index 0 |
+| Numerator roots \(\xi_{m,i}\), \(i=1,\ldots,m\) | `pr_roots` | `rc` |
+| Denominator roots \(\zeta_{m,i}\), \(i=1,\ldots,m+1\) | `pl_roots` | `rb` |
 
-```{r, purl = FALSE, class.source = "fold-hide"}
-# Set seed for reproducibility
-set.seed(1982) 
-# Set global options for all code chunks
-knitr::opts_chunk$set(
-  # Disable messages printed by R code chunks
-  message = FALSE,    
-  # Disable warnings printed by R code chunks
-  warning = FALSE,    
-  # Show R code within code chunks in output
-  echo = TRUE,        
-  # Include both R code and its results in output
-  include = TRUE,     
-  # Evaluate R code chunks
-  eval = TRUE,       
-  # Enable caching of R code chunks for faster rendering
-  cache = FALSE,      
-  # Align figures in the center of the output
-  fig.align = "center",
-  # Enable retina display for high-resolution figures
-  retina = 2,
-  # Show errors in the output instead of stopping rendering
-  error = TRUE,
-  # Do not collapse code and output into a single block
-  collapse = FALSE
-)
-```
+These are roots in the reciprocal variable \(x\); the poles of
+\(\mathcal R(z)\) are \(1/\zeta_{m,i}\). The modal solver uses
+\(D\kappa^{2\beta}/\mathcal R_{m,\beta}(\lambda_{j,h}/\kappa^2)\)
+as the approximate decay rate. It evaluates the products directly, so this
+minimal implementation needs no partial fraction decomposition.
 
-```{r}
-# remotes::install_github("davidbolin/rspde", ref = "devel")
-# remotes::install_github("davidbolin/metricgraph", ref = "devel")
-library(rSPDE)
-library(MetricGraph)
-library(grateful)
+The computed coefficients were generated offline by Cheb--Padé
+approximation on \([\delta_m,1]\), where
+\(\delta_m=10^{-(5+m)/2}\), for orders 1 through 8 at
+\(\beta\in\{0.25,0.45,0.65\}\). The notebooks read the supplied artifact;
+they do not run MATLAB. Root validation checks its algebraic structure.
+It does not certify a uniform approximation error over every finite element
+eigenvalue. A uniform operator estimate would also require coverage of the
+normalized spectrum by the generation interval and appropriate approximation
+error control.
 
-library(ggplot2)
-library(reshape2)
-library(plotly)
-```
+## `rational_supported_orders()`
 
-
-Fractional evolution solvers, rational-approximation operators, and temporal projection.
-
-## Fractional diffusion equations on metric graphs
-
-We analyze and numerically approximate solutions to fractional diffusion equations on metric graphs of the form
-\begin{equation}
-\label{eq:maineq}
-\tag{1}
-\left\{
-\begin{aligned}
-    \partial_t u(s,t) + (\kappa^2 - \Delta_\Gamma)^{\alpha/2} u(s,t) &= f(s,t), && \quad (s,t) \in \Gamma \times (0, T), \\
-    u(s,0) &= u_0(s), && \quad s \in \Gamma,
-\end{aligned}
-\right.
-\end{equation}
-with $u(\cdot,t)$ satisfying the Kirchhoff vertex conditions
-\begin{equation}
-\label{eq:Kcond}
-\tag{2}
-   \mathcal{K} =  \left\{\phi\in C(\Gamma)\;\middle|\; \forall v\in \mathcal{V}:\; \sum_{e\in\mathcal{E}_v}\partial_e \phi(v)=0 \right\}.
-\end{equation}
-Here $\Gamma = (\mathcal{V},\mathcal{E})$ is a metric graph, $\kappa>0$, $\alpha\in(0,2]$ determines the smoothness of $u(\cdot,t)$, $\Delta_{\Gamma}$ is the so-called Kirchhoff--Laplacian, and $f:\Gamma\times (0,T)\to\mathbb{R}$ and $u_0: \Gamma \to \mathbb{R}$ are fixed functions, called right-hand side and initial condition, respectively.
-
-## Numerical Scheme {#num_scheme}
-
-Let $\alpha\in(0,2]$ and $U_h^\tau$ denote the sequence of approximations of the solution to the weak form of problem \eqref{eq:maineq} at each time step on a mesh indexed by $h$. The scheme computes $U_h^{\tau}\subset V_h$, which solves
-\begin{equation}
-    \left\{
-\begin{aligned}
-    \langle\delta U_h^{k+1},\phi\rangle + \mathfrak{a}(
-        U_h^{k+1},\phi) &= \langle f^{k+1},\phi\rangle, \quad\forall\phi\in V_h,\quad k=0,\dots, N-1, \\
-    U^0_h &= P_hu_0, 
-\end{aligned}
-\right.
-\end{equation}
-where $f^{k+1} = \displaystyle\dfrac{1}{\tau}\int_{t_k}^{t_{k+1}}f(t)dt$. The above expression can be equivalently written as
-\begin{equation}
-    \left\{
-\begin{aligned}
-    \langle\dfrac{U_h^{k+1} - U_h^{k}}{\tau},\phi\rangle + \mathfrak{a}(
-        U_h^{k+1},\phi) &= \langle f^{k+1},\phi\rangle, \quad\forall\phi\in V_h,\quad k=0,\dots, N-1, \\
-    U^0_h &= P_hu_0, 
-\end{aligned}
-\right.
-\end{equation}
-or
-\begin{equation}
-\label{system:fully_discrete_scheme}
-\tag{3}
-    \left\{
-\begin{aligned}
-    \langle U_h^{k+1},\phi\rangle + \tau\mathfrak{a}(
-        U_h^{k+1},\phi) &= \langle U_h^{k},\phi\rangle + \tau\langle f^{k+1},\phi\rangle, \quad\forall\phi\in V_h,\quad k=0,\dots, N-1, \\
-    U^0_h &= P_hu_0.
-\end{aligned}
-\right.
-\end{equation}
-
-At each time step $t_k$, the finite element solution $U_h^k\in V_h$ to \eqref{system:fully_discrete_scheme} can be expressed as a linear combination of the basis functions  $\{\psi^i_h\}_{i=1}^{N_h}$ introduced in the [Preliminaries](preliminaries.html#fem-basis) page, namely, 
-\begin{align}
-\label{num_sol}
-\tag{4}
-    U_h^k(s) =  \sum_{i=1}^{N_h}u_i^k\psi^i_h(s), \;s\in\Gamma.
-\end{align}
-
-Replacing \eqref{num_sol} into \eqref{system:fully_discrete_scheme} yields the following system
-\begin{align*}
-    \sum_{j=1}^{N_h}u_j^{k+1}[(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}+ \tau\mathfrak{a}(\psi_h^j,\psi_h^i)] = \sum_{j=1}^{N_h}u_j^{k}(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}+\tau( f^{k+1},\psi_h^i)_{L_2(\Gamma)},\quad i = 1,\dots, N_h.
-\end{align*}
-In matrix notation,
-\begin{align}
-\label{diff_eq_discrete}
-    (\mathbf{C}+\tau \mathbf{L}^{\alpha/2})\mathbf{U}^{k+1} = \mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1},
-\end{align}
-or by introducing the scaling parameter $\kappa^2>0$,
-\begin{align}
-    (\mathbf{C}+\tau (\kappa^2)^{\alpha/2}(\mathbf{L}/\kappa^2)^{\alpha/2})\mathbf{U}^{k+1} = \mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1},
-\end{align}
-where $\mathbf{C}$ has entries $\mathbf{C}_{i,j} = (\psi_h^i,\psi_h^j)_{L_2(\Gamma)}$, $\mathbf{L}^{\alpha/2}$ has entries $\mathfrak{a}(\psi_h^i,\psi_h^j)$, $\mathbf{U}^k$ has components $u_j^k$, and $\mathbf{F}^k$ has components $( f^{k},\psi_h^i)_{L_2(\Gamma)}$. Applying $(\mathbf{L}/\kappa^2)^{-\alpha/2}$ to both sides yields
-\begin{equation}
-((\mathbf{L}/\kappa^2)^{-\alpha/2}\mathbf{C}+\tau (\kappa^2)^{\alpha/2}\mathbf{I})\mathbf{U}^{k+1} = (\mathbf{L}/\kappa^2)^{-\alpha/2}(\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1}).
-\end{equation}
-Following @rSPDE2020, we approximate $(\mathbf{L}/\kappa^2)^{-\alpha/2}$ by $\mathbf{P}_\ell^{-\top}\mathbf{P}_r^\top$ to arrive at
-\begin{equation}
-\label{eq:scheme2}
-\tag{5}
-(\mathbf{P}_\ell^{-\top}\mathbf{P}_r^\top \mathbf{C}+\tau(\kappa^2)^{\alpha/2} \mathbf{I})\mathbf{U}^{k+1} = \mathbf{P}_\ell^{-\top}\mathbf{P}_r^\top(\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1}).
-\end{equation}
-where
-\begin{equation}
-\label{eq:PLPR}
-\tag{6}
-\mathbf{P}_r = \prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{C}^{-1}\mathbf{L}}{\kappa^2}\right)\quad\text{and}\quad \mathbf{P}_\ell = \dfrac{1}{\texttt{factor}}\mathbf{C}\prod_{j=1}^{m+1} \left(\mathbf{I}-r_{2j}\dfrac{\mathbf{C}^{-1}\mathbf{L}}{\kappa^2}\right),
-\end{equation}
-and $\texttt{factor} = \dfrac{c_m}{b_{m+1}}$, and
-$\{r_{1i}\}_{i=1}^m$ and $\{r_{2j}\}_{j=1}^{m+1}$ are the roots of $q_1(x) =\sum_{i=0}^mc_ix^{i}$ and  $q_2(x)=\sum_{j=0}^{m+1}b_jx^{j}$, respectively. The coefficients  $\{c_i\}_{i=0}^m$ and  $\{b_j\}_{j=0}^{m+1}$ are determined as the best rational approximation $q_1/q_2$ of the function $x^{\alpha/2-1}$ over the interval $J_h: = [\kappa^{2}\lambda_{N_h,h}^{-1}, \kappa^{2}\lambda_{1,h}^{-1}]$, where $\lambda_{1,h}, \lambda_{N_h,h}>0$ are the smallest and the largest eigenvalue of $L_h$, respectively.
-
-
-For the sake of clarity, we note that the numerical implementation of @rSPDE2020 actually defines $\mathbf{P}_r$ and $\mathbf{P}_\ell$ as
-\begin{equation}
-\label{eq:PLPRbolin}
-\tag{7}
-\mathbf{P}_r = \prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{C}^{-1}\mathbf{L}}{\kappa^2}\right)\quad\text{and}\quad \mathbf{P}_\ell = \dfrac{\kappa^{2\beta}}{\texttt{factor}}\mathbf{C}\prod_{j=1}^{m+1} \left(\mathbf{I}-r_{2j}\dfrac{\mathbf{C}^{-1}\mathbf{L}}{\kappa^2}\right),
-\end{equation}
-where $\beta = \alpha/2$ and the scaling factor $(\kappa^2)^{\alpha/2}$ or $\kappa^{2\beta}$ is already incorporated in $\mathbf{P}_\ell$, a convention we adopt in the following. With this under consideration, we can rewrite \eqref{eq:scheme2} as
-\begin{equation}
-\tag{8}
-(\mathbf{P}_r^\top \mathbf{C}+\tau \mathbf{P}_\ell^\top)\mathbf{U}^{k+1} = \mathbf{P}_r^\top(\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1}),
-\label{eq:scheme}
-\end{equation}
-where  
-\begin{equation}
-\mathbf{P}_r^\top = \prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)\quad\text{and}\quad \mathbf{P}_\ell^\top = \dfrac{\kappa^{2\beta}}{\texttt{factor}}\prod_{j=1}^{m+1} \left(\mathbf{I}-r_{2j}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)\cdot \mathbf{C}
-\end{equation}
-since $\mathbf{L}$ and $\mathbf{C}^{-1}$ are symmetric and the factors in the product commute. Replacing these two into \eqref{eq:scheme} yields
-\begin{equation}
-\left(\prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)+\dfrac{\tau \kappa^{2\beta}}{\texttt{factor}}\prod_{j=1}^{m+1} \left(\mathbf{I}-r_{2j}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)\right)\mathbf{C}\mathbf{U}^{k+1} = \prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)\cdot (\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1}),
-\end{equation}
-that is,
-\begin{equation}
-\label{eq:final_scheme}
-\tag{9}
-\mathbf{U}^{k+1} = \mathbf{C}^{-1}\left(\prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)+\dfrac{\tau \kappa^{2\beta}}{\texttt{factor}}\prod_{j=1}^{m+1} \left(\mathbf{I}-r_{2j}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)\right)^{-1} \prod_{i=1}^m \left(\mathbf{I}-r_{1i}\dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}\right)\cdot (\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1}).
-\end{equation}
-Considering the partial fraction decomposition
-\begin{equation}
-\label{eq:partial_fraction}
-\tag{10}
-\dfrac{\prod_{i=1}^m (1-r_{1i}x)}{\prod_{i=1}^m (1-r_{1i}x)+\dfrac{\tau \kappa^{2\beta}}{\texttt{factor}} \prod_{j=1}^{m+1} (1-r_{2j}x)}=\sum_{k=1}^{m+1} a_k(x-p_k)^{-1} + r,
-\end{equation}
-scheme \eqref{eq:final_scheme} can be expressed as
-\begin{equation}
-\label{eq:final_scheme2}
-\tag{11}
-\mathbf{U}^{k+1} = \mathbf{C}^{-1}\left(\sum_{k=1}^{m+1} a_k\left( \dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}-p_k\mathbf{I}\right)^{-1} + r\mathbf{I}\right) (\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1})
-\end{equation}
-
-In practice, since the rational function in \eqref{eq:partial_fraction} is proper, there is no remainder $r$. Moreover, since $\left( \dfrac{\mathbf{L}\mathbf{C}^{-1}}{\kappa^2}-p_k\mathbf{I}\right)^{-1}  = \mathbf{C}\left( \dfrac{\mathbf{L}}{\kappa^2}-p_k\mathbf{C}\right)^{-1}$, we have that \eqref{eq:final_scheme2} can be rewritten as
-
-\begin{equation}
-\label{eq:final_scheme3}
-\tag{12}
-\mathbf{U}^{k+1} = \mathbf{R}(\mathbf{C}\mathbf{U}^k+\tau \mathbf{F}^{k+1}),\quad \mathbf{R} = \sum_{k=1}^{m+1} a_k\left( \dfrac{\mathbf{L}}{\kappa^2}-p_k\mathbf{C}\right)^{-1}.
-\end{equation}
-
-## Numerical implementation {#num_implementation}
-
-### Function `my.get.roots()`
-
-For package orders $m=1,…,4$ or computed orders $m=1,…,8$ and smoothness parameter $\beta$ (= $\alpha/2$ with $\alpha$ between 0.5 and 2), function `my.get.roots()` (adapted from the `rSPDE` package) returns $\texttt{factor} = \dfrac{c_m}{b_{m+1}}$, and the roots $\{r_{1i}\}_{i=1}^m$ and $\{r_{2j}\}_{j=1}^{m+1}$.
+Returns the available integer orders: `1:4` for `coefficient_source =
+"package"` and `1:8` for `"computed"`. `match.arg()` selects one of these
+two sources. This helper describes table availability, not a rule for choosing
+\(m\) to meet an error tolerance. The special diagnostic `m = 0` is handled
+in `rational_modal_rates()` before any table lookup.
 
 ```{r}
-# Function to compute the roots and factor for the rational approximation
 rational_supported_orders <- function(coefficient_source = "package") {
   coefficient_source <- match.arg(coefficient_source, c("package", "computed"))
   if (coefficient_source == "package") 1:4 else 1:8
 }
+```
 
+## `read_computed_fractional_roots()`
+
+Reads `matlab/computed_fractional_roots.csv` relative to the project root
+and returns its data frame. Each record has key `(m, beta, kind, index)`
+and a numeric `value` representing one entry of \(F\), \(\xi\), or
+\(\zeta\) in the product above.
+
+The schema must be exactly `m,beta,kind,index,value`. The reader checks
+numeric finite fields, orders in `1:8`, \(0.25\leq\beta<1\), allowed
+record kinds, and absence of duplicate keys. These are whole-file checks;
+completeness of the selected root set and its mathematical admissibility
+are checked subsequently by `my.get.roots()` and
+`validate_fractional_roots()`.
+
+```{r}
 read_computed_fractional_roots <- function() {
   path <- here::here("matlab", "computed_fractional_roots.csv")
   if (!file.exists(path)) stop("Missing computed coefficients: ", path)
@@ -258,7 +122,28 @@ read_computed_fractional_roots <- function() {
     stop("Malformed computed coefficient artifact.")
   tab
 }
+```
 
+## `validate_fractional_roots()`
+
+Checks one coefficient set of order `m` and returns it unchanged on success.
+There must be \(m\) numerator roots, \(m+1\) denominator roots, and one
+finite positive factor. All roots must be numeric, real, finite, and strictly
+negative. After sorting each root family increasingly, the inequalities are
+
+\[
+\zeta_1<\xi_1<\zeta_2<\xi_2<\cdots<\zeta_m<\xi_m<\zeta_{m+1}<0.
+\]
+
+`denominator[-length(denominator)] < numerator` checks the left inequalities;
+`numerator < denominator[-1L]` checks the right ones. Sorting is local to
+validation: the original list and root order are returned. For \(z>0\),
+negative roots make every factor \(1-\xi_i z\) and \(1-\zeta_i z\)
+positive, so a positive \(F\) gives a positive rational inverse and hence
+positive modal decay rates. Interlacing is an additional structural check;
+it is not a numerical bound on \(|\mathcal R(z)-z^{-\beta}|\).
+
+```{r}
 validate_fractional_roots <- function(roots, m) {
   all_roots <- c(roots$pr_roots, roots$pl_roots)
   if (length(roots$pr_roots) != m || length(roots$pl_roots) != m+1L ||
@@ -273,7 +158,49 @@ validate_fractional_roots <- function(roots, m) {
     stop("Fractional coefficient roots do not interlace; this approximation is unsafe.")
   roots
 }
+```
 
+## `my.get.roots()`
+
+Selects the coefficient set for scalar order `m` and scalar `beta`, returning
+the validated list `list(pl_roots, pr_roots, factor)` in the convention above.
+The accepted fractional range is \(0.25\leq\beta<1\), or
+\(0.5\leq\alpha<2\). The integer case \(\beta=1\) bypasses this function
+in the rate evaluator.
+
+With `coefficient_source = "computed"`, rows must have the requested order
+and the same beta within floating-point roundoff:
+
+\[
+|\beta_{\mathrm{row}}-\beta|
+\leq32\,\varepsilon_{\mathrm{mach}}\max(1,|\beta|).
+\]
+
+The nested `values()` helper requires exactly index 0 for the factor,
+indices \(1,\ldots,m\) for `rc`, and indices \(1,\ldots,m+1\) for
+`rb`, and reorders rows by those indices. An unavailable beta or an
+incomplete block raises an error. This branch returns before the
+interpolation code: its `interpolation` argument does not interpolate
+computed coefficients, and order eight uses its own stored coefficient set.
+
+With `coefficient_source = "package"` (this function's default), the function
+loads `m1table` through `m4table` from the `rSPDE` namespace. Each factor or
+root column is interpolated independently in beta. For a column \(v\),
+linear interpolation between adjacent table entries is
+
+\[
+v(\beta)=(1-t)v(\beta_\ell)+t v(\beta_{\ell+1}),\qquad
+t=\frac{\beta-\beta_\ell}{\beta_{\ell+1}-\beta_\ell}.
+\]
+
+The `"cubic"` option instead uses `splinefun(..., method = "fmm")`.
+The nested `interpolate()` helper implements these alternatives. Column
+`rc` is used at \(m=1\); higher orders use `rc.1`, ..., `rc.m`, while
+denominator columns are `rb.1`, ..., `rb.(m+1)`. Both sources pass through
+the same root validation. The convergence wrapper explicitly selects
+`"computed"`, overriding this selector's package default.
+
+```{r}
 my.get.roots <- function(m,
                          beta, # smoothness parameter, beta = alpha/2
                          interpolation = c("linear", "cubic"),
@@ -327,497 +254,3 @@ my.get.roots <- function(m,
               ), m))
 }
 ```
-
-The default package lookup preserves the original API. Set `coefficient_source = "computed"` for the audited tables in `matlab/`, available at beta=0.25, 0.45, 0.65 without interpolation. The operator accepts `diffusion=1` by default; it scales the operator while forcing and the physical time step retain their original meaning.
-
-### Function `poly.from.roots()`
-
-Function `poly.from.roots()` returns descending-power coefficients of `prod(1-root*x)`, retaining small coefficients without FFT convolution.
-
-```{r}
-# Function to compute polynomial coefficients from roots
-poly.from.roots <- function(roots) {
-  coef <- 1
-  for (r in roots) coef <- c(-r*coef, 0)+c(0, coef)
-  return(coef) # Descending powers; the constant coefficient is one.
-}
-```
-
-### Function `compute.partial.fraction.param()`
-
-Given `factor`$=\texttt{factor} = \dfrac{c_m}{b_{m+1}}$, `pr_roots`$=\{r_{1i}\}_{i=1}^m$, `pl_roots`$=\{r_{2j}\}_{j=1}^{m+1}$, `time_step`$=\tau$, and `scaling`$=\kappa^{2\beta}$, function `compute.partial.fraction.param()` computes the parameters for the partial fraction decomposition \eqref{eq:partial_fraction}.
-
-```{r}
-# Function to compute the parameters for the partial fraction decomposition
-compute.partial.fraction.param <- function(factor, # c_m/b_{m+1}
-                                           pr_roots, # roots \{r_{1i}\}_{i=1}^m
-                                           pl_roots, # roots \{r_{2j}\}_{j=1}^{m+1}
-                                           time_step, # \tau
-                                           scaling # diffusion * kappa^(2*beta)
-                                           ) {
-  strength <- (scaling*time_step)/factor
-  if (!is.finite(strength) || strength <= 0)
-    stop("Invalid or underflowed scaled time step in the rational update.")
-  pr_coef <- c(0, poly.from.roots(pr_roots))
-  pl_coef <- poly.from.roots(pl_roots)
-  factor_pr_coef <- pr_coef
-  pr_plus_pl_coef <- factor_pr_coef + strength * pl_coef
-  #res <- gsignal::residue(factor_pr_coef, pr_plus_pl_coef)
-  # Coefficients passed here are in descending powers.
-  # polyroot() expects ascending powers.
-  p <- polyroot(rev(pr_plus_pl_coef))
-  
-  # Verify that these poles are numerically real and negative.
-  stopifnot(
-    all(abs(Im(p)) <= 1e-10 * pmax(1, abs(Re(p)))),
-    all(Re(p) < 0)
-  )
-  p <- Re(p)
-  
-  derivative <- function(roots, x) sum(vapply(seq_along(roots), function(j)
-    -roots[j]*prod(1-roots[-j]*x), numeric(1)))
-  # At a pole P=-strength*Q: use that identity instead of evaluating the
-  # nearly zero numerator. Products/derivatives retain the root representation.
-  r <- vapply(p, function(x) {
-    -strength*prod(1-pl_roots*x)/
-      (derivative(pr_roots, x)+strength*derivative(pl_roots, x))
-  }, numeric(1))
-  if (length(p) != length(pl_roots) || any(!is.finite(r)) || any(r <= 0))
-    stop("Unstable rational update: residues must be finite and positive.")
-  # Guard against a misleading real-pole result with inaccurate reconstruction.
-  z <- 10^seq(0, 12, length.out = 65L)
-  P <- vapply(z, function(x) prod(1-pr_roots*x), numeric(1))
-  Q <- vapply(z, function(x) prod(1-pl_roots*x), numeric(1))
-  expected <- P/(P+strength*Q)
-  reconstructed <- rowSums(vapply(seq_along(p), function(j) r[j]/(z-p[j]), numeric(length(z))))
-  if (any(!is.finite(reconstructed)) || max(abs(reconstructed-expected)) > 5e-9)
-    stop("Unstable rational update: partial-fraction reconstruction failed.")
-  
-  res <- list(r = r, p = p, k = numeric(0))
-  return(list(r = res$r, # residues \{a_k\}_{k=1}^{m+1}
-              p = res$p, # poles \{p_k\}_{k=1}^{m+1}
-              k = res$k # remainder r
-              ))
-}
-```
-
-### Function `my.fractional.operators.frac()`
-
-Given the Laplacian matrix `L`, the smoothness parameter `beta`, the mass matrix `C` (not lumped), the scaling factor `scale.factor`$=\kappa^2$, the rational order `m`, and the time step `time_step`$=\tau$, function `my.fractional.operators.frac()` computes the fractional operator and returns a list containing the necessary matrices and parameters for the fractional diffusion equation.
-
-```{r}
-# Function to compute the fractional operator
-my.fractional.operators.frac <- function(L, # Laplacian matrix
-                                         beta, # smoothness parameter beta
-                                         C, # mass matrix (not lumped)
-                                         scale.factor, # scaling parameter = kappa^2
-                                         m = 1, # order supported by the selected source
-                                         time_step, # physical time step = tau
-                                         diffusion = 1, # coefficient outside the fractional power
-                                         root_interpolation = "linear",
-                                         coefficient_source = "package"
-                                         ) {
-  coefficient_source <- match.arg(coefficient_source, c("package", "computed"))
-  stopifnot(length(diffusion) == 1L, is.finite(diffusion), diffusion > 0,
-            length(time_step) == 1L, is.finite(time_step), time_step > 0,
-            length(beta) == 1L, is.finite(beta), beta > 0, beta <= 1,
-            length(scale.factor) == 1L, is.finite(scale.factor), scale.factor > 0)
-  L <- L / scale.factor
-  if(beta == 1){
-    L <- L * scale.factor^beta
-    return(list(C = C, # mass matrix
-                L = L, # Laplacian matrix scaled
-                m = m, # rational order
-                beta = beta, # smoothness parameter
-                diffusion = diffusion,
-                LHS = C + time_step * diffusion * L,
-                factorization = Matrix::Cholesky(
-                  Matrix::forceSymmetric(C + time_step * diffusion * L), LDL = FALSE)
-                ))
-  } else {
-    scaling <- diffusion * scale.factor^beta
-    roots <- my.get.roots(m, beta, interpolation = root_interpolation,
-                          coefficient_source = coefficient_source)
-    poles_rs_k <- compute.partial.fraction.param(factor = roots$factor,
-                                                 pr_roots = roots$pr_roots,
-                                                 pl_roots = roots$pl_roots,
-                                                 time_step = time_step, 
-                                                 scaling = scaling)
-
-    partial_fraction_terms <- list()
-    for (i in 1:(m+1)) {
-      # Here is where the terms in the sum in eq 12 are computed
-      partial_fraction_terms[[i]] <- (L - poles_rs_k$p[i] * C)#/poles_rs_k$r[i]
-      }
-    return(list(C = C, # mass matrix
-                L = L, # Laplacian matrix scaled
-                m = m, # rational order
-                beta = beta, # smoothness parameter
-                partial_fraction_terms = partial_fraction_terms, # partial fraction terms
-                residues = poles_rs_k$r, # residues \{a_k\}_{k=1}^{m+1}
-                poles = poles_rs_k$p,
-                coefficient_source = coefficient_source,
-                diffusion = diffusion,
-                factorizations = lapply(partial_fraction_terms, function(A) {
-                  Matrix::Cholesky(Matrix::forceSymmetric(A), LDL = FALSE)
-                })
-                ))
-  }
-}
-```
-
-### Function `my.solver.frac()`
-
-Given the object returned by `my.fractional.operators.frac()` and a vector `v`, function `my.solver.frac()` solves the linear \eqref{eq:final_scheme2} for the vector `v`. If `beta = 1`, it solves the system directly; otherwise, it uses the partial fraction decomposition.
-
-```{r}
-# Function to solve the iteration
-my.solver.frac <- function(obj, # object returned by my.fractional.operators.frac()
-                           v # vector to be solved for
-                           ){
-  beta <- obj$beta
-  m <- obj$m
-  if (beta == 1){
-    return(if (!is.null(obj$factorization))
-      solve(obj$factorization, v, system = "A") else solve(obj$LHS, v)
-           )
-  } else {
-    partial_fraction_terms <- obj$partial_fraction_terms
-    residues <- obj$residues
-    output <- v*0
-    for (i in seq_len(m + 1L)) {
-      solved <- if (!is.null(obj$factorizations)) {
-        solve(obj$factorizations[[i]], v, system = "A")
-      } else solve(partial_fraction_terms[[i]], v)
-      output <- output + residues[i] * solved
-    }
-    return(output # solve the linear system using the partial fraction decomposition
-           )
-  }
-}
-
-# my.solver.frac <- function(obj, v) {
-#   beta <- obj$beta
-#   m <- obj$m
-#   
-#   if (beta == 1) {
-#     return(solve(obj$LHS, v))
-#   } 
-#   
-#   partial_fraction_terms <- obj$partial_fraction_terms
-#   residues <- obj$residues
-#   
-#   # --- PARALLEL PART ---
-#   results <- parallel::mclapply(
-#     1:(m+1),
-#     function(i) residues[i] * solve(partial_fraction_terms[[i]], v),
-#     mc.cores = parallel::detectCores()  
-#   )
-#   
-#   return(Reduce(`+`, results))
-# }
-```
-
-
-### Function `solve_fractional_evolution()`
-
-Given the fractional operator object `my_op_frac`, a time step `time_step`, a sequence of time points `time_seq`, an initial value `val_at_0`, and the right-hand side matrix `RHST`, function `solve_fractional_evolution()` computes the solution to the fractional diffusion equation at each time step using scheme \eqref{eq:final_scheme2}.
-
-
-```{r}
-solve_fractional_evolution <- function(my_op_frac, time_step, time_seq, val_at_0, RHST) {
-  CC <- my_op_frac$C
-  SOL <- matrix(NA, nrow = nrow(CC), ncol = length(time_seq))
-  SOL[, 1] <- val_at_0
-  for (k in 1:(length(time_seq) - 1)) {
-    rhs <- CC %*% SOL[, k] + time_step * RHST[, k + 1]
-    SOL[, k + 1] <- as.matrix(my.solver.frac(my_op_frac, rhs))
-  }
-  return(SOL)
-}
-```
-
-### Function `estimate_error_memory()`
-
-Estimate the memory associated with error accumulation before allocating a reference time grid or running the solver. Supply the number of reference spatial nodes, the number of positive-time reference samples (excluding $t=0$), and one or more requested block counts. The estimator uses scalar arithmetic and allocates only its small result table. `n_solver_steps` may contain the step counts of multiple stored solver grids, as in the temporal-convergence experiment.
-
-`matrix_gib` is the payload of one dense double-precision block matrix. `block_workspace_gib` allows for `matrix_copies` such matrices (six by default) plus approximately 128 bytes per sample for block indices and other temporal work vectors. `time_vectors_gib` counts one full reference time vector and, for every supplied solver grid, its time vector and forcing-average vector. Increasing the number of blocks reduces block workspace, but not those full time vectors. The effective block count is capped at the number of positive-time samples, just as in the solver.
-
-`estimated_gib` sums these modeled quantities and the optional `baseline_gib` allowance for other resident objects. With the default `baseline_gib = 0`, graph/FEM objects, spatial modes, solver matrices and factorizations, other R-session memory, and temporary allocations during grid/forcing construction are excluded. The six-matrix allowance is a planning assumption, not a measured peak or a guaranteed upper bound: custom exact-solution callbacks and R's garbage collector can change the actual peak. All sizes use GiB ($2^{30}$ bytes).
-
-```{r}
-estimate_error_memory <- function(
-    n_reference_nodes, n_reference_samples, n_blocks,
-    n_solver_steps = numeric(0), matrix_copies = 6,
-    baseline_gib = 0) {
-
-  positive_counts <- function(x) {
-    is.numeric(x) && length(x) > 0L &&
-      all(is.finite(x)) && all(x >= 1) && all(x == floor(x))
-  }
-  stopifnot(
-    positive_counts(n_reference_nodes), length(n_reference_nodes) == 1L,
-    positive_counts(n_reference_samples), length(n_reference_samples) == 1L,
-    positive_counts(n_blocks),
-    is.numeric(n_solver_steps),
-    length(n_solver_steps) == 0L || positive_counts(n_solver_steps),
-    is.numeric(matrix_copies), length(matrix_copies) == 1L,
-    is.finite(matrix_copies), matrix_copies >= 1,
-    is.numeric(baseline_gib), length(baseline_gib) == 1L,
-    is.finite(baseline_gib), baseline_gib >= 0
-  )
-
-  # Promote counts before multiplication to avoid integer overflow.
-  samples <- as.double(n_reference_samples)
-  blocks <- pmin(as.double(n_blocks), samples)
-  per_block <- ceiling(samples / blocks)
-  gib <- 1024^3
-  matrix_bytes <- 8 * as.double(n_reference_nodes) * per_block
-  block_bytes <- matrix_copies * matrix_bytes + 128 * per_block
-  time_bytes <- 8 * (samples + 1 +
-    2 * sum(as.double(n_solver_steps) + 1))
-
-  data.frame(
-    requested_blocks = as.double(n_blocks),
-    n_blocks = blocks,
-    samples_per_block = per_block,
-    matrix_gib = matrix_bytes / gib,
-    block_workspace_gib = block_bytes / gib,
-    time_vectors_gib = time_bytes / gib,
-    baseline_gib = baseline_gib,
-    estimated_gib = (block_bytes + time_bytes) / gib + baseline_gib
-  )
-}
-```
-
-### Function `solve_fractional_evolution_error()`
-
-Advance the numerical solution one step at a time and accumulate the reference-grid error without storing a space-time solution matrix. The separable forcing is supplied through a spatial load vector and its interval-averaged temporal factors. For each reference time in $(t_{k-1},t_k]$, compare the exact solution with the current iterate \(U_h^k\). The initial reference sample has zero weight, and subsequent samples use the right-endpoint weights \(t_j^\star-t_{j-1}^\star\).
-
-The callback `exact_at_time(t)` returns a matrix of exact solution values at the reference spatial nodes, with one column per supplied time. The parameter `n_blocks` divides the positive-time reference samples into that many approximately equal blocks, capped at the number of samples. Blocks may span multiple solver intervals; each sample uses the corresponding piecewise constant numerical state. Larger numbers of blocks reduce temporary memory use. Choosing at least as many blocks as reference samples gives one-at-a-time evaluation, for which a vector-valued callback is also accepted.
-
-With `verbose = TRUE`, the function reports the initial block dimensions and approximate size of one dense matrix, followed by the completed block, percentage and sample count, current solver step, elapsed time, and estimated time remaining. The function returns the accumulated space-time error.
-
-```{r}
-solve_fractional_evolution_error <- function(
-    my_op_frac, time_step, time_seq, val_at_0,
-    spatial_load, g_average, Psi, reference_C,
-    reference_times, exact_at_time, n_blocks = 1000L,
-    verbose = FALSE) {
-
-  stopifnot(
-    length(time_step) == 1L,
-    is.finite(time_step), time_step > 0,
-    length(time_seq) >= 2L,
-    length(reference_times) >= 2L,
-    all(is.finite(time_seq)),
-    all(is.finite(reference_times)),
-    all(diff(time_seq) > 0),
-    all(diff(reference_times) > 0),
-    reference_times[1] == time_seq[1],
-    tail(reference_times, 1) == tail(time_seq, 1),
-    length(g_average) == length(time_seq),
-    length(val_at_0) == nrow(my_op_frac$C),
-    length(spatial_load) == length(val_at_0),
-    ncol(Psi) == length(val_at_0),
-    nrow(Psi) == nrow(reference_C),
-    nrow(reference_C) == ncol(reference_C),
-    is.function(exact_at_time),
-    length(n_blocks) == 1L,
-    is.finite(n_blocks), n_blocks >= 1,
-    n_blocks == floor(n_blocks),
-    is.logical(verbose), length(verbose) == 1L, !is.na(verbose)
-  )
-
-  n_samples <- length(reference_times) - 1L
-  n_blocks <- min(n_blocks, n_samples)
-  samples_per_block <- n_samples / n_blocks
-  n_steps <- length(time_seq) - 1L
-  u <- as.numeric(val_at_0)
-  spatial_load <- as.numeric(spatial_load)
-  solver_step <- 0L
-  projected_step <- -1L
-  u_ref <- NULL
-  next_ref <- 2L
-  error_sum <- 0
-  started <- proc.time()[["elapsed"]]
-
-  if (verbose) {
-    message(sprintf(
-      "Error accumulation: %s reference samples in %s blocks; up to %s samples/block (%.2f GiB per dense matrix).",
-      format(n_samples, big.mark = ",", scientific = FALSE, trim = TRUE),
-      format(n_blocks, big.mark = ",", scientific = FALSE, trim = TRUE),
-      format(ceiling(samples_per_block), big.mark = ",", scientific = FALSE, trim = TRUE),
-      8 * nrow(reference_C) * ceiling(samples_per_block) / 1024^3
-    ))
-  }
-
-  for (block in seq_len(n_blocks)) {
-    last_ref <- if (block == n_blocks) {
-      length(reference_times)
-    } else {
-      1L + floor(block * samples_per_block)
-    }
-    ids <- seq.int(next_ref, last_ref)
-    times <- reference_times[ids]
-    target_steps <- findInterval(times, time_seq, left.open = TRUE)
-    runs <- rle(target_steps)
-
-    error <- as.matrix(exact_at_time(times))
-    stopifnot(
-      nrow(error) == nrow(reference_C),
-      ncol(error) == length(ids)
-    )
-
-    first_column <- 1L
-    for (run in seq_along(runs$values)) {
-      target <- runs$values[run]
-      while (solver_step < target) {
-        solver_step <- solver_step + 1L
-        rhs <- my_op_frac$C %*% u +
-          time_step * spatial_load * g_average[solver_step + 1L]
-        u <- as.numeric(my.solver.frac(my_op_frac, rhs))
-      }
-
-      if (projected_step != target) {
-        u_ref <- as.numeric(Psi %*% u)
-        projected_step <- target
-      }
-
-      last_column <- first_column + runs$lengths[run] - 1L
-      columns <- seq.int(first_column, last_column)
-      error[, columns] <- error[, columns, drop = FALSE] - u_ref
-      first_column <- last_column + 1L
-    }
-
-    squared <- colSums(error * (reference_C %*% error))
-    weights <- times - reference_times[ids - 1L]
-    error_sum <- error_sum + sum(weights * squared)
-    rm(error)
-    next_ref <- last_ref + 1L
-
-    if (verbose) {
-      processed <- last_ref - 1L
-      elapsed <- proc.time()[["elapsed"]] - started
-      remaining <- elapsed * (n_samples / processed - 1)
-      message(sprintf(
-        "Block %s/%s | %.1f%% | %s/%s samples | solver step %s/%s | elapsed %.1f min | ETA %.1f min",
-        block, n_blocks, 100 * processed / n_samples,
-        format(processed, big.mark = ",", scientific = FALSE, trim = TRUE),
-        format(n_samples, big.mark = ",", scientific = FALSE, trim = TRUE),
-        solver_step, n_steps, elapsed / 60, remaining / 60
-      ))
-    }
-  }
-
-  stopifnot(next_ref == length(reference_times) + 1L,
-            solver_step == n_steps)
-  sqrt(error_sum)
-}
-```
-
-### Function `construct_piecewise_projection()` {#construct_piecewise_projection}
-
-Given a matrix `projected_U_approx` with approximated values at discrete time points, a sequence of time points `time_seq`, and an extended sequence of time points `overkill_time_seq`, function `construct_piecewise_projection()` constructs a piecewise constant projection of the approximated values over the extended time sequence.
-
-```{r}
-# Function to construct a piecewise constant projection of approximated values
-# construct_piecewise_projection <- function(projected_U_approx, time_seq, overkill_time_seq) {
-#   projected_U_piecewise <- matrix(NA, nrow = nrow(projected_U_approx), ncol = length(overkill_time_seq))
-  
-#   # Assign value at t = 0
-#   projected_U_piecewise[, which(overkill_time_seq == 0)] <- projected_U_approx[, 1]
-  
-#   # Assign values for intervals (t_{k-1}, t_k]
-#   for (k in 2:length(time_seq)) {
-#     idxs <- which(overkill_time_seq > time_seq[k - 1] & overkill_time_seq <= time_seq[k])
-#     projected_U_piecewise[, idxs] <- projected_U_approx[, k]
-#   }
-  
-#   return(projected_U_piecewise)
-# }
-construct_piecewise_projection <- function(
-    projected_U_approx, time_seq, overkill_time_seq) {
-
-  stopifnot(
-    length(time_seq) >= 2L,
-    ncol(projected_U_approx) == length(time_seq),
-    all(is.finite(time_seq)),
-    all(diff(time_seq) > 0),
-    all(is.finite(overkill_time_seq)),
-    all(overkill_time_seq >= time_seq[1]),
-    all(overkill_time_seq <= tail(time_seq, 1))
-  )
-
-  columns <- findInterval(
-    overkill_time_seq,
-    time_seq,
-    left.open = TRUE
-  ) + 1L
-
-  projected_U_approx[, columns, drop = FALSE]
-}
-```
-
-```{r}
-make_time_grid <- function(T_final, target_step) {
-  stopifnot(
-    length(T_final) == 1L, is.finite(T_final), T_final > 0,
-    length(target_step) == 1L,
-    is.finite(target_step), target_step > 0
-  )
-  N <- ceiling(T_final / target_step)
-  time_step <- T_final / N
-  time_seq <- seq(0, T_final, length.out = N + 1)
-  
-  return(list(N = N, time_step = time_step, time_seq = time_seq))
-}
-```
-
-The next function computes
-
-\[
-\overline g_k
-=\frac1\tau\int_{t_{k-1}}^{t_k}g(t)\,dt
-=\frac{A[\cos(\omega t_{k-1})-\cos(\omega t_k)]}{\omega\tau}.
-\]
-To avoid subtracting nearly equal cosines, we use the equivalent formula
-\[
-\overline g_k
-=A\sin\!\left(\omega\frac{t_{k-1}+t_k}{2}\right)
-\frac{\sin(\omega\tau/2)}{\omega\tau/2}.
-\]
-
-```{r}
-average_sine_forcing <- function(time_seq, A = 1, omega = pi) {
-  dt <- diff(time_seq)
-
-  stopifnot(
-    length(time_seq) >= 2L,
-    all(is.finite(time_seq)),
-    all(dt > 0)
-  )
-
-  midpoint <- head(time_seq, -1) + dt/2
-  z <- omega * dt/2
-
-  # sin(z)/z, with its limiting value at z = 0.
-  sinc_z <- rep(1, length(z))
-  nonzero <- z != 0
-  sinc_z[nonzero] <- sin(z[nonzero]) / z[nonzero]
-
-  averages <- A * sin(omega * midpoint) * sinc_z
-
-  # First entry is unused by the evolution solver.
-  c(0, averages)
-}
-```
-
-
-
-## References
-
-```{r, purl = FALSE}
-grateful::cite_packages(output = "paragraph", out.dir = ".")
-```
-

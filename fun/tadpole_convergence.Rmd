@@ -3,41 +3,67 @@ title: "Tadpole convergence: closed evaluation of the discrete solution"
 output: html_document
 ---
 
-The three convergence notebooks call `tadpole_convergence_error()` inside
-ordinary nested loops. This helper evaluates the consistent P1 FEM and
-backward Euler solution for the specified orthonormal modes on the tadpole
-with edge lengths 1 and 2. It needs neither a fine reference mesh nor a
-stored time vector. The default T=1, tau=1e-10 represents ten billion steps;
-their scalar recurrence is evaluated in closed form.
+These functions compute the space--time error for diffusion on the tadpole
+graph with edge lengths 1 and 2. The model and data are
 
-For wave number w and uniform element length ell=1/n, the FEM eigenvalue is
-`kappa^2 + 12*sin(w*ell/2)^2/(ell^2*(2+cos(w*ell)))`. The L2 projection has
-squared norm `3*sinc(w*ell/2)^4/(2+cos(w*ell))`. Distinct resolved modes are
-orthogonal; the error is the sum of the modal coefficient error and the
-orthogonal projection residual. A series evaluates the latter near zero.
-The exact reference solves the continuum equation with the same physical
-forcing, while the numerical coefficients solve the rational FEM recurrence.
+\[
+L=\kappa^2-\Delta_\Gamma,\qquad \beta=\alpha/2,\qquad
+\partial_tu+D L^\beta u=f,\qquad
+u_0=\sum_{j\in\mathcal J}x_je_j,\qquad
+f(t)=A\sin(\omega t)\sum_{j\in\mathcal J}y_je_j.
+\]
 
-Time reconstruction is right-constant on each solver interval. Four-point
-Gauss quadrature integrates within an interval. A 64-point Gaussian rule for
-the discrete uniform measure on step indices sums the interval contributions
-without enumerating them. Its Jacobi off-diagonal is
-`j/2*sqrt((1-(j/N)^2)/(4*j^2-1))`; order N gives the complete finite sum.
-Doubling both quadrature orders is checked in `tests/check_convergence.R`.
-Resolution guards reject unresolved initial layers or oscillations.
+The eigenfunctions \(e_j\) are orthonormal in \(L_2(\Gamma)\).
+The benchmark uses \(D=1\), \(T=1\), \(\kappa=4\),
+\(\mathcal J=\{5,7\}\), \((x_5,x_7)=(10,0)\),
+\((y_5,y_7)=(0,10)\), \(A=1\), and \(\omega=\pi\).
+Here `diffusion` is \(D\), and `initial` and `forcing` contain \(x_j\)
+and \(y_j\) in the order specified by `modes`.
 
-The coefficient difference is evaluated algebraically using `expm1` instead
-of subtracting two nearly equal solutions. For `t=k*tau-offset`, the initial
-difference factors `exp(-r*t)` and uses the exponent increment
-`k*(tau*(r-r_num)+x-log1p(x))-r*offset`, with x=tau*r_num. The sine response
-uses exact transfer denominator `r+i*omega` and discrete denominator
-`r_num*exp(i*u)/sinc(u)+i*omega`, u=omega*tau/2. Factoring their difference
-retains the small error accurately. Large decay factors the larger exponential.
+The numerical solution uses continuous piecewise linear (P1) finite elements
+with a consistent mass matrix, exact spatial projection of the data, and
+backward Euler with interval-averaged forcing. On this uniform graph mesh,
+the selected projected modes diagonalize the discrete operator. Their
+scalar recurrences can therefore be evaluated in closed form even when
+\(T=1\) and \(\tau=10^{-10}\) describe ten billion time steps.
 
-Only computed tables at alpha=0.5,0.9,1.3 are used here (alpha=2 uses exact
-rates). This is a finite-mode uniform-tadpole benchmark, not a general graph
-solver or a uniform spectral-accuracy claim. The general sparse solver remains
-in `fractional_evolution.Rmd`; its original package defaults are preserved.
+Load the functions from `fractional_evolution.Rmd` and `exact_solutions.Rmd`
+through the project's `source_if_updated()` loader before calling these
+helpers. The former supplies rational coefficients and the latter
+supplies analytic continuum coefficients and Gauss--Legendre quadrature.
+The call sequence is
+
+`tadpole_convergence_error()` → `experiment_grid()` →
+`uniform_tadpole_error()`, which builds the modal basis and quadrature,
+computes rational rates, and integrates the stable coefficient differences
+together with the spatial projection residual.
+
+This calculation applies to the resolved modes of the uniform tadpole
+benchmark. It does not assemble an operator for arbitrary graph data.
+The computed tables cover \(\alpha\in\{0.5,0.9,1.3\}\);
+\(\alpha=2\) uses exact discrete rates. The local formulas and their
+corresponding code variables are given below.
+
+## `experiment_grid()`
+
+Given final time \(T>0\) and requested maximum step \(\eta>0\), define
+
+\[
+N=\max\{1,\lceil T/\eta\rceil\},\qquad
+\tau=T/N,\qquad t_k=k\tau.
+\]
+
+The returned list contains `N`, `time_step` \(=\tau\), and `T_final`
+\(=T\). It describes the grid using three scalars; it allocates no time
+vector. The actual step divides \(T\) exactly in the mathematical formula
+and is at most the target, apart from floating-point snapping.
+
+`ratio` is \(T/\eta\). A quotient already within
+\(\min\{0.01,32\varepsilon_{\mathrm{mach}}\max(1,T/\eta)\}\) of an
+integer is snapped before taking the ceiling. The cap avoids removing whole
+intervals on extremely large grids. Both inputs must be finite positive
+scalars, and \(N>2^{52}\) is rejected to retain the supported exact
+step-index range in double precision.
 
 ```{r}
 experiment_grid <- function(T_final, target_step) {
@@ -53,13 +79,86 @@ experiment_grid <- function(T_final, target_step) {
   if (N > 2^52) stop("Time grid exceeds the supported exact step-index range.")
   list(N = max(1, N), time_step = T_final/max(1, N), T_final = T_final)
 }
+```
 
+## `uniform_tadpole_h()`
+
+Converts each positive finite target mesh size \(\eta\) into
+
+\[
+n=\max\{1,\lceil\eta^{-1}\rceil\},\qquad h=1/n.
+\]
+
+The edges of lengths 1 and 2 then have \(n\) and \(2n\) elements with
+the same element length. The return is a numeric vector matching the input
+length. `inverse` stores \(\eta^{-1}\); the small subtraction before
+`ceiling()` avoids an extra element caused by roundoff near an integer.
+The other modal helpers use a single actual mesh size at a time.
+
+```{r}
 uniform_tadpole_h <- function(h) {
   stopifnot(all(is.finite(h)), all(h > 0))
   inverse <- 1/h
   1/pmax(1, ceiling(inverse-32*.Machine$double.eps*pmax(1, inverse)))
 }
+```
 
+## `uniform_tadpole_basis()`
+
+Builds analytic spectral and projection data for the requested modes on a
+uniform mesh. The tadpole wave-number catalogue is
+
+\[
+w_j=\frac{\pi}{2}q_j,\qquad (q_j)=(0,1,2,2,3,4,4,5,6,6,\ldots),
+\qquad \lambda_j=\kappa^2+w_j^2.
+\]
+
+`catalogue` lists integers from 0 through `N_finite`, repeating positive
+even integers twice to account for multiplicity. `modes` gives one-based
+indices into this list. For `N_finite = 4`, it is `c(0,1,2,2,3,4,4)`;
+indices 5 and 7 give \(3\pi/2\) and \(2\pi\). `N_finite` controls
+catalogue availability, rather than the mesh dimension or the rational order.
+Mode indices must be distinct integers in range, and \(\kappa>0\).
+
+Let \(P_h\) be the \(L_2(\Gamma)\)-orthogonal projector onto the P1
+space and \(\phi_{j,h}=P_he_j\). With the consistent mass matrix, the
+resolved projected modes satisfy
+
+\[
+L_h\phi_{j,h}=\lambda_{j,h}\phi_{j,h},\qquad
+\lambda_{j,h}=\kappa^2+
+\frac{12\sin^2(w_jh/2)}{h^2(2+\cos(w_jh))},
+\]
+
+\[
+g_{j,h}=\|\phi_{j,h}\|_{L_2(\Gamma)}^2
+=\frac{3\operatorname{sinc}^4(w_jh/2)}{2+\cos(w_jh)},\qquad
+\operatorname{sinc}(v)=\begin{cases}\sin(v)/v,&v\ne0,\\1,&v=0.\end{cases}
+\]
+
+The projected modes are mutually orthogonal. The returned list contains
+`h`, continuum `eigenvalues` \(\lambda_j\), `discrete_eigenvalues`
+\(\lambda_{j,h}\), and the diagonal matrices
+
+\[
+G_h=\operatorname{diag}(g_{j,h})\quad\texttt{gram},\qquad
+R_h=\operatorname{diag}(1-g_{j,h})\quad\texttt{residual\_gram}.
+\]
+
+In the code `z = w*h`. The guard rejects \(z\geq\pi/2\), requiring
+more than four elements per nonconstant wavelength. For \(|z|<0.1\),
+subtracting \(g\) from one would lose the small projection error, so
+`residual` is evaluated by the Taylor polynomial in `x = z^2`:
+
+\[
+1-g=\frac{z^4}{720}+\frac{z^6}{3024}
++\frac{7z^8}{259200}+O(z^{10}).
+\]
+
+The code retains terms through \(z^{16}\). The zero-wave-number mode
+therefore has residual zero without evaluating \(\sin(0)/0\).
+
+```{r}
 uniform_tadpole_basis <- function(h, kappa, modes, N_finite) {
   stopifnot(length(kappa) == 1L, is.finite(kappa), kappa > 0,
             length(N_finite) == 1L, N_finite >= 0,
@@ -85,7 +184,45 @@ uniform_tadpole_basis <- function(h, kappa, modes, N_finite) {
        gram = diag(1-residual, length(z)),
        residual_gram = diag(residual, length(z)))
 }
+```
 
+## `discrete_uniform_rule()`
+
+Constructs Gaussian quadrature for the average over the \(N\) solver
+intervals. Define the discrete probability measure
+
+\[
+\nu_N=\frac1N\sum_{k=1}^N\delta_{(k-1/2)/N}.
+\]
+
+For \(Q=\min\{N,\texttt{order}\}\), its Jacobi matrix has diagonal
+\(1/2\) and off-diagonal entries
+
+\[
+J_{\ell,\ell+1}=\frac{\ell}{2}
+\sqrt{\frac{1-(\ell/N)^2}{4\ell^2-1}},\qquad \ell=1,\ldots,Q-1.
+\]
+
+If \((z_\ell,v_\ell)\) is a normalized eigenpair, the returned
+`nodes` are \(K_\ell=Nz_\ell+1/2\) and `weights` are
+\(W_\ell=(v_\ell)_1^2\). Consequently,
+
+\[
+\frac1N\sum_{k=1}^N H(k)\approx
+\sum_{\ell=1}^Q W_\ell H(K_\ell),\qquad \sum_\ell W_\ell=1.
+\]
+
+This is exact for polynomials of degree at most \(2Q-1\), and for every
+function on the finite support when \(Q=N\). Otherwise it approximates
+the average; the modal formulas supply an analytic extension to noninteger
+\(K_\ell\). No rounding to integer time indices is performed. The
+`pmin`/`pmax` clamps only small numerical excursions outside \([1,N]\).
+Returned nodes follow the eigensolver's ordering, which does not affect the
+weighted sum. A single interval gives node and weight both equal to one.
+`N` must be an integer in \([1,2^{52}]\); the requested order must be an
+integer from 2 through 512, with default 64.
+
+```{r}
 discrete_uniform_rule <- function(N, order = 64L) {
   stopifnot(length(N) == 1L, is.finite(N), N >= 1, N == round(N),
             N <= 2^52, length(order) == 1L, is.finite(order), order >= 2L,
@@ -99,7 +236,38 @@ discrete_uniform_rule <- function(N, order = 64L) {
   e <- eigen(J, symmetric = TRUE)
   list(nodes = pmin(N, pmax(1, N*e$values+.5)), weights = e$vectors[1, ]^2)
 }
+```
 
+## `rational_modal_rates()`
+
+Converts discrete spatial eigenvalues into positive modal decay rates.
+For \(\beta=\alpha/2\), set \(z_j=\lambda_{j,h}/\kappa^2\) and
+
+\[
+\mathcal R_{m,\beta}(z)=F_{m,\beta}
+\frac{\prod_{i=1}^m(1-\xi_{m,i}z)}
+     {\prod_{i=1}^{m+1}(1-\zeta_{m,i}z)}\approx z^{-\beta},\qquad
+\widehat a_{j,h,m}=\frac{D\kappa^{2\beta}}{\mathcal R_{m,\beta}(z_j)}.
+\]
+
+`eigenvalues` supplies \(\lambda_{j,h}\), `z` is the normalized vector,
+and `inverse` stores \(\mathcal R(z_j)\), not its reciprocal. The
+products use `pr_roots` \(=\xi\), `pl_roots` \(=\zeta\), and
+`factor` \(=F\) returned by `my.get.roots()`. The return is a numeric
+rate vector in the input eigenvalue order. Invalid or nonpositive rational
+values cause an error. Inputs require \(0<\alpha\leq2\), \(D>0\),
+and finite eigenvalues at least \(\kappa^2\), with positive \(\kappa\)
+provided by the basis helper.
+
+For \(\alpha=2\), the function returns \(D\lambda_{j,h}\) directly.
+For the diagnostic flag `m = 0`, it returns the exact discrete fractional
+rates \(D\lambda_{j,h}^{\beta}\). This removes rational error while
+retaining the spatial and time discretizations; it does not define a
+zeroth-order rational approximant. Other orders use computed coefficients
+by default. `root_interpolation` affects only the optional package source;
+computed coefficients are selected at their stored beta values.
+
+```{r}
 rational_modal_rates <- function(eigenvalues, alpha, m, diffusion, kappa,
                                  root_interpolation = "linear", coefficient_source = "computed") {
   beta <- alpha/2
@@ -116,7 +284,54 @@ rational_modal_rates <- function(eigenvalues, alpha, m, diffusion, kappa,
   if (any(!is.finite(inverse)) || any(inverse <= 0)) stop("Invalid rational modal rates.")
   diffusion*kappa^(2*beta)/inverse
 }
+```
 
+## `uniform_modal_coefficients()`
+
+Evaluates the discrete backward Euler coefficients at the supplied step
+indices without traversing earlier steps. Write \(\tau=\texttt{time_step}\),
+\(\widehat a_j=\texttt{rates[j]}\), \(\theta=\omega\tau\), and
+\(\mu_j=(1+\tau\widehat a_j)^{-1}\). The interval average of the temporal
+forcing factor is
+
+\[
+\overline g_k=\frac1\tau\int_{(k-1)\tau}^{k\tau}
+A\sin(\omega t)\,dt
+=A\operatorname{sinc}(\theta/2)\sin((k-1/2)\theta).
+\]
+
+Since \(U_{h,m}^k=\sum_j b_j^k\phi_{j,h}\), the projected scheme gives
+
+\[
+b_j^0=x_j,\qquad
+b_j^k=\mu_j\big(b_j^{k-1}+\tau y_j\overline g_k\big).
+\]
+
+Summing its geometric series yields the expression implemented in `response`:
+
+\[
+b_j^k=\mu_j^k x_j+
+\tau\mu_j A y_j\operatorname{sinc}(\theta/2)
+\operatorname{Im}\left[
+e^{i\theta/2}\frac{e^{ik\theta}-\mu_j^k}{e^{i\theta}-\mu_j}
+\right].
+\]
+
+`logq = -log1p(time_step*rates)` stores \(\log\mu_j\); `outer(logq,k)`
+forms all \(k\log\mu_j\). The nested `expm1_i()` evaluates
+\(e^{iv}-1=-2\sin^2(v/2)+i\sin v\), and real `expm1()` evaluates
+\(\mu_j^k-1\). Their differences preserve small numerators and denominators
+when \(\tau\) is tiny. Zero frequency gives `sinc = 1` and a zero sine
+response.
+
+`rates`, `initial`, and `forcing` have equal lengths, with positive finite
+rates and finite real data. The returned matrix has one row per mode and
+one column per finite nonnegative `k`. Integer indices give the solver
+iterates; noninteger indices give the extension used by the step-sum rule.
+The formula retains both FEM and rational rates, so it evaluates the discrete
+scheme rather than replacing it by the continuum solution.
+
+```{r}
 uniform_modal_coefficients <- function(k, time_step, rates, initial, forcing,
                                        A = 1, omega = pi) {
   stopifnot(all(is.finite(k)), all(k >= 0), time_step > 0,
@@ -135,7 +350,109 @@ uniform_modal_coefficients <- function(k, time_step, rates, initial, forcing,
   }
   result
 }
+```
 
+## `uniform_modal_difference()`
+
+Returns the coefficient difference \(\delta_j=c_j(t)-b_j^k\) as a
+mode-by-index matrix. At within-interval fraction \(s=\texttt{fraction}\),
+
+\[
+d=(1-s)\tau,\qquad t=k\tau-d=(k-1+s)\tau,\qquad 0\leq s\leq1.
+\]
+
+`exact_rates` supplies the continuum rates \(a_j=D\lambda_j^\beta\),
+and `numerical_rates` supplies \(\widehat a_j\). The comparison uses the
+right-constant value \(b_j^k\) throughout the interval. Indices may be
+noninteger for quadrature but must be at least one; `fraction` is a scalar.
+All rate and data vectors must have compatible lengths and positive finite
+rates. The return contains neither Gram weights nor squared errors; those
+are applied in `uniform_tadpole_error()`.
+
+### Initial contribution
+
+Put \(x=\tau\widehat a_j\), \(\mu_j=(1+x)^{-1}\), and
+
+\[
+H=k\left[\tau(a_j-\widehat a_j)+x-\log(1+x)\right]-a_jd
+=\log(\mu_j^k)+a_jt.
+\]
+
+The quantity `initial_difference` is evaluated as
+
+\[
+I_j=e^{-a_jt}-\mu_j^k=
+\begin{cases}
+-e^{-a_jt}\operatorname{expm1}(H),&H\leq0,\\
+\mu_j^k\operatorname{expm1}(-H),&H>0.
+\end{cases}
+\]
+
+`exponent_difference` is \(H\), `dr` is \(a_j-\widehat a_j\), and
+`offset` is \(d\). Factoring the larger exponential keeps the argument
+of `expm1()` nonpositive, avoiding an overflowing intermediate product.
+When \(x<10^{-3}\), `remainder` uses
+
+\[
+x-\log(1+x)=\sum_{\ell=2}^{12}\frac{(-1)^\ell x^\ell}{\ell}
++O(x^{13})
+\]
+
+instead of subtracting nearly equal values. Multiplication by `initial[j]`
+then gives the initial-data part of \(\delta_j\).
+
+### Forcing contribution
+
+Let \(v=\omega\tau/2\) and define the exact and discrete transfer
+denominators
+
+\[
+D_e=a_j+i\omega,\qquad
+\Phi=\frac{e^{iv}}{\operatorname{sinc}(v)},\qquad
+D_n=\widehat a_j\Phi+i\omega.
+\]
+
+In this form, the forcing responses are
+\(A y_j\operatorname{Im}(N_e/D_e)\) and
+\(A y_j\operatorname{Im}(N_n/D_n)\), where
+
+\[
+N_e=e^{i\omega t}-e^{-a_jt},\qquad
+N_n=e^{ik\omega\tau}-\mu_j^k.
+\]
+
+The code forms their difference using
+
+\[
+\frac{N_e}{D_e}-\frac{N_n}{D_n}
+=\left(\frac1{D_e}-\frac1{D_n}\right)N_n
++\frac{N_e-N_n}{D_e},
+\]
+
+\[
+\frac1{D_e}-\frac1{D_n}
+=\frac{-(a_j-\widehat a_j)+\widehat a_j(\Phi-1)}{D_eD_n},\qquad
+N_e-N_n=-e^{i\omega t}(e^{i\omega d}-1)-I_j.
+\]
+
+These are `inverse_difference`, `numerator`, and `numerator_difference`.
+The same complex `expm1_i()` identity used by the coefficient evaluator
+retains small phase increments. `phi_minus_one` uses the expansion
+
+\[
+\Phi-1=v\cot v-1+iv
+=-\frac{v^2}{3}-\frac{v^4}{45}-\frac{2v^6}{945}
+-\frac{v^8}{4725}-\frac{2v^{10}}{93555}+O(v^{12})+iv.
+\]
+
+Thus the small-step branch uses finite Taylor evaluations of the algebraic
+identities, preserving errors that direct subtraction can round away.
+The forcing calculation is skipped if `omega`, `A`, or the mode's forcing
+coefficient is zero. For \(|\omega\tau|\geq0.1\), the function instead
+subtracts the literal exact and discrete coefficient matrices. The current
+experiments use the small-step branch.
+
+```{r}
 uniform_modal_difference <- function(k, fraction, time_step, exact_rates, numerical_rates,
                                       initial, forcing, A = 1, omega = pi) {
   stopifnot(length(fraction) == 1L, is.finite(fraction), fraction >= 0, fraction <= 1,
@@ -195,7 +512,85 @@ uniform_modal_difference <- function(k, fraction, time_step, exact_rates, numeri
   }
   out
 }
+```
 
+## `uniform_tadpole_error()`
+
+Combines the spectral, temporal, and rational calculations into an
+approximation of the full space--time norm
+
+\[
+E=\|u-U_{h,m}^{\tau}\|_{L_2(0,T;L_2(\Gamma))},\qquad
+U_{h,m}^{\tau}(t)=U_{h,m}^k\quad\text{for }t\in(t_{k-1},t_k].
+\]
+
+Orthogonality of \(P_h\) splits the squared spatial error into
+\(\|u-P_hu\|^2+\|P_hu-U_{h,m}^k\|^2\). Orthogonality of the selected
+modes then gives the scalar integrand
+
+\[
+\mathcal F(k,t)=\sum_{j\in\mathcal J}
+\left[g_{j,h}|c_j(t)-b_j^k|^2+(1-g_{j,h})|c_j(t)|^2\right].
+\]
+
+The second term retains the spatial projection residual. Comparing only
+\(c_j\) and \(b_j^k\) would omit this part of the FEM error. In matrix
+form, the code variable `squared` contains the columnwise values of
+
+\[
+\delta^\mathsf{T}G_h\delta+c^\mathsf{T}R_hc,
+\]
+
+where `delta` is returned by `uniform_modal_difference()`, `exact` contains
+the continuum coefficients \(c\), and `basis$gram` and
+`basis$residual_gram` are \(G_h\) and \(R_h\). The exact rate uses
+`basis$eigenvalues`, while the numerical rate uses
+`basis$discrete_eigenvalues` and the requested rational order.
+
+Changing variables within each interval gives
+
+\[
+E^2=\tau\sum_{k=1}^N\int_0^1
+\mathcal F(k,(k-1+s)\tau)\,ds.
+\]
+
+Let \((s_r,w_r)\) be the `quadrature_order`-point Gauss--Legendre rule,
+and let \((K_\ell,W_\ell)\) be the rule from `discrete_uniform_rule()`.
+The computed value is
+
+\[
+\widehat E=\left[
+T\sum_\ell W_\ell\sum_r w_r
+\mathcal F(K_\ell,(K_\ell-1+s_r)\tau)
+\right]^{1/2}.
+\]
+
+Both weight sets sum to one. Therefore `total` is a weighted mean squared
+error and `sqrt(T*total)` supplies the integral's time scale. The default
+orders are 4 inside each interval and 64 for the step-index average. The
+outer rule generally uses noninteger indices, evaluated by the analytic
+continuations above. It is an approximation of the finite sum unless all
+\(N\) indices are represented; the within-interval integration also remains
+a quadrature approximation.
+
+`grid` must contain `N`, `time_step`, and `T_final` with \(N\tau=T\)
+within roundoff. The scalar `h`, mode catalogue, initial and forcing vectors,
+and physical parameters must describe the same modal problem. The routine
+checks the consistency of \(N\tau\) and rejects nonfinite or negative
+accumulated error. When \(N>\texttt{step_sum_order}=Q_s\), it also rejects
+dynamics for which
+
+\[
+T\max_j\{a_j,\widehat a_j\}>Q_s^2/8
+\quad\text{or}\quad |\omega|T>Q_s/2.
+\]
+
+This resolution guard detects potentially underresolved decay or oscillation;
+it does not certify quadrature accuracy. Doubling the two quadrature orders
+independently is a useful accuracy check for a chosen experiment. No reference
+mesh, spatial mass matrix, or array of all time steps is required.
+
+```{r}
 uniform_tadpole_error <- function(h, alpha, m, diffusion, grid, kappa, modes,
                                   N_finite, initial, forcing, A = 1, omega = pi,
                                   quadrature_order = 4L, step_sum_order = 64L,
@@ -227,7 +622,31 @@ uniform_tadpole_error <- function(h, alpha, m, diffusion, grid, kappa, modes,
   if (!is.finite(total) || total < 0) stop("Invalid uniform modal error.")
   sqrt(T*total)
 }
+```
 
+## `tadpole_convergence_error()`
+
+This is the entry point called inside the three notebooks' refinement loops.
+It returns the scalar \(\widehat E\) defined above for the requested spatial
+target `h`, time-step target `time_step`, rational order `m`, and spatial
+fractional order `alpha`.
+
+`parameters` supplies `T_final`, `diffusion`, `kappa`, `modes`, `N_finite`,
+`initial`, `forcing`, `A`, and `omega`. By default it also supplies
+`quadrature_order` and `step_sum_order`, which can be overridden per call.
+`experiment_grid()` turns the time target into the actual step
+\(T/\lceil T/\texttt{time_step}\rceil\), and the basis helper turns the
+spatial target into a uniform mesh. The wrapper passes the other values to
+`uniform_tadpole_error()` and explicitly chooses `coefficient_source =
+"computed"` for reproducible exact-beta coefficient lookup.
+
+Varying `h`, `time_step`, or `m` while fixing the other two produces the
+spatial, temporal, or rational study. Passing diagnostic `m = 0` measures
+the same norm with exact discrete fractional rates, retaining spatial and
+backward Euler error. The wrapper performs no regression, file export, or
+parameter sweep itself.
+
+```{r}
 tadpole_convergence_error <- function(h, time_step, m, alpha, parameters,
                                      quadrature_order = parameters$quadrature_order,
                                      step_sum_order = parameters$step_sum_order) {

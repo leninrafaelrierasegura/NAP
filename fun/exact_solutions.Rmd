@@ -1,5 +1,5 @@
 ---
-title: "Exact Solution and Forcing Functions"
+title: "Exact modal coefficients and quadrature"
 date: "Last modified: `r format(Sys.time(), '%d-%m-%Y.')`"
 output:
   html_document:
@@ -30,128 +30,67 @@ header-includes:
   - \newcommand{\Wcal}{\mathcal{W}}
 ---
 
-Go back to the [Contents](../about.html) page.
+These functions evaluate the analytic reference solution and the
+within-interval quadrature used to measure its error against the numerical
+solution. Write
 
-<div style="color: #2c3e50; text-align: right;">
-********  
-<strong>Press Show to reveal the code chunks.</strong>  
+\[
+L=\kappa^2-\Delta_\Gamma,\qquad \beta=\alpha/2,\qquad
+\partial_t u+D L^\beta u=f,\qquad u(0)=u_0.
+\]
 
-********
-</div>
+Here the Kirchhoff--Laplacian imposes continuity and conservation of outgoing
+flux at graph vertices. The code calls the positive multiplier \(D\)
+`diffusion`; the convergence experiments use \(D=1\). For orthonormal
+eigenfunctions \(Le_j=\lambda_j e_j\), let
 
+\[
+u_0=\sum_j x_j e_j,\qquad
+f(t)=A\sin(\omega t)\sum_j y_j e_j,\qquad
+a_j=D\lambda_j^\beta.
+\]
 
-```{r, purl = FALSE, echo = FALSE}
-# Create a clipboard button on the rendered HTML page
-source(here::here("clipboard.R")); clipboard
-```
+The modal coefficients solve independent scalar equations
+\(c_j'(t)+a_jc_j(t)=A y_j\sin(\omega t)\), with \(c_j(0)=x_j\).
+The arguments `initial`, `forcing`, and `rates` store \(x_j\), \(y_j\),
+and \(a_j\) in the same mode order. Quadrature below is for the error
+integral; the reference coefficients themselves use an analytic convolution.
 
+## `decayed_sine_convolution()`
 
-```{r, purl = FALSE, class.source = "fold-hide"}
-# Set seed for reproducibility
-set.seed(1982) 
-# Set global options for all code chunks
-knitr::opts_chunk$set(
-  # Disable messages printed by R code chunks
-  message = FALSE,    
-  # Disable warnings printed by R code chunks
-  warning = FALSE,    
-  # Show R code within code chunks in output
-  echo = TRUE,        
-  # Include both R code and its results in output
-  include = TRUE,     
-  # Evaluate R code chunks
-  eval = TRUE,       
-  # Enable caching of R code chunks for faster rendering
-  cache = FALSE,      
-  # Align figures in the center of the output
-  fig.align = "center",
-  # Enable retina display for high-resolution figures
-  retina = 2,
-  # Show errors in the output instead of stopping rendering
-  error = TRUE,
-  # Do not collapse code and output into a single block
-  collapse = FALSE
-)
-```
+For a single nonnegative rate \(a\), this function returns
 
-```{r}
-# remotes::install_github("davidbolin/rspde", ref = "devel")
-# remotes::install_github("davidbolin/metricgraph", ref = "devel")
-library(rSPDE)
-library(MetricGraph)
-library(grateful)
+\[
+S_a(t)=A\int_0^t e^{-a(t-s)}\sin(\omega s)\,ds
+=A\operatorname{Im}\left(
+\frac{e^{i\omega t}-e^{-at}}{a+i\omega}\right).
+\]
 
-library(ggplot2)
-library(reshape2)
-library(plotly)
-```
+When \(a^2+\omega^2>0\), the equivalent real expression is
 
+\[
+S_a(t)=\frac{A}{a^2+\omega^2}
+\left[a\sin(\omega t)-\omega\cos(\omega t)+\omega e^{-at}\right].
+\]
 
-Time-dependent forcing functions and closed-form integrals for exact solutions.
+`t` is a vector of finite nonnegative times; `rate`, `A`, and `omega` are
+scalar parameters. The return is a numeric vector of length `length(t)`.
+In particular, \(S_a(0)=0\); zero frequency gives zero forcing response.
 
-### Functions for computing an exact solution to the fractional diffusion equation {#exact_solution}
+Direct subtraction loses accuracy near \(t=0\), where the response starts
+at \(A\omega t^2/2\). With `z = (rate + 1i*omega)*t`, the small-argument
+branch uses
 
-Below we present closed-form expressions for $\displaystyle G_j(t)= \int_0^t e^{\lambda^{\alpha/2}_jr}g(r)dr$ corresponding to some choices of $g(r)$.
+\[
+S_a(t)=A e^{-at}t\operatorname{Im}
+\left[\sum_{k=1}^{\infty}\frac{z^k}{(k+1)!}\right].
+\]
 
-\begin{aligned}
-g(r) &= Ae^{-\lambda^{\alpha/2}_j r} &\implies\quad G_j(t) &= At, \quad A\in\mathbb{R} \\[1.5ex]
-g(r) &= Ae^{\mu r} &\implies\quad G_j(t) &= A \frac{e^{(\lambda^{\alpha/2}_j+\mu)t} - 1}{\lambda^{\alpha/2}_j + \mu}, \quad -\lambda^{\alpha/2}_j \ne \mu \in \mathbb{R} \\[1.5ex]
-g(r) &= Ar^n &\implies\quad G_j(t) &= A\frac{(-1)^{n+1} n!}{(\lambda_j^{\alpha/2})^{n+1}} \left(1 - e^{\lambda_j^{\alpha/2} t} \sum_{k=0}^n \frac{(-\lambda_j^{\alpha/2} t)^k}{k!} \right), \quad n=0,1,\dots \\[1.5ex]
-g(r) &= A\sin(\omega r) &\implies\quad G_j(t) &= A \frac{e^{\lambda_j^{\alpha/2} t} \left( \lambda_j^{\alpha/2} \sin(\omega t) - \omega \cos(\omega t) \right) + \omega}{(\lambda_j^{\alpha/2})^2 + \omega^2}, \quad \omega \in \mathbb{R} \\[1.5ex]
-g(r) &= A\cos(\theta r) &\implies\quad G_j(t) &= A \frac{e^{\lambda_j^{\alpha/2} t} \left( \lambda_j^{\alpha/2} \cos(\theta t) + \theta \sin(\theta t) \right) - \lambda_j^{\alpha/2}}{(\lambda_j^{\alpha/2})^2 + \theta^2}, \quad \theta \in \mathbb{R}
-\end{aligned}
-
-
-```{r}
-# Functions to compute the exact solution to the fractional diffusion equation
-g_linear <- function(r, A, lambda_j_alpha_half) {
-  return(A * exp(-lambda_j_alpha_half * r))
-  }
-G_linear <- function(t, A) {
-  return(A * t)
-  }
-g_exp <- function(r, A, mu) {
-  return(A * exp(mu * r))
-  }
-G_exp <- function(t, A, lambda_j_alpha_half, mu) {
-  exponent <- lambda_j_alpha_half + mu
-  return(A * (exp(exponent * t) - 1) / exponent)
-  }
-g_poly <- function(r, A, n) {
-  return(A * r^n)
-}
-G_poly <- function(t, A, lambda_j_alpha_half, n) {
-  t <- as.vector(t)
-  k_vals <- 0:n
-  sum_term <- sapply(t, function(tt) {
-    sum(((-lambda_j_alpha_half * tt)^k_vals) / factorial(k_vals))
-  })
-  coeff <- ((-1)^(n + 1)) * factorial(n) / (lambda_j_alpha_half^(n + 1))
-  return(A * coeff * (1 - exp(lambda_j_alpha_half * t) * sum_term))
-}
-g_sin <- function(r, A, omega) {
-  return(A * sin(omega * r))
-}
-G_sin <- function(t, A, lambda_j_alpha_half, omega) {
-  denom <- lambda_j_alpha_half^2 + omega^2
-  numerator <- exp(lambda_j_alpha_half * t) * (lambda_j_alpha_half * sin(omega * t) - omega * cos(omega * t)) + omega
-  return(A * numerator / denom)
-}
-g_cos <- function(r, A, theta) {
-  return(A * cos(theta * r)) 
-}
-G_cos <- function(t, A, lambda_j_alpha_half, theta) {
-  denom <- lambda_j_alpha_half^2 + theta^2
-  numerator <- exp(lambda_j_alpha_half * t) * (lambda_j_alpha_half * cos(theta * t) + theta * sin(theta * t)) - lambda_j_alpha_half
-  return(A * numerator / denom)
-}
-```
-
-### Stable modal solution and quadrature
-
-The decay rate is the full rate `diffusion * lambda^(alpha/2)`. The decayed
-sine convolution below avoids positive exponentials and uses a power series
-near zero to avoid cancellation of its two first-order terms.
+`term` generates each term recursively and `series` accumulates 24 terms
+when \(|z|<0.5\). The real constant term is omitted before taking the
+imaginary part. This also handles \(a=\omega=0\) without division by zero.
+The other branch evaluates the complex quotient directly using only
+non-growing exponentials.
 
 ```{r}
 decayed_sine_convolution <- function(t, rate, A = 1, omega = pi) {
@@ -180,7 +119,39 @@ decayed_sine_convolution <- function(t, rate, A = 1, omega = pi) {
   }
   answer
 }
+```
 
+## `exact_modal_coefficients()`
+
+Variation of constants gives
+
+\[
+c_j(t)=x_j e^{-a_jt}+y_j S_{a_j}(t),\qquad
+u(t)=\sum_j c_j(t)e_j.
+\]
+
+The loop fills row `j` of `out` with this expression, calling
+`decayed_sine_convolution()` for its second term. `rates`, `initial`, and
+`forcing` must have equal lengths, and the rates must be finite and positive.
+The result is a matrix with one row per supplied mode and one column per
+entry of `t`. Continuum rates \(D\lambda_j^\beta\) must be supplied when
+using this function as the exact reference.
+
+For the benchmark, \(\kappa=4\), \(D=1\), \(A=1\), \(\omega=\pi\),
+\(u_0=10e_5\), and \(f(t)=10\sin(\pi t)e_7\). The active wave numbers
+are \(w_5=3\pi/2\) and \(w_7=2\pi\), so
+\(\lambda_j=16+w_j^2\) and
+
+\[
+c_5(t)=10e^{-a_5t},\qquad
+c_7(t)=\frac{10}{a_7^2+\pi^2}
+\left[a_7\sin(\pi t)-\pi\cos(\pi t)+\pi e^{-a_7t}\right].
+\]
+
+Only these two coefficients are nonzero for these data. Thus their finite
+sum is the full continuum solution, with no omitted spectral tail.
+
+```{r}
 exact_modal_coefficients <- function(t, rates, initial, forcing, A = 1, omega = pi) {
   stopifnot(length(rates) == length(initial), length(rates) == length(forcing),
             all(is.finite(rates)), all(rates > 0))
@@ -191,7 +162,34 @@ exact_modal_coefficients <- function(t, rates, initial, forcing, A = 1, omega = 
   }
   out
 }
+```
 
+## `gauss_legendre_rule()`
+
+For `order` \(=q\), this returns the Gauss--Legendre nodes and weights on
+\([0,1]\), normalized so that
+
+\[
+\int_0^1 F(s)\,ds\approx\sum_{r=1}^q w_r F(s_r),\qquad
+\sum_{r=1}^q w_r=1.
+\]
+
+The rule is exact for polynomials of degree at most \(2q-1\). On
+\([-1,1]\), the Legendre Jacobi matrix has zero diagonal and off-diagonal
+entries \(J_{k,k+1}=k/\sqrt{4k^2-1}\). If its normalized eigenpair is
+\((\eta_r,v_r)\), transforming to \([0,1]\) gives
+
+\[
+s_r=(\eta_r+1)/2,\qquad w_r=(v_r)_1^2.
+\]
+
+`off` constructs the off-diagonal, `eigen()` diagonalizes `J`, and `ix`
+orders the returned nodes increasingly. The list contains `nodes` and
+`weights`, each of length `order`; supported integer orders are 2 through
+32. The error routine uses \(q=4\) by default, with
+\(t=(k-1+s_r)\tau\) inside each backward Euler interval.
+
+```{r}
 gauss_legendre_rule <- function(order = 4L) {
   stopifnot(length(order) == 1L, is.finite(order), order == as.integer(order),
             order >= 2L, order <= 32L)

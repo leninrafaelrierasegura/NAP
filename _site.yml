@@ -18,11 +18,11 @@ navbar:
         - text: "Example"
           href: exp1.html
         - text: "Convergence in 𝘩"
-          href: conv_in_h_with_logtau_and_tauminustwo.html
+          href: conv_in_h.html
         - text: "Convergence in τ"
-          href: conv_in_tau_with_logtau_and_tauminustwo.html
+          href: conv_in_tau.html
         - text: "Convergence in 𝑚"
-          href: conv_in_m_with_logtau_and_tauminustwo.html
+          href: conv_in_m.html
     # - text: "On a rectangle"
     #   menu:
     #     - text: "Example"

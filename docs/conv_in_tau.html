@@ -449,13 +449,13 @@ div.tocify {
       <a href="exp1.html">Example</a>
     </li>
     <li>
-      <a href="conv_in_h_with_logtau_and_tauminustwo.html">Convergence in 𝘩</a>
+      <a href="conv_in_h.html">Convergence in 𝘩</a>
     </li>
     <li>
-      <a href="conv_in_tau_with_logtau_and_tauminustwo.html">Convergence in τ</a>
+      <a href="conv_in_tau.html">Convergence in τ</a>
     </li>
     <li>
-      <a href="conv_in_m_with_logtau_and_tauminustwo.html">Convergence in 𝑚</a>
+      <a href="conv_in_m.html">Convergence in 𝑚</a>
     </li>
   </ul>
 </li>
@@ -493,7 +493,7 @@ div.tocify {
 
 
 <h1 class="title toc-ignore">Convergence in τ</h1>
-<h4 class="date">Last modified: 26-10-2026.</h4>
+<h4 class="date">Last modified: 27-10-2026.</h4>
 
 </div>
 
@@ -509,101 +509,80 @@ The exact reference, physical data, quadrature and error norm are
 identical. Outputs use the original fixed filenames under
 <code>data_files/</code> and <code>data_files/tikzpic/</code>.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;sourceifupdated.R&quot;</span>))</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/fractional_evolution&quot;</span>)</span></code></pre></div>
-<pre><code>## Loading required package: Matrix</code></pre>
-<pre><code>## This is rSPDE 2.5.1.9000
-## - See https://davidbolin.github.io/rSPDE for vignettes and manuals.</code></pre>
-<pre><code>## This is MetricGraph 1.5.0.9000
-## - See https://davidbolin.github.io/MetricGraph for vignettes and manuals.</code></pre>
-<pre><code>## 
-## Attaching package: &#39;MetricGraph&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:stats&#39;:
-## 
-##     filter</code></pre>
-<pre><code>## 
-## Attaching package: &#39;plotly&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:ggplot2&#39;:
-## 
-##     last_plot</code></pre>
-<pre><code>## The following object is masked from &#39;package:stats&#39;:
-## 
-##     filter</code></pre>
-<pre><code>## The following object is masked from &#39;package:graphics&#39;:
-## 
-##     layout</code></pre>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/exact_solutions&quot;</span>)</span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/tadpole_convergence&quot;</span>)</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/plotting&quot;</span>)</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/metafunctions&quot;</span>)</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="fu">library</span>(reshape2)</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">eval =</span> <span class="cn">FALSE</span>, <span class="at">cache =</span> <span class="cn">FALSE</span>, <span class="at">echo =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>fig_count <span class="ot">&lt;-</span> <span class="dv">0</span></span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>captioner <span class="ot">&lt;-</span> <span class="cf">function</span>(caption) {</span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  fig_count <span class="ot">&lt;&lt;-</span> fig_count <span class="sc">+</span> <span class="dv">1</span></span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">&quot;Figure &quot;</span>, fig_count, <span class="st">&quot;: &quot;</span>, caption)</span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>}</span></code></pre></div>
-<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Parameters: edit the one shared file, then rerun all three notebooks.</span></span>
-<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;fun/convergence_parameters.R&quot;</span>), <span class="at">local =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a>tau_vector <span class="ot">&lt;-</span> <span class="fu">vapply</span>(study_range, <span class="cf">function</span>(tau)</span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a>  <span class="fu">experiment_grid</span>(convergence_parameters<span class="sc">$</span>T_final, tau)<span class="sc">$</span>time_step, <span class="fu">numeric</span>(<span class="dv">1</span>))</span>
-<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a>study_parameters <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">problem =</span> convergence_parameters, <span class="at">alpha =</span> alpha_vector,</span>
-<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a>                         <span class="at">h =</span> h_fixed, <span class="at">tau =</span> tau_vector, <span class="at">m =</span> m_fixed)</span></code></pre></div>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/fractional_evolution&quot;</span>)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/exact_solutions&quot;</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/tadpole_convergence&quot;</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/plotting&quot;</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">source_if_updated</span>(<span class="st">&quot;fun/metafunctions&quot;</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="fu">library</span>(reshape2)</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(<span class="at">eval =</span> <span class="cn">FALSE</span>, <span class="at">cache =</span> <span class="cn">FALSE</span>, <span class="at">echo =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a>fig_count <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a>captioner <span class="ot">&lt;-</span> <span class="cf">function</span>(caption) {</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a>  fig_count <span class="ot">&lt;&lt;-</span> fig_count <span class="sc">+</span> <span class="dv">1</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a>  <span class="fu">paste0</span>(<span class="st">&quot;Figure &quot;</span>, fig_count, <span class="st">&quot;: &quot;</span>, caption)</span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a>}</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Parameters: edit the one shared file, then rerun all three notebooks.</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">source</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;fun/convergence_parameters.R&quot;</span>), <span class="at">local =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>tau_vector <span class="ot">&lt;-</span> <span class="fu">vapply</span>(study_range, <span class="cf">function</span>(tau)</span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="fu">experiment_grid</span>(convergence_parameters<span class="sc">$</span>T_final, tau)<span class="sc">$</span>time_step, <span class="fu">numeric</span>(<span class="dv">1</span>))</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>study_parameters <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">problem =</span> convergence_parameters, <span class="at">alpha =</span> alpha_vector,</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a>                         <span class="at">h =</span> h_fixed, <span class="at">tau =</span> tau_vector, <span class="at">m =</span> m_fixed)</span></code></pre></div>
 <p>The backward Euler time benchmark is first order. We vary the actual
 uniform time step over two orders of magnitude, keeping h=1e-5 and m=8
 fixed. The helper uses interval averages of the physical sinusoidal
 forcing and the same right-constant reconstruction as the direct
 time-stepping solver.</p>
-<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co"># Compute the error matrix and save at the original main-branch location.</span></span>
-<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a>errors_projected <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="cn">NA_real_</span>, <span class="fu">length</span>(tau_vector), <span class="fu">length</span>(alpha_vector))</span>
-<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(tau_vector)) {</span>
-<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a>  <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_along</span>(alpha_vector)) {</span>
-<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a>    errors_projected[i, j] <span class="ot">&lt;-</span> <span class="fu">tadpole_convergence_error</span>(</span>
-<span id="cb13-6"><a href="#cb13-6" tabindex="-1"></a>      <span class="at">h =</span> h_fixed, <span class="at">time_step =</span> tau_vector[i], <span class="at">m =</span> m_fixed,</span>
-<span id="cb13-7"><a href="#cb13-7" tabindex="-1"></a>      <span class="at">alpha =</span> alpha_vector[j], <span class="at">parameters =</span> convergence_parameters</span>
-<span id="cb13-8"><a href="#cb13-8" tabindex="-1"></a>    )</span>
-<span id="cb13-9"><a href="#cb13-9" tabindex="-1"></a>  }</span>
-<span id="cb13-10"><a href="#cb13-10" tabindex="-1"></a>}</span>
-<span id="cb13-11"><a href="#cb13-11" tabindex="-1"></a><span class="fu">save</span>(errors_projected, study_parameters,</span>
-<span id="cb13-12"><a href="#cb13-12" tabindex="-1"></a>     <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/errors_projected_tau.RData&quot;</span>))</span></code></pre></div>
-<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a><span class="co"># Verify that the fixed-name results belong to the parameters above.</span></span>
-<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>saved <span class="ot">&lt;-</span> <span class="fu">new.env</span>()</span>
-<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a><span class="fu">load</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/errors_projected_tau.RData&quot;</span>), <span class="at">envir =</span> saved)</span>
-<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(saved<span class="sc">$</span>study_parameters, study_parameters))</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>errors_projected <span class="ot">&lt;-</span> saved<span class="sc">$</span>errors_projected</span></code></pre></div>
-<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>observed_rates <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(alpha_vector))</span>
-<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="cf">for</span> (u <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(alpha_vector)) {</span>
-<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a>  observed_rates[u] <span class="ot">&lt;-</span> <span class="fu">coef</span>(<span class="fu">lm</span>(<span class="fu">log10</span>(errors_projected[, u]) <span class="sc">~</span> <span class="fu">log10</span>(tau_vector)))[<span class="dv">2</span>]</span>
-<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a>}</span>
-<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a></span>
-<span id="cb15-6"><a href="#cb15-6" tabindex="-1"></a>theoretical_rates <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(alpha_vector))</span>
-<span id="cb15-7"><a href="#cb15-7" tabindex="-1"></a></span>
-<span id="cb15-8"><a href="#cb15-8" tabindex="-1"></a></span>
-<span id="cb15-9"><a href="#cb15-9" tabindex="-1"></a>p_tau_tadpole <span class="ot">&lt;-</span> <span class="fu">error.convergence.plotter</span>(<span class="at">x_axis_vector =</span> tau_vector, </span>
-<span id="cb15-10"><a href="#cb15-10" tabindex="-1"></a>                                   alpha_vector, </span>
-<span id="cb15-11"><a href="#cb15-11" tabindex="-1"></a>                                   errors_projected, </span>
-<span id="cb15-12"><a href="#cb15-12" tabindex="-1"></a>                                   theoretical_rates, </span>
-<span id="cb15-13"><a href="#cb15-13" tabindex="-1"></a>                                   observed_rates,</span>
-<span id="cb15-14"><a href="#cb15-14" tabindex="-1"></a>                                   <span class="at">line_equation_fun =</span> loglog_line_equation,</span>
-<span id="cb15-15"><a href="#cb15-15" tabindex="-1"></a>                                   <span class="at">fig_title =</span> <span class="fu">expression</span>(<span class="st">&quot;Convergence in &quot;</span> <span class="sc">*</span> <span class="fu">italic</span>(tau)),</span>
-<span id="cb15-16"><a href="#cb15-16" tabindex="-1"></a>                                   <span class="at">x_axis_label =</span> <span class="fu">expression</span>(<span class="fu">italic</span>(tau)))</span>
-<span id="cb15-17"><a href="#cb15-17" tabindex="-1"></a></span>
-<span id="cb15-18"><a href="#cb15-18" tabindex="-1"></a>p_tau_nicer_tadpole <span class="ot">&lt;-</span> <span class="fu">errorConvergencePlotterLatex</span>(<span class="at">x_axis_vector =</span> tau_vector, </span>
-<span id="cb15-19"><a href="#cb15-19" tabindex="-1"></a>                                 alpha_vector, </span>
-<span id="cb15-20"><a href="#cb15-20" tabindex="-1"></a>                                 errors_projected, </span>
-<span id="cb15-21"><a href="#cb15-21" tabindex="-1"></a>                                 theoretical_rates, </span>
-<span id="cb15-22"><a href="#cb15-22" tabindex="-1"></a>                                 observed_rates,</span>
-<span id="cb15-23"><a href="#cb15-23" tabindex="-1"></a>                                 <span class="at">line_equation_fun =</span> loglog_line_equation,</span>
-<span id="cb15-24"><a href="#cb15-24" tabindex="-1"></a>                                 <span class="at">fig_title =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">mbox{Convergence in }</span><span class="sc">\\</span><span class="st">tau$&quot;</span>,</span>
-<span id="cb15-25"><a href="#cb15-25" tabindex="-1"></a>                                 <span class="at">x_axis_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">tau</span><span class="sc">\\</span><span class="st">quad(</span><span class="sc">\\</span><span class="st">log_{10}</span><span class="sc">\\</span><span class="st">mbox{ scale})$&quot;</span>,</span>
-<span id="cb15-26"><a href="#cb15-26" tabindex="-1"></a>                                 <span class="at">y_axis_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">|u-U_{h,m}^{</span><span class="sc">\\</span><span class="st">tau}</span><span class="sc">\\</span><span class="st">|_{L_2(</span><span class="sc">\\</span><span class="st">Gamma</span><span class="sc">\\</span><span class="st">times[0,T])}</span><span class="sc">\\</span><span class="st">quad(</span><span class="sc">\\</span><span class="st">log_{10}</span><span class="sc">\\</span><span class="st">mbox{ scale})$&quot;</span>,</span>
-<span id="cb15-27"><a href="#cb15-27" tabindex="-1"></a>                                 <span class="at">color_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">quad</span><span class="sc">\\</span><span class="st">quad</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">alpha</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">mathtt{theo}</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">mathtt{obs}</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">%</span><span class="sc">\\</span><span class="st">mathtt{re}$&quot;</span>)</span>
-<span id="cb15-28"><a href="#cb15-28" tabindex="-1"></a></span>
-<span id="cb15-29"><a href="#cb15-29" tabindex="-1"></a><span class="fu">ggsave</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/conv_rates_tau_tadpole.png&quot;</span>), <span class="at">width =</span> <span class="dv">4</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">plot =</span> p_tau_tadpole, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb15-30"><a href="#cb15-30" tabindex="-1"></a><span class="fu">myggsave</span>(p_tau_nicer_tadpole, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">use_mathpazo =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb15-31"><a href="#cb15-31" tabindex="-1"></a><span class="fu">save</span>(p_tau_tadpole, <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/p_tau_tadpole.RData&quot;</span>))</span>
-<span id="cb15-32"><a href="#cb15-32" tabindex="-1"></a><span class="fu">save</span>(p_tau_nicer_tadpole, <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/p_tau_nicer_tadpole.RData&quot;</span>))</span></code></pre></div>
-<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">include_graphics</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/tikzpic/p_tau_nicer_tadpole_with_mathpazo.pdf&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Compute the error matrix and save at the original main-branch location.</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>errors_projected <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="cn">NA_real_</span>, <span class="fu">length</span>(tau_vector), <span class="fu">length</span>(alpha_vector))</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(tau_vector)) {</span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>  <span class="cf">for</span> (j <span class="cf">in</span> <span class="fu">seq_along</span>(alpha_vector)) {</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>    errors_projected[i, j] <span class="ot">&lt;-</span> <span class="fu">tadpole_convergence_error</span>(</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>      <span class="at">h =</span> h_fixed, <span class="at">time_step =</span> tau_vector[i], <span class="at">m =</span> m_fixed,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>      <span class="at">alpha =</span> alpha_vector[j], <span class="at">parameters =</span> convergence_parameters</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>    )</span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  }</span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>}</span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="fu">save</span>(errors_projected, study_parameters,</span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a>     <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/errors_projected_tau.RData&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Verify that the fixed-name results belong to the parameters above.</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>saved <span class="ot">&lt;-</span> <span class="fu">new.env</span>()</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">load</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/errors_projected_tau.RData&quot;</span>), <span class="at">envir =</span> saved)</span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">identical</span>(saved<span class="sc">$</span>study_parameters, study_parameters))</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a>errors_projected <span class="ot">&lt;-</span> saved<span class="sc">$</span>errors_projected</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>observed_rates <span class="ot">&lt;-</span> <span class="fu">numeric</span>(<span class="fu">length</span>(alpha_vector))</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="cf">for</span> (u <span class="cf">in</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(alpha_vector)) {</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  observed_rates[u] <span class="ot">&lt;-</span> <span class="fu">coef</span>(<span class="fu">lm</span>(<span class="fu">log10</span>(errors_projected[, u]) <span class="sc">~</span> <span class="fu">log10</span>(tau_vector)))[<span class="dv">2</span>]</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>}</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>theoretical_rates <span class="ot">&lt;-</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(alpha_vector))</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a></span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>p_tau_tadpole <span class="ot">&lt;-</span> <span class="fu">error.convergence.plotter</span>(<span class="at">x_axis_vector =</span> tau_vector, </span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a>                                   alpha_vector, </span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>                                   errors_projected, </span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>                                   theoretical_rates, </span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>                                   observed_rates,</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>                                   <span class="at">line_equation_fun =</span> loglog_line_equation,</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>                                   <span class="at">fig_title =</span> <span class="fu">expression</span>(<span class="st">&quot;Convergence in &quot;</span> <span class="sc">*</span> <span class="fu">italic</span>(tau)),</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a>                                   <span class="at">x_axis_label =</span> <span class="fu">expression</span>(<span class="fu">italic</span>(tau)))</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>p_tau_nicer_tadpole <span class="ot">&lt;-</span> <span class="fu">errorConvergencePlotterLatex</span>(<span class="at">x_axis_vector =</span> tau_vector, </span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a>                                 alpha_vector, </span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a>                                 errors_projected, </span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a>                                 theoretical_rates, </span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a>                                 observed_rates,</span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a>                                 <span class="at">line_equation_fun =</span> loglog_line_equation,</span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a>                                 <span class="at">fig_title =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">mbox{Convergence in }</span><span class="sc">\\</span><span class="st">tau$&quot;</span>,</span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>                                 <span class="at">x_axis_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">tau</span><span class="sc">\\</span><span class="st">quad(</span><span class="sc">\\</span><span class="st">log_{10}</span><span class="sc">\\</span><span class="st">mbox{ scale})$&quot;</span>,</span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>                                 <span class="at">y_axis_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">|u-U_{h,m}^{</span><span class="sc">\\</span><span class="st">tau}</span><span class="sc">\\</span><span class="st">|_{L_2(</span><span class="sc">\\</span><span class="st">Gamma</span><span class="sc">\\</span><span class="st">times[0,T])}</span><span class="sc">\\</span><span class="st">quad(</span><span class="sc">\\</span><span class="st">log_{10}</span><span class="sc">\\</span><span class="st">mbox{ scale})$&quot;</span>,</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>                                 <span class="at">color_label =</span> <span class="st">&quot;$</span><span class="sc">\\</span><span class="st">quad</span><span class="sc">\\</span><span class="st">quad</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">alpha</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">mathtt{theo}</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">mathtt{obs}</span><span class="sc">\\</span><span class="st">;</span><span class="sc">\\</span><span class="st">;|</span><span class="sc">\\</span><span class="st">%</span><span class="sc">\\</span><span class="st">mathtt{re}$&quot;</span>)</span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a></span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="fu">ggsave</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/conv_rates_tau_tadpole.png&quot;</span>), <span class="at">width =</span> <span class="dv">4</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">plot =</span> p_tau_tadpole, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="fu">myggsave</span>(p_tau_nicer_tadpole, <span class="at">width =</span> <span class="dv">4</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">use_mathpazo =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="fu">save</span>(p_tau_tadpole, <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/p_tau_tadpole.RData&quot;</span>))</span>
+<span id="cb5-32"><a href="#cb5-32" tabindex="-1"></a><span class="fu">save</span>(p_tau_nicer_tadpole, <span class="at">file =</span> here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/p_tau_nicer_tadpole.RData&quot;</span>))</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">include_graphics</span>(here<span class="sc">::</span><span class="fu">here</span>(<span class="st">&quot;data_files/tikzpic/p_tau_nicer_tadpole_with_mathpazo.pdf&quot;</span>))</span></code></pre></div>
 <div class="figure" style="text-align: center">
 <embed src="data_files/tikzpic/p_tau_nicer_tadpole_with_mathpazo.pdf" title="Figure 1: Comparison between theoretical and observed convergence behavior for the $L_2(\Gamma\times(0,T))$-error with respect to $\tau$ on a $\text{log}_{10}$–$\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case." width="400px" height="500px" type="application/pdf" />
 <p class="caption">

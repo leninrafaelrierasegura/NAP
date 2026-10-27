@@ -2,7 +2,7 @@ source_if_updated <- function(name) {
   rmd_file  <- here::here(paste0(name, ".Rmd"))
   hash_file <- here::here(paste0(name, ".hash"))
   r_file    <- here::here(paste0(name, ".R"))
-  purl_file <- here::here("old/purl_log.txt")
+  purl_file <- here::here("purl_log.txt")
   
   new_hash <- digest::digest(file = rmd_file, algo = "md5")
   
