@@ -43,7 +43,7 @@ Go back to the [Contents](about.html) page.
 Let us set some global options for all code chunks in this document.
 
 
-```{r}
+```{r, eval = TRUE}
 # Create a clipboard button
 source(here::here("clipboard.R")); clipboard
 source(here::here("sourceifupdated.R"))
@@ -56,7 +56,7 @@ source_if_updated("fun/matrix_reference/reference_experiments")
 ```
 
 
-```{r}
+```{r, eval = TRUE}
 # Set seed for reproducibility
 set.seed(1982) 
 # Set global options for all code chunks
@@ -105,6 +105,13 @@ every FEM/backward Euler step and needs no discrete eigenfunction identities.
 Use `error_method = "reference"` for the original accumulator. Execution
 settings (`workers`, `error_n_blocks`) do not change the mathematical problem.
 
+Set the global `eval` option above to `TRUE` to reload the saved errors and
+regenerate the plots. The heavy setup and convergence computation remain in an
+explicitly disabled chunk; run that chunk manually only when recomputing.
+With global `eval = FALSE`, the explicitly enabled chunks display the saved
+figure and send its Slack update. Results and figures use fixed names under
+`data_files`, with the `_mat` suffix distinguishing this experiment.
+
 ```{r, eval = TRUE}
 # remotes::install_github("davidbolin/rspde", ref = "devel")
 # remotes::install_github("davidbolin/metricgraph", ref = "devel")
@@ -115,7 +122,9 @@ library(grateful)
 library(ggplot2)
 library(reshape2)
 library(plotly)
-# Results stay in the private run directory; no notification setup.
+library(slackr)
+source(here::here("keys.R"))
+slackr::slackr_setup(token = token) # token comes from keys.R
 ```
 
 
@@ -123,13 +132,12 @@ library(plotly)
 
 
 
-```{r}
+```{r, eval = TRUE}
 # Parameters
 T_final <- 1
 diffusion <- 1e-3 # nu > 0 in u_t + nu * L^(alpha/2) u = f
 workers <- 2L # independent complete cases; set 1L for serial execution
 error_method <- "compressed" # "reference" retains the original error accumulator
-run_id <- NULL # use an existing run ID only to reload matching parameters
 kappa <- 4
 N_finite <- 4 # choose even
 adjusted_N_finite <- N_finite + N_finite/2 + 1
@@ -159,37 +167,22 @@ stopifnot(length(unique(tau_vector)) == length(tau_vector))
 g_averages <- lapply(time_grids, function(grid) {
   average_sine_forcing(grid$time_seq, A = AAA, omega = OMEGA)
 })
-```
 
-
-
-```{r}
 # Reference quadrature and error accumulation.
 overkill_time_step <- 1e-5
 overkill_h <- 1e-5
 error_verbose <- TRUE
-
-study_parameters <- list(
-  study = "tau", T_final = T_final, diffusion = diffusion, kappa = kappa,
-  N_finite = N_finite, initial = coeff_U_0, forcing = coeff_FF,
-  A = AAA, omega = OMEGA, alpha = alpha_vector, axis = tau_targets,
-  fixed_h = h_fixed, fixed_m = m_fixed, time_steps = tau_vector, reference_h = overkill_h,
-  reference_time_step_target = overkill_time_step, error_method = error_method,
-  coefficient_source = "rSPDE package",
-  package_versions = vapply(c("Matrix", "MetricGraph", "rSPDE"),
-                           function(p) as.character(utils::packageVersion(p)), character(1)))
-run_dir <- reference_experiment_run("tau", study_parameters, run_id)
-result_file <- file.path(run_dir, "errors_projected_tau.RData")
-cat("Run ID:", basename(run_dir), "\nPrivate results:", run_dir, "\n")
-
-overkill_graph <- gets.graph.tadpole(h = overkill_h)
-overkill_graph$compute_fem()
-overkill_C <- overkill_graph$mesh$C
+error_n_blocks <- 1L
 ```
 
 
-```{r}
-error_n_blocks <- 1L
+
+```{r, eval = FALSE, class.source = "fold-show"}
+# Heavy setup and convergence computation: run manually to replace saved results.
+overkill_graph <- gets.graph.tadpole(h = overkill_h)
+overkill_graph$compute_fem()
+overkill_C <- overkill_graph$mesh$C
+
 # Preview modeled memory before allocating the reference time vector or solving.
 # estimated_gib excludes FEM/solver objects and other session memory by default.
 error_memory <- estimate_error_memory(
@@ -202,10 +195,7 @@ error_memory <- estimate_error_memory(
 )
 print(error_memory, digits = 3, row.names = FALSE)
 # Set error_n_blocks above to the desired count before running the experiment.
-```
 
-
-```{r}
 reference_grid <- make_time_grid(
   T_final = T_final, target_step = overkill_time_step
 )
@@ -237,12 +227,7 @@ spatial_load <- as.numeric(spatial_modes %*% coeff_FF)
 error_projection <- if (error_method == "compressed")
   prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
 m_values <- c()
-```
 
-
-```{r, eval = FALSE, class.source = "fold-show"}
-# Only the coordinator saves results; refuse overwriting an existing run.
-stopifnot(!file.exists(result_file))
 errors_projected <- matrix(NA_real_, length(tau_vector), length(alpha_vector))
 for (j in seq_along(alpha_vector)) {
   alpha <- alpha_vector[j]
@@ -269,16 +254,21 @@ for (j in seq_along(alpha_vector)) {
       error_projection = error_projection)
   }, workers = workers)
   errors_projected[, j] <- vapply(cases, identity, numeric(1))
+  for (i in seq_along(tau_vector)) {
+    slackr::slackr_msg(
+      text = paste0("Convergence in tau (matrix): m = ", m_fixed,
+                    ", alpha = ", alpha, ", h = ", h_fixed,
+                    ", time_step = ", tau_vector[i],
+                    ", error = ", errors_projected[i, j]),
+      channel = "#research")
+  }
 }
-save(errors_projected, study_parameters, file = result_file)
+save(errors_projected, file = here::here("data_files/errors_projected_tau_mat.RData"))
 ```
 
 ```{r}
 # Load the errors_projected data
-saved <- new.env()
-load(result_file, envir = saved)
-stopifnot(identical(saved$study_parameters, study_parameters))
-errors_projected <- saved$errors_projected
+load(here::here("data_files/errors_projected_tau_mat.RData"))
 ```
 
 
@@ -292,7 +282,7 @@ for (u in 1:length(alpha_vector)) {
 theoretical_rates <- rep(1, length(alpha_vector))
 
 
-p_tau_tadpole <- error.convergence.plotter(x_axis_vector = tau_vector, 
+p_tau_tadpole_mat <- error.convergence.plotter(x_axis_vector = tau_vector,
                                    alpha_vector, 
                                    errors_projected, 
                                    theoretical_rates, 
@@ -301,7 +291,7 @@ p_tau_tadpole <- error.convergence.plotter(x_axis_vector = tau_vector,
                                    fig_title = expression("Convergence in " * italic(tau)),
                                    x_axis_label = expression(italic(tau)))
 
-p_tau_nicer_tadpole <- errorConvergencePlotterLatex(x_axis_vector = tau_vector, 
+p_tau_nicer_tadpole_mat <- errorConvergencePlotterLatex(x_axis_vector = tau_vector,
                                  alpha_vector, 
                                  errors_projected, 
                                  theoretical_rates, 
@@ -312,26 +302,44 @@ p_tau_nicer_tadpole <- errorConvergencePlotterLatex(x_axis_vector = tau_vector,
                                  y_axis_label = "$\\|u-U_{h,m}^{\\tau}\\|_{L_2(\\Gamma\\times[0,T])}\\quad(\\log_{10}\\mbox{ scale})$",
                                  color_label = "$\\quad\\quad\\;\\;\\alpha\\;|\\;\\mathtt{theo}\\;|\\;\\;\\mathtt{obs}\\;\\;|\\%\\mathtt{re}$")
 
-ggsave(file.path(run_dir, "conv_rates_tau_tadpole.png"), width = 4, height = 5, plot = p_tau_tadpole, dpi = 300)
-myggsave(p_tau_nicer_tadpole, width = 4, height = 5, use_mathpazo = TRUE,
-         output_dir = file.path(run_dir, "tikzpic"), copy_to_presentation = FALSE)
-save(p_tau_tadpole, file = file.path(run_dir, "p_tau_tadpole.RData"))
-save(p_tau_nicer_tadpole, file = file.path(run_dir, "p_tau_nicer_tadpole.RData"))
+ggsave(here::here("data_files/conv_rates_tau_tadpole_mat.png"), width = 4, height = 5, plot = p_tau_tadpole_mat, dpi = 300)
+myggsave(p_tau_nicer_tadpole_mat, width = 4, height = 5, use_mathpazo = TRUE)
+save(p_tau_tadpole_mat, file = here::here("data_files/p_tau_tadpole_mat.RData"))
+save(p_tau_nicer_tadpole_mat, file = here::here("data_files/p_tau_nicer_tadpole_mat.RData"))
 ```
 
 
 ```{r, eval = TRUE, fig.align='center', out.width="400px", out.height="500px", fig.cap = captioner("Comparison between theoretical and observed convergence behavior for the $L_2(\\Gamma\\times(0,T))$-error with respect to $\\tau$ on a $\\text{log}_{10}$–$\\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case.")}
-knitr::include_graphics(file.path(run_dir, "tikzpic", "p_tau_nicer_tadpole_with_mathpazo.pdf"))
+knitr::include_graphics(here::here("data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.pdf"))
 ```
 
 
 
 
 
-Results and figures are saved under `run_dir`. No notifications are sent.
+```{r, eval = TRUE, echo = FALSE}
+slackr::slackr_upload(
+  filename = here::here("data_files/conv_rates_tau_tadpole_mat.png"),
+  initial_comment = "Here’s the latest plot update for the convergence in τ (matrix)!",
+  channels = "#research")
+
+numeric_settings <- list(T_final = T_final, diffusion = diffusion, kappa = kappa,
+                         N_finite = N_finite, m_fixed = m_fixed,
+                         h_fixed = h_fixed, overkill_h = overkill_h,
+                         overkill_time_step = overkill_time_step)
+scalar_msg <- paste(
+  sprintf("%s = %s", names(numeric_settings), unlist(numeric_settings)),
+  collapse = "\n")
+tau_msg <- paste(sprintf("%.12f", tau_vector), collapse = ", ")
+alpha_msg <- paste(alpha_vector, collapse = ", ")
+slackr::slackr_msg(
+  text = paste("Convergence in tau (matrix): notebook settings\n", scalar_msg,
+               "\n\ntau_vector =", tau_msg, "\nalpha_vector =", alpha_msg),
+  channel = "#research")
+```
 
 # References
 
 ```{r, eval = TRUE}
-if (exists("run_dir")) cite_packages(output = "paragraph", out.dir = run_dir)
+cite_packages(output = "paragraph", out.dir = ".")
 ```
