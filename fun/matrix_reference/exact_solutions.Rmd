@@ -1,0 +1,198 @@
+---
+title: "Exact Solution and Forcing Functions"
+date: "Last modified: `r format(Sys.time(), '%d-%m-%Y.')`"
+output:
+  html_document:
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    highlight: pygments
+    theme: flatly
+    code_folding: show # class.source = "fold-hide" to hide code and add a button to show it
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    fig_caption: true
+    code_download: true
+    css: visual.css
+always_allow_html: true
+bibliography: 
+  - references.bib
+  - grateful-refs.bib
+header-includes:
+  - \newcommand{\ar}{\mathbb{R}}
+  - \newcommand{\llav}[1]{\left\{#1\right\}}
+  - \newcommand{\pare}[1]{\left(#1\right)}
+  - \newcommand{\Ncal}{\mathcal{N}}
+  - \newcommand{\Vcal}{\mathcal{V}}
+  - \newcommand{\Ecal}{\mathcal{E}}
+  - \newcommand{\Wcal}{\mathcal{W}}
+---
+
+Go back to the [Contents](../about.html) page.
+
+<div style="color: #2c3e50; text-align: right;">
+********  
+<strong>Press Show to reveal the code chunks.</strong>  
+
+********
+</div>
+
+
+```{r, purl = FALSE, echo = FALSE}
+# Create a clipboard button on the rendered HTML page
+source(here::here("clipboard.R")); clipboard
+```
+
+
+```{r, purl = FALSE, class.source = "fold-hide"}
+# Set seed for reproducibility
+set.seed(1982) 
+# Set global options for all code chunks
+knitr::opts_chunk$set(
+  # Disable messages printed by R code chunks
+  message = FALSE,    
+  # Disable warnings printed by R code chunks
+  warning = FALSE,    
+  # Show R code within code chunks in output
+  echo = TRUE,        
+  # Include both R code and its results in output
+  include = TRUE,     
+  # Evaluate R code chunks
+  eval = TRUE,       
+  # Enable caching of R code chunks for faster rendering
+  cache = FALSE,      
+  # Align figures in the center of the output
+  fig.align = "center",
+  # Enable retina display for high-resolution figures
+  retina = 2,
+  # Show errors in the output instead of stopping rendering
+  error = TRUE,
+  # Do not collapse code and output into a single block
+  collapse = FALSE
+)
+```
+
+```{r}
+# remotes::install_github("davidbolin/rspde", ref = "devel")
+# remotes::install_github("davidbolin/metricgraph", ref = "devel")
+library(rSPDE)
+library(MetricGraph)
+library(grateful)
+
+library(ggplot2)
+library(reshape2)
+library(plotly)
+```
+
+
+Time-dependent forcing functions and closed-form integrals for exact solutions.
+
+### Functions for computing an exact solution to the fractional diffusion equation {#exact_solution}
+
+Below we present closed-form expressions for $\displaystyle G_j(t)= \int_0^t e^{\lambda^{\alpha/2}_jr}g(r)dr$ corresponding to some choices of $g(r)$.
+
+\begin{aligned}
+g(r) &= Ae^{-\lambda^{\alpha/2}_j r} &\implies\quad G_j(t) &= At, \quad A\in\mathbb{R} \\[1.5ex]
+g(r) &= Ae^{\mu r} &\implies\quad G_j(t) &= A \frac{e^{(\lambda^{\alpha/2}_j+\mu)t} - 1}{\lambda^{\alpha/2}_j + \mu}, \quad -\lambda^{\alpha/2}_j \ne \mu \in \mathbb{R} \\[1.5ex]
+g(r) &= Ar^n &\implies\quad G_j(t) &= A\frac{(-1)^{n+1} n!}{(\lambda_j^{\alpha/2})^{n+1}} \left(1 - e^{\lambda_j^{\alpha/2} t} \sum_{k=0}^n \frac{(-\lambda_j^{\alpha/2} t)^k}{k!} \right), \quad n=0,1,\dots \\[1.5ex]
+g(r) &= A\sin(\omega r) &\implies\quad G_j(t) &= A \frac{e^{\lambda_j^{\alpha/2} t} \left( \lambda_j^{\alpha/2} \sin(\omega t) - \omega \cos(\omega t) \right) + \omega}{(\lambda_j^{\alpha/2})^2 + \omega^2}, \quad \omega \in \mathbb{R} \\[1.5ex]
+g(r) &= A\cos(\theta r) &\implies\quad G_j(t) &= A \frac{e^{\lambda_j^{\alpha/2} t} \left( \lambda_j^{\alpha/2} \cos(\theta t) + \theta \sin(\theta t) \right) - \lambda_j^{\alpha/2}}{(\lambda_j^{\alpha/2})^2 + \theta^2}, \quad \theta \in \mathbb{R}
+\end{aligned}
+
+
+```{r}
+# Functions to compute the exact solution to the fractional diffusion equation
+g_linear <- function(r, A, lambda_j_alpha_half) {
+  return(A * exp(-lambda_j_alpha_half * r))
+  }
+G_linear <- function(t, A) {
+  return(A * t)
+  }
+g_exp <- function(r, A, mu) {
+  return(A * exp(mu * r))
+  }
+G_exp <- function(t, A, lambda_j_alpha_half, mu) {
+  exponent <- lambda_j_alpha_half + mu
+  return(A * (exp(exponent * t) - 1) / exponent)
+  }
+g_poly <- function(r, A, n) {
+  return(A * r^n)
+}
+G_poly <- function(t, A, lambda_j_alpha_half, n) {
+  t <- as.vector(t)
+  k_vals <- 0:n
+  sum_term <- sapply(t, function(tt) {
+    sum(((-lambda_j_alpha_half * tt)^k_vals) / factorial(k_vals))
+  })
+  coeff <- ((-1)^(n + 1)) * factorial(n) / (lambda_j_alpha_half^(n + 1))
+  return(A * coeff * (1 - exp(lambda_j_alpha_half * t) * sum_term))
+}
+g_sin <- function(r, A, omega) {
+  return(A * sin(omega * r))
+}
+G_sin <- function(t, A, lambda_j_alpha_half, omega) {
+  denom <- lambda_j_alpha_half^2 + omega^2
+  numerator <- exp(lambda_j_alpha_half * t) * (lambda_j_alpha_half * sin(omega * t) - omega * cos(omega * t)) + omega
+  return(A * numerator / denom)
+}
+g_cos <- function(r, A, theta) {
+  return(A * cos(theta * r)) 
+}
+G_cos <- function(t, A, lambda_j_alpha_half, theta) {
+  denom <- lambda_j_alpha_half^2 + theta^2
+  numerator <- exp(lambda_j_alpha_half * t) * (lambda_j_alpha_half * cos(theta * t) + theta * sin(theta * t)) - lambda_j_alpha_half
+  return(A * numerator / denom)
+}
+```
+
+### Exact coefficients with a diffusion multiplier
+
+For $u_t+\nu L^{\alpha/2}u=f$, use the full rates
+$a_j=\nu\lambda_j^{\alpha/2}$ below. The forcing coefficients,
+amplitude, and physical time are unchanged. These functions evaluate the
+same analytic reference as `G_sin()` multiplied by its decaying exponential,
+with stable small-argument formulas. Rows correspond to exact spatial modes;
+columns correspond to the supplied reference times. They do not evolve the
+numerical FEM solution and introduce no new quadrature rule.
+
+```{r}
+decayed_sine_convolution <- function(t, rate, A = 1, omega = pi) {
+  stopifnot(all(is.finite(t)), all(t >= 0), length(rate) == 1L,
+            is.finite(rate), rate >= 0, is.finite(A), is.finite(omega))
+  z <- (rate + 1i * omega) * t
+  small <- Mod(z) < 0.5
+  answer <- numeric(length(t))
+  if (any(small)) {
+    # exp(-rate*t) * (exp(z)-1)/z; subtract the real constant before
+    # taking the imaginary part so the sine response is O(t^2) accurately.
+    zz <- z[small]
+    term <- rep(1 + 0i, length(zz))
+    series <- rep(0 + 0i, length(zz))
+    for (k in 1:24) {
+      term <- term * zz / (k + 1)
+      series <- series + term
+    }
+    answer[small] <- A * exp(-rate * t[small]) * t[small] * Im(series)
+  }
+  if (any(!small)) {
+    tt <- t[!small]
+    answer[!small] <- A * Im(
+      (exp(1i * omega * tt) - exp(-rate * tt)) / (rate + 1i * omega)
+    )
+  }
+  answer
+}
+
+exact_modal_coefficients <- function(t, rates, initial, forcing, A = 1, omega = pi) {
+  stopifnot(length(rates) == length(initial), length(rates) == length(forcing),
+            all(is.finite(rates)), all(rates > 0))
+  out <- matrix(0, nrow = length(rates), ncol = length(t))
+  for (j in seq_along(rates)) {
+    out[j, ] <- initial[j] * exp(-rates[j] * t) + forcing[j] *
+      decayed_sine_convolution(t, rates[j], A = A, omega = omega)
+  }
+  out
+}
+```

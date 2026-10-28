@@ -1,0 +1,1589 @@
+---
+title: "From NAFDEMG-main to NAP: a mathematical comparison"
+subtitle: "Deriving the modal construction from the matrix construction"
+date: "27 October 2026"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    highlight: pygments
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    self_contained: true
+---
+
+# Purpose and precise meaning of equivalence
+
+This note assumes that the reader already understands the construction in
+the `main` branch of NAFDEMG and the numerical experiments in `main.tex`:
+assemble finite element matrices, project the initial condition, assemble
+the forcing, apply the rational backward Euler update, and measure the
+error on a reference space--time mesh. It derives the construction used by
+NAP and `main_copy.tex` from those objects.
+
+The central statement is conditional and exact:
+
+> Fix the same actual uniform graph mesh, time grid, physical data, and
+> scalar rational function. Assemble the initial and forcing loads exactly.
+> Then the matrix update and NAP's modal recurrence produce the same finite
+> element function at every solver time. The modal formula for its spatial
+> error is also exact in real arithmetic.
+
+Several additional choices must be distinguished from this identity.
+NAP uses exact spatial loads, a different source of rational coefficients,
+different experiment parameters, and a different quadrature for the
+space--time error. Thus equivalence of the discrete evolution does not mean
+equality of the numbers produced by the two repositories with their shipped
+settings.
+
+The note separates four mathematical objects throughout:
+
+| Object | Meaning |
+|---|---|
+| The continuum solution \(u\) | The solution of the differential equation |
+| The discrete iterates \(U_{h,m}^k\) | The rational FEM/backward Euler solution |
+| The exact error \(E\) | The norm of the difference between those two functions, with right-constant time reconstruction |
+| The reported errors \(E_\star\) and \(\widehat E\) | Different quadrature approximations to that norm |
+
+All equations needed for the comparison are written here. No paper equation
+numbers or source line numbers are needed. The comparison of settings uses
+the NAFDEMG `main` sources at commit
+`bdbfc925d1ccc92d7378f45d7ed9c86d765e9656` and the NAP sources inspected on
+the date above. The final source guide links the relevant files. This
+document contains no executable experiment chunks and has no dependency on
+saved error matrices or notification services.
+
+# Start from the familiar matrix construction
+
+## The model, finite element space, and coefficient vectors
+
+Let \(\Gamma\) be the tadpole with a terminal edge of length 1 and a loop
+of length 2. Define
+
+\[
+L=\kappa^2-\Delta_\Gamma,\qquad \beta=\alpha/2,\qquad
+\partial_tu+L^\beta u=f,\qquad u(0)=u_0.
+\]
+
+The domain of the Kirchhoff--Laplacian imposes continuity at vertices and
+zero sum of outgoing derivatives. At the degree-one terminal vertex this
+is a Neumann condition.
+
+Take the same continuous P1 finite element space \(V_h\) as in the matrix
+construction, with nodal basis \(\{\psi_i\}_{i=1}^{N_h}\). Write
+
+\[
+v_h=\sum_i V_i\psi_i,\qquad
+C_{ij}=(\psi_j,\psi_i),\qquad
+G_{ij}=(\psi_j',\psi_i'),\qquad K=\kappa^2C+G.
+\]
+
+Inner products without a subscript are in \(L_2(\Gamma)\). The coefficient
+vector \(V\) and the function \(v_h\) are different representations of
+the same finite element object. In particular,
+
+\[
+\|v_h\|^2=V^{\mathsf T}CV.
+\]
+
+The discrete operator is defined by
+
+\[
+(L_hv_h,z_h)=\kappa^2(v_h,z_h)+(v_h',z_h')
+\quad\text{for every }z_h\in V_h.
+\]
+
+Its coefficient matrix is \(C^{-1}K\). The matrix named `L` in the
+NAFDEMG convergence notebooks is \(K\), not \(C^{-1}K\). Accordingly,
+discrete eigenvectors satisfy the generalized eigenproblem
+
+\[
+KV=\lambda_h CV.
+\]
+
+This distinction is important when translating the shifted solves in the
+old code into scalar eigenvalue formulas.
+
+## Projection and loads
+
+The orthogonal projection \(P_hv\in V_h\) is characterized by
+
+\[
+(P_hv,z_h)=(v,z_h)\quad\text{for every }z_h\in V_h.
+\]
+
+If \(b(v)_i=(v,\psi_i)\), its coefficient vector is
+\(C^{-1}b(v)\). Thus the familiar initialization
+
+\[
+CU^0=b(u_0)
+\]
+
+already gives \(P_hu_0\). No change from nodal initialization to
+orthogonal initialization is involved in moving to NAP.
+
+For uniform times \(t_k=k\tau\), \(N\tau=T\), the forcing average is
+
+\[
+f^k=\frac1\tau\int_{t_{k-1}}^{t_k}f(t)\,dt,
+\qquad F_i^k=(f^k,\psi_i).
+\]
+
+The coefficient vector of \(P_hf^k\) is \(C^{-1}F^k\).
+For \(\beta=1\), the usual backward Euler update is
+
+\[
+(C+\tau K)U^k=CU^{k-1}+\tau F^k.
+\]
+
+The fractional/rational update replaces \(L_h\) by an approximation of
+\(L_h^\beta\), while retaining the same mass inner product and loads.
+
+## The exact solution is already a two-mode solution
+
+For orthonormal continuum eigenfunctions \(Le_j=\lambda_je_j\), the
+benchmark data are
+
+\[
+u_0=10e_5,\qquad f(t)=10\sin(\pi t)e_7,\qquad
+w_5=3\pi/2,\quad w_7=2\pi,\quad \lambda_j=\kappa^2+w_j^2.
+\]
+
+Set \(a_j=\lambda_j^\beta\). Both manuscripts use
+
+\[
+u(t)=c_5(t)e_5+c_7(t)e_7,
+\]
+
+\[
+c_5(t)=10e^{-a_5t},\qquad
+c_7(t)=\frac{10}{a_7^2+\pi^2}
+\left[a_7\sin(\pi t)-\pi\cos(\pi t)+\pi e^{-a_7t}\right].
+\]
+
+This is the full continuum solution for these data. Taking only these
+two modes introduces no spectral truncation error. A new fact must still
+be proved before reducing the *discrete* solution to two modes: the
+projections of these functions must span an invariant subspace of the
+discrete operator. That is the purpose of the next section.
+
+# Why the projected modes are discrete eigenfunctions
+
+## The extra mesh assumption
+
+NAP chooses a single element length \(h=1/n\). The terminal edge has
+\(n\) elements and the loop has \(2n\) elements. Every element on both
+edges therefore has exactly the same length.
+
+For a requested target \(\eta\), NAP uses
+
+\[
+n=\max\{1,\lceil\eta^{-1}\rceil\},\qquad h=1/n,
+\]
+
+with a floating-point snap near integer reciprocals. The following proof
+concerns the actual partition. Two mesh generators receiving the same
+target need not produce the same partition; a comparison must match the
+actual element lengths and connectivity.
+
+Let \(I_he\) be the nodal interpolant of a continuum eigenfunction with
+wave number \(w\), so \(-e''=w^2e\) on every edge. Its nodal coefficient
+vector is \(E_v=e(v)\). We first prove that \(I_he\) is a discrete
+eigenfunction, and then identify \(P_he\).
+
+## The vertex conditions preserve the trigonometric stencil
+
+At any mesh node \(v\), parameterize each incident element by distance
+\(s\) directed away from the node. Let \(d_v\) count the incident
+elements, counting the two ends of a loop separately. On incidence \(r\),
+
+\[
+e_r(s)=E_v\cos(ws)+\frac{\partial_re(v)}{w}\sin(ws).
+\]
+
+Write \(z=wh\). Summing the values at the neighboring nodes gives
+
+\[
+\sum_{r=1}^{d_v}e_r(h)
+=d_v E_v\cos z+
+\frac{\sin z}{w}\sum_{r=1}^{d_v}\partial_re(v)
+=d_v E_v\cos z.
+\]
+
+The derivative sum vanishes at graph vertices by the Kirchhoff condition.
+At an interior edge node the two outgoing derivatives cancel by smoothness.
+At the terminal vertex its single outgoing derivative is zero. Thus this
+identity covers the degree-three junction as well as ordinary edge nodes.
+
+For P1 elements, each incident element contributes
+\((E_v-E_{\mathrm{neighbor}})/h\) to the stiffness row and
+\(h(2E_v+E_{\mathrm{neighbor}})/6\) to the mass row. Hence
+
+\[
+(GE)_v=\frac{d_v}{h}(1-\cos z)E_v,
+\qquad
+(CE)_v=\frac{d_vh}{6}(2+\cos z)E_v.
+\]
+
+Their ratio is independent of the node and its degree:
+
+\[
+GE=\nu_h(w)CE,\qquad
+\nu_h(w)=\frac{6(1-\cos(wh))}{h^2(2+\cos(wh))}
+=\frac{12\sin^2(wh/2)}{h^2(2+\cos(wh))}.
+\]
+
+Adding the shift yields
+
+\[
+KE=\lambda_h(w)CE,\qquad
+\lambda_h(w)=\kappa^2+\nu_h(w).
+\]
+
+This establishes the eigenfunction property for the interpolant. Equal
+element lengths make the same trigonometric factor appear in every row.
+
+## The projection is a scalar multiple of the interpolant
+
+Let \(b_i=(e,\psi_i)\), and let \(p\) be the coefficients of \(P_he\),
+so \(Cp=b\). On each element the derivative of any \(v_h\in V_h\) is
+constant. The fundamental theorem of calculus therefore gives
+
+\[
+\big((I_he)',v_h'\big)
+=\sum_{[a,b]}v_h'|_{[a,b]}\,[e(b)-e(a)]
+=(e',v_h').
+\]
+
+Integration by parts on all edges and cancellation of the vertex terms give
+
+\[
+(e',v_h')=w^2(e,v_h).
+\]
+
+Taking nodal test functions yields \(GE=w^2b\). Combining this with
+\(GE=\nu_h(w)CE\), for \(w>0\), gives
+
+\[
+p=C^{-1}b=\rho_h(w)E,\qquad
+\rho_h(w)=\frac{\nu_h(w)}{w^2}
+=\frac{3\operatorname{sinc}^2(wh/2)}{2+\cos(wh)},
+\]
+
+where \(\operatorname{sinc}(x)=\sin(x)/x\), continuously extended by
+\(\operatorname{sinc}(0)=1\). Thus
+
+\[
+\boxed{P_he=\rho_h(w)I_he,\qquad
+L_hP_he=\lambda_h(w)P_he.}
+\]
+
+For \(w=0\), the eigenfunction is constant and belongs to \(V_h\), so
+the same statement holds with \(\rho_h(0)=1\) and
+\(\lambda_h(0)=\kappa^2\).
+
+The proportionality factor matters: projection and interpolation are
+different functions in general. NAP uses the projected functions. The
+proof is an identity of this uniform P1 setting and does not assert that
+orthogonal projection generally preserves continuum eigenfunctions on
+arbitrary meshes.
+
+For the modes retained by NAP, \(0<wh<\pi/2\). This resolution condition
+keeps the sampled modes nonzero and away from aliasing. The formula also
+shows that the FEM eigenvalue is genuinely different from the continuum
+one:
+
+\[
+\lambda_h(w)=\kappa^2+w^2+\frac{w^4h^2}{12}+O(h^4)
+\quad\text{for fixed }w.
+\]
+
+## An explicit check at the tadpole junction
+
+Choose terminal-edge coordinate \(x\in[0,1]\), directed toward the
+junction, and loop coordinate \(x\in[0,2]\), beginning and ending there.
+The two normalized modes can be written
+
+\[
+e_5|_{\mathrm{terminal}}=\frac2{\sqrt3}\cos(3\pi x/2),
+\qquad
+e_5|_{\mathrm{loop}}=\frac1{\sqrt3}\sin(3\pi x/2),
+\]
+
+\[
+e_7|_{\mathrm{terminal}}=\sqrt{\frac23}\cos(2\pi x),
+\qquad
+e_7|_{\mathrm{loop}}=\sqrt{\frac23}\cos(2\pi x).
+\]
+
+For \(e_5\), the three outgoing derivatives at the junction are
+\(-2w_5/\sqrt3\), \(w_5/\sqrt3\), and \(w_5/\sqrt3\), whose sum
+vanishes. For \(e_7\), all three derivatives vanish individually.
+These are concrete instances of the cancellation used in the matrix proof.
+
+# Where the projection norm and orthogonality formulas come from
+
+## Deriving the scalar weight \(g_{j,h}\)
+
+The projected modes \(\phi_{j,h}=P_he_j\) need not have unit norm. NAP
+retains their squared norms rather than renormalizing their coefficients.
+We now derive the weight used in its error formula.
+
+Define a diagonal matrix \(D_h\) by
+\((D_h)_{vv}=d_vh/2\). Its quadratic form is the composite trapezoidal
+sum of nodal squares. The mass-row formula above implies
+
+\[
+CE=\frac{2+\cos z}{3}D_hE.
+\]
+
+For either of the two normalized modes displayed above,
+
+\[
+E^{\mathsf T}D_hE=1.
+\]
+
+Indeed, their squares are linear combinations of constants and
+\(\cos(2wx)\) on each edge. For these edge lengths and frequencies, the
+integral and the uniform composite trapezoidal sum of each oscillatory
+term both vanish. This can be checked by summing a geometric progression.
+Consequently the trapezoidal sum equals the exact normalized squared norm.
+The resolution condition excludes the aliasing cases of that sum.
+
+It follows that
+
+\[
+\|I_he_j\|^2=E_j^{\mathsf T}CE_j=\frac{2+\cos z_j}{3},
+\qquad z_j=w_jh.
+\]
+
+Since \(P_he_j=\rho_h(w_j)I_he_j\),
+
+\[
+\boxed{
+g_{j,h}:=\|P_he_j\|^2
+=\rho_h(w_j)^2\frac{2+\cos z_j}{3}
+=\frac{3\operatorname{sinc}^4(z_j/2)}{2+\cos z_j}.}
+\]
+
+The diagonal matrix \(D_h\) was used only to prove the identity. The
+evolution scheme and the projection still use the consistent mass matrix
+\(C\).
+
+## Why there are no cross terms for modes 5 and 7
+
+The operator \(L_h\) is self-adjoint in the mass inner product. Thus
+
+\[
+\lambda_{5,h}(\phi_{5,h},\phi_{7,h})
+=(L_h\phi_{5,h},\phi_{7,h})
+=(\phi_{5,h},L_h\phi_{7,h})
+=\lambda_{7,h}(\phi_{5,h},\phi_{7,h}).
+\]
+
+The function \(\nu_h(w)\) is strictly increasing for \(0<wh<\pi\),
+so the two resolved wave numbers have distinct discrete eigenvalues.
+Therefore \((\phi_{5,h},\phi_{7,h})=0\).
+
+Projection orthogonality also gives
+
+\[
+(e_i-P_he_i,e_j-P_he_j)
+=\delta_{ij}-(P_he_i,P_he_j).
+\]
+
+The residual modes are consequently orthogonal as well, with squared
+norms \(1-g_{j,h}\). In particular,
+
+\[
+1-g_{j,h}=\frac{z_j^4}{720}+O(z_j^6),\qquad
+\|e_j-P_he_j\|=O(h^2).
+\]
+
+The small projection error is fully present even though no reference mesh
+is constructed.
+
+# The rational matrix update becomes the same scalar multiplier
+
+## Keep the inverse approximation and the decay rate distinct
+
+Introduce the normalized coefficient operator
+
+\[
+B=\kappa^{-2}C^{-1}K.
+\]
+
+Its eigenvalues are \(z_j=\lambda_{j,h}/\kappa^2\), not
+\(\lambda_{j,h}\) themselves. Given polynomials
+
+\[
+q_1(x)=c_m\prod_{i=1}^m(x-\xi_i),\qquad
+q_2(x)=b_{m+1}\prod_{i=1}^{m+1}(x-\zeta_i),
+\]
+
+approximate \(x^{\beta-1}\) by \(q_1(x)/q_2(x)\). Multiplication by
+\(x\), followed by \(x=z^{-1}\), gives
+
+\[
+\mathcal R_{m,\beta}(z)
+=x\frac{q_1(x)}{q_2(x)}\bigg|_{x=1/z}
+=F_{m,\beta}\frac{P(z)}{Q(z)}\approx z^{-\beta},
+\]
+
+\[
+F_{m,\beta}=\frac{c_m}{b_{m+1}},\qquad
+P(z)=\prod_{i=1}^m(1-\xi_i z),\qquad
+Q(z)=\prod_{i=1}^{m+1}(1-\zeta_i z).
+\]
+
+The list fields `pr_roots`, `pl_roots`, and `factor` store
+\(\xi_i\), \(\zeta_i\), and \(F_{m,\beta}\), respectively. The
+stored roots are roots in the reciprocal variable \(x\); the poles of
+\(\mathcal R\) as a function of \(z\) are \(1/\zeta_i\).
+
+Let \(\mathcal R(B)\) denote the resulting matrix function. The
+approximation of \(L_h^\beta\) is represented by
+
+\[
+A_{h,m}=\kappa^{2\beta}\mathcal R(B)^{-1}.
+\]
+
+Thus \(\mathcal R\) approximates an inverse power, whereas the positive
+decay rate involves its reciprocal. These two roles explain the division
+in NAP's `rational_modal_rates()`.
+
+## Recovering the original shifted solves
+
+For \(q^k=U^{k-1}+\tau C^{-1}F^k\), the rational backward Euler update is
+
+\[
+U^k=S_\tau(B)q^k,\qquad
+S_\tau(z)=\frac{\mathcal R(z)}{\mathcal R(z)+\tau\kappa^{2\beta}}
+=\frac{P(z)}{P(z)+\sigma Q(z)},\qquad
+\sigma=\frac{\tau\kappa^{2\beta}}{F_{m,\beta}}.
+\]
+
+If \(p_\ell\) are the simple poles of this update, its partial fraction
+representation is
+
+\[
+S_\tau(z)=\sum_{\ell=1}^{m+1}\frac{r_\ell}{z-p_\ell}.
+\]
+
+Since
+
+\[
+B-p_\ell I=C^{-1}(K/\kappa^2-p_\ell C),
+\]
+
+we obtain exactly the matrix form used by the original solver:
+
+\[
+\boxed{
+U^k=\sum_{\ell=1}^{m+1}r_\ell
+(K/\kappa^2-p_\ell C)^{-1}
+(CU^{k-1}+\tau F^k).}
+\]
+
+For simple poles the residue can be written in either form
+
+\[
+r_\ell=
+\frac{P(p_\ell)}{P'(p_\ell)+\sigma Q'(p_\ell)}
+=-\frac{\sigma Q(p_\ell)}{P'(p_\ell)+\sigma Q'(p_\ell)}.
+\]
+
+Their equality follows from the pole equation
+\(P(p_\ell)+\sigma Q(p_\ell)=0\). The second form is the stable
+residue expression discussed in `main_copy.tex`. NAP's minimal modal
+runtime does not form these poles or residues; they explain its relationship
+to a sparse implementation.
+
+## Evaluating that same update on a projected mode
+
+Let \(p_j\) be the nodal coefficient vector of \(\phi_{j,h}\). Then
+
+\[
+Bp_j=\frac{\lambda_{j,h}}{\kappa^2}p_j,
+\qquad
+A_{h,m}p_j=\widehat a_{j,h,m}p_j,
+\]
+
+\[
+\widehat a_{j,h,m}
+=\frac{\kappa^{2\beta}}
+{\mathcal R_{m,\beta}(\lambda_{j,h}/\kappa^2)},\qquad
+S_\tau(B)p_j=\mu_jp_j,\qquad
+\mu_j=(1+\tau\widehat a_{j,h,m})^{-1}.
+\]
+
+This is an application of the same rational function to an eigenvector.
+All matrix dimensions and mass factors remain accounted for in the
+generalized eigenvalue relation.
+
+Finite negative roots and a positive factor make \(\mathcal R(z)>0\)
+for \(z>0\). Hence \(\widehat a_j>0\), \(0<\mu_j<1\), and the update
+is a contraction in the \(C\)-inner product. The implicit update is
+uniquely defined. These facts will justify the invariant-subspace argument.
+
+# Exact loads and the two-dimensional invariant subspace
+
+## Which part of the old assembly changes
+
+Write
+
+\[
+u_0=\sum_{j\in\{5,7\}}x_je_j,\qquad
+f(t)=A\sin(\omega t)\sum_{j\in\{5,7\}}y_je_j,
+\]
+
+where the benchmark has \(x=(10,0)\), \(y=(0,10)\), \(A=1\),
+and \(\omega=\pi\). Define exact load vectors
+\((b_j)_i=(e_j,\psi_i)\), so \(b_j=Cp_j\).
+
+The initial vector is
+
+\[
+U^0=C^{-1}\sum_jx_jb_j=\sum_jx_jp_j.
+\]
+
+This agrees with the analytic initial projection in NAFDEMG-main.
+For the forcing, however, NAFDEMG-main uses
+
+\[
+\widetilde b_7=\Psi^{\mathsf T}C^\star e_7^\star\approx b_7.
+\]
+
+The reference mass matrix computes the inner product of the reference
+piecewise linear interpolants of the sampled functions. This is an
+approximation of the exact load, including when the continuum eigenfunction
+itself is known analytically. NAP uses \(b_7\) exactly through its modal
+projection formulas.
+
+Thus exact equivalence is with the original matrix scheme *using exact
+spatial loads*. The shipped reference-load assembly is a further
+approximation of that scheme. If the reference partition is not nested in
+the solver partition, its load approximation can also reflect interpolation
+of the coarse hat functions onto the reference partition.
+
+## Deriving the common time average
+
+Let \(\theta=\omega\tau\). Direct integration gives
+
+\[
+\overline g_k=\frac1\tau\int_{(k-1)\tau}^{k\tau}A\sin(\omega t)\,dt
+=A\operatorname{sinc}(\theta/2)\sin((k-\tfrac12)\theta).
+\]
+
+For \(\omega\ne0\), this equals
+\(A[\cos((k-1)\theta)-\cos(k\theta)]/(\omega\tau)\).
+The sinc form preserves the small-step limit accurately. Both constructions
+use interval averages, and the load vector is
+
+\[
+F^k=\overline g_k\sum_jy_jb_j,
+\qquad C^{-1}F^k=\overline g_k\sum_jy_jp_j.
+\]
+
+## Why no other discrete modes are required
+
+Set \(\mathcal W_h=\operatorname{span}\{\phi_{5,h},\phi_{7,h}\}\).
+The initial condition belongs to \(\mathcal W_h\), every projected forcing
+average belongs to \(\mathcal W_h\), and \(S_\tau(L_h/\kappa^2)\)
+maps each basis function of \(\mathcal W_h\) to a scalar multiple of
+itself. Therefore every iterate remains in \(\mathcal W_h\).
+
+In detail, if \(U_{h,m}^{k-1}=\sum_jb_j^{k-1}\phi_{j,h}\), then the
+matrix update derived above gives
+
+\[
+U_{h,m}^k=\sum_j\mu_j
+\left(b_j^{k-1}+\tau y_j\overline g_k\right)\phi_{j,h}.
+\]
+
+Thus its coefficients satisfy
+
+\[
+\boxed{b_j^0=x_j,\qquad
+b_j^k=\mu_j(b_j^{k-1}+\tau y_j\overline g_k).}
+\]
+
+Induction and uniqueness establish equality with the full matrix solution
+for every integer step. All coefficients in the complementary discrete
+eigenspaces are zero. The full finite element space is still present in
+the definition of the scheme; these particular data simply excite an
+invariant two-dimensional subspace.
+
+## What a reference-load discrepancy does
+
+With \(\widetilde b_7\) in place of \(b_7\), the projected forcing is
+perturbed by the finite element function whose vector is
+
+\[
+\delta q=10C^{-1}(\widetilde b_7-b_7).
+\]
+
+For identical other inputs and \(A=1\), the difference \(D^k\) between
+the two coefficient solutions satisfies
+
+\[
+D^0=0,\qquad D^k=S_\tau(B)
+\left(D^{k-1}+\tau\overline g_k\delta q\right).
+\]
+
+Here \(\overline g_k\) is the average of \(\sin(\omega t)\), with
+the factor 10 already included in \(\delta q\). Contractivity implies
+
+\[
+\|D^k\|_C\leq\tau\sum_{\ell=1}^k|\overline g_\ell|\,\|\delta q\|_C
+\leq T\|\delta q\|_C.
+\]
+
+This explains mathematically how an approximate load changes the result
+and how its effect disappears as the load approximation converges. A
+general load perturbation need not lie in \(\mathcal W_h\).
+
+# Closed evaluation of the backward Euler recurrence
+
+## Summing the recurrence, rather than advancing it
+
+For one mode, write \(\mu=(1+\tau\widehat a)^{-1}\), initial coefficient
+\(x\), and forcing coefficient \(y\). Repeated substitution gives
+
+\[
+b^k=\mu^kx+\tau\mu y\sum_{\ell=1}^k\mu^{k-\ell}\overline g_\ell.
+\]
+
+The trigonometric average has the complex representation
+
+\[
+\overline g_\ell=A\operatorname{sinc}(\theta/2)
+\operatorname{Im}\left(e^{i(\ell-1/2)\theta}\right),
+\qquad\theta=\omega\tau.
+\]
+
+The geometric progression is
+
+\[
+\sum_{\ell=1}^k\mu^{k-\ell}e^{i(\ell-1/2)\theta}
+=e^{i\theta/2}\frac{e^{ik\theta}-\mu^k}{e^{i\theta}-\mu}.
+\]
+
+Hence the closed solution is
+
+\[
+\boxed{
+b^k=\mu^kx+
+\tau\mu A y\operatorname{sinc}(\theta/2)
+\operatorname{Im}\left[
+e^{i\theta/2}\frac{e^{ik\theta}-\mu^k}{e^{i\theta}-\mu}
+\right].}
+\]
+
+At integer \(k\), this is exactly the result of \(k\) backward Euler
+updates with interval-averaged forcing. No new time discretization has
+been introduced. The denominator is nonzero because \(0<\mu<1\) and
+\(|e^{i\theta}|=1\).
+
+The formula requires only the step index \(k\), the scalar \(\tau\),
+and the rate. For \(T=1\) and \(\tau=10^{-10}\), \(N=10^{10}\)
+steps are defined mathematically, but a coefficient at step \(N\) is
+obtained without computing the preceding iterates or storing their times.
+NAFDEMG-main's streamed solver also saves memory compared with a full
+solution matrix, but still traverses the solver steps needed by its
+reference samples. These are different computational costs for the same
+underlying recurrence when the inputs match.
+
+## Three different rates remain distinct
+
+The three relevant decay rates are
+
+\[
+a_j=(\kappa^2+w_j^2)^\beta,\qquad
+a_{j,h}=\lambda_{j,h}^\beta,\qquad
+\widehat a_{j,h,m}
+=\frac{\kappa^{2\beta}}
+{\mathcal R_{m,\beta}(\lambda_{j,h}/\kappa^2)}.
+\]
+
+They describe, respectively, continuum evolution, exact fractional FEM
+evolution, and rational FEM evolution. Backward Euler then contributes
+\(\mu_j=(1+\tau\widehat a_{j,h,m})^{-1}\).
+
+Even if the rational approximation were exact, the numerical initial-data
+decay would be \((1+\tau a_{j,h})^{-k}\), rather than
+\(e^{-a_jk\tau}\). Both spatial and temporal discretization errors remain
+in the closed formula.
+
+When NAP's optional `diffusion` parameter is \(D>0\), all three rates
+are multiplied by \(D\); the physical forcing is still the prescribed
+\(A\sin(\omega t)\sum_jy_je_j\). The compared experiments use \(D=1\).
+There is no forcing rescaling hidden in the acceleration.
+
+# Replacing the reference spatial mesh by an exact error identity
+
+## What the reference matrix measures
+
+The original procedure evaluates the exact solution at reference nodes,
+evaluates the numerical finite element function there through \(\Psi\),
+and forms
+
+\[
+d_\ell=u^\star(t_\ell^\star)-\Psi U^{k(\ell)},\qquad
+t_\ell^\star\in(t_{k(\ell)-1},t_{k(\ell)}],
+\]
+
+\[
+E_\star^2=\tau_\star\sum_{\ell=1}^{N_\star}
+d_\ell^{\mathsf T}C^\star d_\ell.
+\]
+
+The quadratic form is the exact squared norm of the *reference P1
+interpolant of the nodal difference*. It approximates the spatial norm of
+the continuum-minus-FEM difference. The right-endpoint time sum approximates
+its integral in time. These approximations are present even though the
+continuum solution can be evaluated analytically.
+
+For a fixed numerical solution, refinement of the reference space and time
+partitions targets its actual space--time error. In the old workflow,
+refining \(h_\star\) can additionally change the numerical solution because
+the same reference mesh is used to approximate the forcing load.
+
+## Orthogonal decomposition of the full spatial error
+
+Keep exactly the same right-constant reconstruction:
+
+\[
+U_{h,m}^\tau(t)=U_{h,m}^k\quad\text{for }t\in(t_{k-1},t_k].
+\]
+
+At a fixed time in that interval,
+
+\[
+u(t)-U_{h,m}^k
+=(I-P_h)u(t)+\big(P_hu(t)-U_{h,m}^k\big).
+\]
+
+The first summand is orthogonal to every member of \(V_h\), and the
+second belongs to \(V_h\). Therefore Pythagoras gives
+
+\[
+\|u(t)-U_{h,m}^k\|^2
+=\|(I-P_h)u(t)\|^2+\|P_hu(t)-U_{h,m}^k\|^2.
+\]
+
+Using \(u(t)=\sum_jc_j(t)e_j\),
+\(U_{h,m}^k=\sum_jb_j^k\phi_{j,h}\), and the orthogonality proved
+above, the two terms become
+
+\[
+\|(I-P_h)u(t)\|^2=\sum_j(1-g_{j,h})|c_j(t)|^2,
+\]
+
+\[
+\|P_hu(t)-U_{h,m}^k\|^2
+=\sum_jg_{j,h}|c_j(t)-b_j^k|^2.
+\]
+
+Thus the exact spatial error is the scalar function
+
+\[
+\boxed{
+\mathcal F(k,t)=\sum_{j\in\{5,7\}}
+\left[g_{j,h}|c_j(t)-b_j^k|^2
++(1-g_{j,h})|c_j(t)|^2\right].}
+\]
+
+The weights \(g_{j,h}\) account for the projected basis norms; the
+weights \(1-g_{j,h}\) retain the projection residual. This formula
+computes the error against the continuum function, including the part of
+that function outside \(V_h\). It is not merely a coefficient comparison
+within the discrete space.
+
+For example, if all coefficient differences vanished at some time, the
+error would still be \(\sum_j(1-g_{j,h})|c_j(t)|^2\). This is exactly
+the spatial error of representing \(u(t)\) by its orthogonal projection.
+
+The same decomposition can be written without diagonal Gram matrices.
+For any orthonormal continuum family and its projections, let
+\(H_{ij}=(P_he_i,P_he_j)\). Then, for real coefficient vectors,
+
+\[
+\|u-U\|^2=c^{\mathsf T}(I-H)c+(c-b)^{\mathsf T}H(c-b).
+\]
+
+NAP's special setting makes \(H=\operatorname{diag}(g_{5,h},g_{7,h})\)
+and also makes the evolution diagonal. The projection decomposition itself
+is a general orthogonality identity.
+
+## The exact norm being approximated has not changed
+
+The desired squared norm is
+
+\[
+E^2=\int_0^T\|u(t)-U_{h,m}^\tau(t)\|^2\,dt
+=\tau\sum_{k=1}^N\int_0^1
+\mathcal F\big(k,(k-1+s)\tau\big)\,ds.
+\]
+
+This follows by splitting the integral over solver intervals and setting
+\(t=(k-1+s)\tau\). The numerical solution is still right-constant,
+while \(c_j(t)\) varies continuously inside the interval. Evaluating
+only at solver endpoints would give a further quadrature rule for this
+same integral.
+
+For matched discrete solutions, \(E_\star\) and NAP's \(\widehat E\)
+therefore target the same \(E\). Their finite quadrature values are not
+an algebraic identity. NAP has eliminated the reference *spatial*
+approximation by using known exact inner products.
+
+# The two time quadratures in NAP
+
+## Gauss--Legendre integration inside each interval
+
+Let \((s_r,w_r)_{r=1}^{Q_t}\) be a Gauss--Legendre rule on \([0,1]\),
+with positive weights summing to one. Then
+
+\[
+\int_0^1\mathcal F(k,(k-1+s)\tau)\,ds
+\approx H(k):=\sum_{r=1}^{Q_t}w_r
+\mathcal F(k,(k-1+s_r)\tau).
+\]
+
+The rule integrates polynomials of degree at most \(2Q_t-1\) exactly.
+The present integrand contains exponentials and trigonometric functions,
+so this polynomial exactness does not make the error integral exact.
+The default is \(Q_t=4\).
+
+The rule can be constructed from a symmetric Jacobi matrix with zero
+diagonal and off-diagonal entries
+
+\[
+\frac{r}{\sqrt{4r^2-1}},\qquad r=1,\ldots,Q_t-1.
+\]
+
+If its eigenvalues and normalized eigenvectors are \(\eta_r,v_r\),
+then transforming the Legendre rule from \([-1,1]\) to \([0,1]\) gives
+\(s_r=(\eta_r+1)/2\), \(w_r=(v_r)_1^2\). This explains
+`gauss_legendre_rule()` without introducing a new solver time step.
+
+## Recasting the outer sum as an average
+
+Since \(\tau N=T\), after the within-interval quadrature,
+
+\[
+E^2\approx \tau\sum_{k=1}^N H(k)
+=T\left(\frac1N\sum_{k=1}^NH(k)\right).
+\]
+
+The remaining task is to approximate a discrete average over all solver
+intervals. Introduce the probability measure
+
+\[
+\nu_N=\frac1N\sum_{k=1}^N\delta_{x_k},\qquad
+x_k=\frac{k-1/2}{N}.
+\]
+
+Then
+
+\[
+\frac1N\sum_{k=1}^NH(k)
+=\int H(Nx+1/2)\,d\nu_N(x).
+\]
+
+This is an integral against a finite discrete measure, which explains why
+NAP uses a second Gaussian rule specifically for that measure. A continuous
+uniform measure on \([0,1]\) would describe a different average at finite
+\(N\).
+
+## Why this particular Jacobi matrix appears
+
+A Gaussian quadrature rule is obtained from orthonormal polynomials for
+the chosen measure. Symmetry of \(\nu_N\) about \(1/2\) makes the Jacobi
+diagonal equal to \(1/2\).
+
+The off-diagonal can be understood through centered integer coordinates
+\(X=k-(N+1)/2\). For monic orthogonal polynomials \(p_\ell(X)\) under
+the normalized discrete uniform measure, their squared norms are
+
+\[
+h_\ell:=\frac1N\sum_{k=1}^N p_\ell(X_k)^2
+=\frac{(\ell!)^4}{(2\ell)!(2\ell+1)!}
+\prod_{r=1}^{\ell}(N^2-r^2),\qquad 0\leq\ell<N.
+\]
+
+These are the finite-uniform orthogonal-polynomial norm identities; the
+empty product for \(\ell=0\) is one. Their ratio is
+
+\[
+\frac{h_\ell}{h_{\ell-1}}
+=\frac{\ell^2(N^2-\ell^2)}{4(4\ell^2-1)}.
+\]
+
+In an orthonormal three-term recurrence the off-diagonal is the square
+root of this ratio. Rescaling from \(X\) to \(x=1/2+X/N\) divides it
+by \(N\). Thus the normalized Jacobi off-diagonal is
+
+\[
+d_\ell=\frac{\ell}{2}
+\sqrt{\frac{1-(\ell/N)^2}{4\ell^2-1}}.
+\]
+
+For an order \(Q_s\leq N\) rule, diagonalize the \(Q_s\times Q_s\)
+Jacobi matrix with this off-diagonal and diagonal \(1/2\). If
+\((z_\ell,v_\ell)\) are its normalized eigenpairs, use
+
+\[
+W_\ell=(v_\ell)_1^2,\qquad K_\ell=Nz_\ell+1/2.
+\]
+
+The weights are positive and sum to one. Gaussian quadrature reproduces
+moments through degree \(2Q_s-1\), so
+
+\[
+\frac1N\sum_{k=1}^N H(k)
+\approx\sum_{\ell=1}^{Q_s}W_\ell H(K_\ell).
+\]
+
+If \(Q_s=N\), the rule has the original support and weights, recovering
+the finite average exactly. When \(Q_s<N\), it is an approximation.
+The code uses \(\min(N,\texttt{step_sum_order})\), normally with requested
+order 64, and handles \(N=1\) separately. Its implemented maximum
+requested order is 512; recovering an enormous full sum is a mathematical
+observation, not the practical acceleration used in the benchmark.
+
+## What noninteger step indices mean
+
+For \(Q_s<N\), the Gaussian indices \(K_\ell\) are usually not integers.
+The closed coefficient formula extends to real \(k\) using
+\(\mu^k=\exp(k\log\mu)\) and \(e^{ik\theta}\). This defines the
+function \(H(k)\) at quadrature nodes while agreeing with the discrete
+recurrence at every integer.
+
+There is no claim that a noninteger index is an additional solver iterate.
+The analytic extension is used only to approximate the average of the
+integer-index values. Different extensions could agree on all integers
+and give different reduced quadrature approximations, another reason the
+quadrature needs accuracy checks.
+
+Combining both rules gives the reported norm
+
+\[
+\boxed{
+\widehat E^2=T\sum_{\ell=1}^{Q_s}W_\ell
+\sum_{r=1}^{Q_t}w_r
+\mathcal F\big(K_\ell,(K_\ell-1+s_r)\tau\big).}
+\]
+
+For two modes, \(Q_t=4\), and \(Q_s=64\), this requires two coefficient
+values at each of 256 locations. It has no reference spatial dimension
+and no loop over \(N\). The factor \(T\) converts the weighted mean
+squared error into a time integral; no extra factor \(\tau\) should be
+inserted after this normalization.
+
+## What must be checked numerically
+
+Increasing \(Q_t\) tests the within-interval quadrature. Increasing
+\(Q_s\) independently tests the approximation of the step average.
+These checks serve the role of reference-time refinement in the old
+construction, although the rules and approximation errors differ.
+
+For \(N>Q_s\), the implementation rejects cases with
+
+\[
+T\max_j\{a_j,\widehat a_j\}>Q_s^2/8
+\quad\text{or}\quad |\omega|T>Q_s/2.
+\]
+
+This is a resolution guard for strong initial decay or oscillation. It is
+not a rigorous quadrature error estimate. The integrand is not polynomial,
+so the polynomial exactness of the rule alone cannot justify any claimed
+number of accurate digits. `main_copy.tex` reports checks obtained by
+doubling the two orders; those measured claims are specific to its stated
+data and parameters.
+
+# Stable evaluation of small errors
+
+## Why algebraic equivalence is not sufficient in floating point
+
+The preceding equivalences concern exact mathematical expressions. For
+small \(h\), small \(\tau\), and large \(m\), their differences can be
+many orders of magnitude smaller than the solution itself. Computing two
+accurate order-one quantities and subtracting them can lose the small
+error. NAP therefore evaluates several differences algebraically.
+
+Its implementations also use finite Taylor polynomials in small-argument
+branches. These are floating-point approximations of the analytic
+identities, not additional exact identities. They are intended to make the
+truncation negligible in the chosen branches while avoiding cancellation.
+
+## The continuum forcing response
+
+For a general positive rate \(a\),
+
+\[
+S_a(t)=A\int_0^t e^{-a(t-s)}\sin(\omega s)\,ds
+=A\operatorname{Im}\frac{e^{i\omega t}-e^{-at}}{a+i\omega}.
+\]
+
+This is exactly \(e^{-at}G_{\mathrm{sin}}(t)\) from the original
+construction. With \(z=(a+i\omega)t\), near zero it can be evaluated as
+
+\[
+S_a(t)=Ae^{-at}t\operatorname{Im}
+\left(\sum_{\ell=1}^{\infty}\frac{z^\ell}{(\ell+1)!}\right).
+\]
+
+The real constant term has no imaginary part and is omitted before
+summation. The response begins at \(A\omega t^2/2\); preserving this
+small value is the reason for the series. NAP uses 24 terms for
+\(|z|<0.5\) and the decayed complex quotient otherwise.
+
+## The spatial projection residual
+
+Directly subtracting \(g_{j,h}\) from one can round a tiny residual to
+zero. NAP instead uses a Taylor polynomial beginning with
+
+\[
+1-g_{j,h}=\frac{z_j^4}{720}+\frac{z_j^6}{3024}
++\frac{7z_j^8}{259200}+O(z_j^{10}),\qquad z_j=w_jh.
+\]
+
+The small-argument branch retains terms through \(z_j^{16}\) when
+\(|z_j|<0.1\). This retains the squared spatial error instead of losing
+it through subtraction.
+
+## The initial-data coefficient difference
+
+At interval fraction \(s\), put
+
+\[
+d=(1-s)\tau,\qquad t=k\tau-d,\qquad
+\chi=\tau\widehat a,\qquad \mu=(1+\chi)^{-1}.
+\]
+
+Define
+
+\[
+H=k\left[\tau(a-\widehat a)+\chi-\log(1+\chi)\right]-ad
+=k\log\mu+at.
+\]
+
+Then the exponential difference is exactly
+
+\[
+I:=e^{-at}-\mu^k
+=\begin{cases}
+-e^{-at}\operatorname{expm1}(H),&H\leq0,\\
+\mu^k\operatorname{expm1}(-H),&H>0.
+\end{cases}
+\]
+
+Here \(\operatorname{expm1}(x)=e^x-1\), evaluated accurately near zero.
+The branch factors out the larger exponential and keeps the `expm1`
+argument nonpositive. It avoids an overflowing exponential followed by
+multiplication by an underflowing factor.
+
+The other small difference is evaluated through
+
+\[
+\chi-\log(1+\chi)=\frac{\chi^2}{2}-\frac{\chi^3}{3}+\cdots.
+\]
+
+The implementation uses terms of degrees 2 through 12 for \(\chi<10^{-3}\).
+Multiplication by the initial coefficient \(x_j\) then gives the
+initial-data contribution to \(c_j(t)-b_j^k\).
+
+## The forcing coefficient difference
+
+Let \(v=\omega\tau/2\). The continuum forcing transfer denominator is
+
+\[
+D_e=a+i\omega.
+\]
+
+The discrete closed-form denominator can be rewritten using
+
+\[
+\frac{e^{i\omega\tau}-\mu}
+{\tau\mu\operatorname{sinc}(v)e^{iv}}
+=\widehat a\frac{e^{iv}}{\operatorname{sinc}(v)}+i\omega
+=:D_n.
+\]
+
+Indeed, replacing \(\mu^{-1}\) by \(1+\tau\widehat a\) leaves
+\((e^{iv}-e^{-iv})/(\tau\operatorname{sinc}(v))=i\omega\).
+With \(\Phi=e^{iv}/\operatorname{sinc}(v)\), write
+
+\[
+N_e=e^{i\omega t}-e^{-at},\qquad
+N_n=e^{ik\omega\tau}-\mu^k.
+\]
+
+The forcing response difference divided by \(Ay_j\) is
+
+\[
+\operatorname{Im}\left(\frac{N_e}{D_e}-\frac{N_n}{D_n}\right)
+=\operatorname{Im}\left[
+\left(\frac1{D_e}-\frac1{D_n}\right)N_n
++\frac{N_e-N_n}{D_e}\right].
+\]
+
+Its small factors are available directly:
+
+\[
+\frac1{D_e}-\frac1{D_n}
+=\frac{-(a-\widehat a)+\widehat a(\Phi-1)}{D_eD_n},
+\qquad
+N_e-N_n=-e^{i\omega t}(e^{i\omega d}-1)-I.
+\]
+
+Near zero,
+
+\[
+\Phi-1=v\cot v-1+iv
+=-\frac{v^2}{3}-\frac{v^4}{45}-\frac{2v^6}{945}
+-\frac{v^8}{4725}-\frac{2v^{10}}{93555}+O(v^{12})+iv.
+\]
+
+Phase increments use
+\(e^{i\eta}-1=-2\sin^2(\eta/2)+i\sin\eta\), and powers use
+\(\mu^k=\exp[-k\operatorname{log1p}(\tau\widehat a)]\).
+These rearrangements explain `uniform_modal_difference()`. When
+\(|\omega\tau|\geq0.1\), it instead subtracts the literal continuum
+and numerical coefficient arrays. The present studies use the small-step
+branch.
+
+# A different coefficient source is a genuine change of input
+
+## What the two repositories select
+
+The derivation of the matrix-to-scalar equivalence works for any fixed
+admissible rational function \(\mathcal R\). The shipped repositories
+select that function differently.
+
+NAFDEMG-main reads `rSPDE` tables for \(m=1,2,3,4\). For a requested
+\(\beta\), it linearly interpolates each root and the factor between
+table rows. Denote the resulting function by
+\(\mathcal R_{m,\beta}^{\mathrm{pkg}}\).
+
+NAP's convergence wrapper selects computed coefficients generated directly
+at
+
+\[
+m=1,\ldots,8,\qquad \beta\in\{0.25,0.45,0.65\},\qquad
+\delta_m=10^{-(5+m)/2}.
+\]
+
+For each pair, Cheb--Padé approximation was applied to
+\(x^{\beta-1}\) on \([\delta_m,1]\), with numerator degree \(m\)
+and denominator degree \(m+1\). The root/factor artifact stores 17
+significant digits. Denote its function by
+\(\mathcal R_{m,\beta}^{\mathrm{cmp}}\).
+
+NAP selects stored beta values within a floating-point equality tolerance;
+it does not interpolate between them. Order eight has a separately
+generated coefficient set, and is not extrapolated from orders 1--4.
+MATLAB generation precedes the notebook runs.
+
+The two rational functions may agree at some parameter choices, but equality
+does not follow from matching \((m,\beta)\). If
+\(\mathcal R^{\mathrm{pkg}}(z_j)\ne\mathcal R^{\mathrm{cmp}}(z_j)\),
+then their decay rates and backward Euler multipliers differ. This changes
+the discrete evolution itself, independently of whether it is evaluated
+by sparse solves or by modal formulas.
+
+The NAP selector retains a package-source option, but
+`tadpole_convergence_error()` explicitly chooses the computed source. An
+equivalence check must deliberately supply the same coefficients to both
+forms of the scheme.
+
+## What root validation proves
+
+The computed path checks the root counts, a finite positive factor,
+finite real negative roots, and strict interlacing. In increasing order,
+the roots satisfy
+
+\[
+\zeta_1<\xi_1<\zeta_2<\cdots<\xi_m<\zeta_{m+1}<0.
+\]
+
+For \(z>0\), each linear factor \(1-\xi_i z\) and
+\(1-\zeta_i z\) is positive. This establishes positivity of the
+rational inverse and of its decay rates. Interlacing is an additional
+structural admissibility check.
+
+These conditions do not establish an approximation error bound for
+\(\mathcal R(z)-z^{-\beta}\). They also do not establish best uniform
+rational approximation or accurate evaluation on every fine-mesh mode.
+
+For example, on a selected mode, if
+
+\[
+\mathcal R(z_j)=z_j^{-\beta}(1+\varepsilon_j),\qquad
+|\varepsilon_j|\leq\eta<1,
+\]
+
+then
+
+\[
+\frac{\widehat a_j}{a_{j,h}}=\frac1{1+\varepsilon_j},\qquad
+\left|\frac{\widehat a_j}{a_{j,h}}-1\right|
+\leq\frac{\eta}{1-\eta}.
+\]
+
+This is a quantitative rate-error statement if the relative approximation
+error is known. Root negativity alone supplies no such value of \(\eta\).
+
+## Active-mode accuracy and full-spectrum interval coverage
+
+The normalized reciprocal spectrum is
+
+\[
+\sigma(B^{-1})\subset
+[\delta_h,1],\qquad
+\delta_h=\frac{\kappa^2}{\lambda_{\max,h}}.
+\]
+
+To apply an approximation guarantee on a generation interval
+\([\delta,1]\) to the entire operator, that interval must contain the
+whole reciprocal spectrum. In particular, \(\delta\leq\delta_h\) is
+required. Appropriate approximation error bounds on that interval are
+also required; coverage alone is not sufficient.
+
+The distinction is concrete for the present mesh. Its loop has \(2n\)
+elements, so an alternating nodal vector is consistent around the loop
+and along the terminal edge. On every element it has opposite endpoint
+values. The stiffness/mass ratio for an element with endpoint values
+\(a,b\) is
+
+\[
+\frac{(a-b)^2/h}{h(a^2+ab+b^2)/3}\leq\frac{12}{h^2},
+\]
+
+with equality when \(a=-b\). Hence the global alternating vector attains
+the upper Rayleigh bound, and
+
+\[
+\lambda_{\max,h}=\kappa^2+12h^{-2}.
+\]
+
+At \(\kappa=4\) and \(h=10^{-5}\),
+
+\[
+\delta_h=\frac{16}{16+12\times10^{10}}
+\approx1.33\times10^{-10},\qquad
+\delta_8=10^{-6.5}\approx3.16\times10^{-7}.
+\]
+
+Thus the order-eight generation interval does **not** cover the full
+reciprocal spectrum on that mesh. A uniform operator error theorem based
+on complete interval coverage cannot be certified by these fixed-interval
+coefficient checks alone.
+
+By contrast, the two active reciprocal eigenvalues, for fine meshes, are
+approximately
+
+\[
+\frac{16}{16+(3\pi/2)^2}\approx0.42,\qquad
+\frac{16}{16+(2\pi)^2}\approx0.29.
+\]
+
+Their actual FEM counterparts remain well within the generation intervals
+throughout the stated experiments. Only these two values affect the
+exact-load solution, because the other modes are unexcited. This explains
+the finite-mode scope stated in `main_copy.tex`.
+
+There are two separate assertions: the modal evaluation is exactly the
+restriction of the chosen rational matrix scheme, and the chosen rational
+scheme approximates the desired fractional operator accurately. The first
+was proved above. The second requires approximation estimates or numerical
+accuracy evidence on the relevant spectrum. Computational equivalence
+does not supply that evidence automatically.
+
+# What the convergence studies now test
+
+## Spatial and temporal reference slopes
+
+For the theoretical scheme under its approximation hypotheses, the error
+estimate has the form
+
+\[
+E\lesssim \tau+h^{\min\{\alpha+2s,2\}-\epsilon}
++h^{\alpha-2}\exp(-c_\alpha\sqrt m),\qquad
+c_\alpha=2\pi\sqrt{1-\alpha/2},
+\]
+
+where \(s\in[0,1]\) describes data regularity and \(\epsilon>0\) is
+sufficiently small. The finite eigenfunction data belong to every
+nonnegative spectral Sobolev space, so the spatial prediction saturates
+at \(2-\epsilon\). NAP uses the limiting reference slope 2.
+
+This is also visible directly in the modal construction. For fixed active
+wave numbers,
+
+\[
+\lambda_{j,h}-\lambda_j=O(h^2),\qquad
+a_{j,h}-a_j=O(h^2),\qquad
+\|e_j-P_he_j\|=O(h^2).
+\]
+
+Smooth dependence of the finite set of scalar solutions on their rates
+then gives second-order spatial behavior when auxiliary errors are small.
+This does not conflict with the weaker \(h^{\alpha-\epsilon}\) estimate
+obtained by using less of the available data regularity.
+
+For fixed positive rate \(a\),
+
+\[
+\log\mu=-\log(1+\tau a)
+=-\tau a+\frac{\tau^2a^2}{2}+O(\tau^3).
+\]
+
+For fixed \(t=k\tau\), the accumulated exponent error is \(O(\tau)\).
+The right-constant reconstruction also introduces a within-interval
+\(O(\tau)\) difference for these smooth solutions. Thus NAP retains the
+first-order temporal reference slope 1.
+
+The analytic loss \(\epsilon\) is distinct from machine precision and
+from the roundoff tolerances used to identify grid values. NAP does not
+introduce a numerical experiment parameter \(\epsilon\) to generate its
+reference slope.
+
+## Why the rational slope is a benchmark
+
+The rational part of the bound suggests the scale
+
+\[
+\log E\sim-c_\alpha\sqrt m+\text{constant}
+\]
+
+only as a comparison of decay scales. An upper bound does not imply
+equality, asymptotic sharpness, or a straight line over \(m=1,2,3,4\).
+The computed approximants also have order-dependent generation intervals,
+and the experiment samples only two smooth modes.
+
+Both constructions fit a regression against \(\sqrt m\). NAP labels
+\(-c_\alpha\) as a bound benchmark and does not attach a percentage
+agreement error between that benchmark and the fitted rational slope.
+It retains slope-percentage comparisons for the spatial and temporal
+reference lines. The fitted relations are
+
+\[
+\log E=s_h\log h+b_h,\qquad
+\log E=s_\tau\log\tau+b_\tau,\qquad
+\ln E=s_m\sqrt m+b_m.
+\]
+
+The first two slopes are unchanged if the logarithm base is changed on
+both axes. The rational slope uses the natural logarithm specifically.
+Guide curves have prescribed slopes and data-dependent vertical placement;
+their heights are not rigorous upper-bound constants.
+
+## The diagnostic with exact discrete fractional rates
+
+NAP's `m = 0` flag bypasses rational coefficients and uses
+
+\[
+\widehat a_j=a_{j,h}=\lambda_{j,h}^\beta.
+\]
+
+It still uses \(P_he_j\), the same FEM eigenvalues, backward Euler,
+right-constant reconstruction, and the same error quadrature. The
+resulting \(E_{\mathrm{st}}\) measures the combined spatial/time error
+with rational approximation removed. It is not a zeroth-order rational
+approximant. At \(\alpha=2\), exact discrete rates are also used
+regardless of \(m\).
+
+The spatial projection residual and projected coefficient error have an
+orthogonal squared-error decomposition. The temporal and rational parts
+of the coefficient error generally do not: they can reinforce or cancel.
+Thus subtracting \(E_{\mathrm{st}}\) from the total error does not isolate
+a rational error norm.
+
+If \(U_R\) and \(U_{\mathrm{st}}\) denote the two reconstructed numerical
+solutions, the reverse triangle inequality only gives
+
+\[
+\left|\|u-U_R\|-\|u-U_{\mathrm{st}}\|\right|
+\leq\|U_R-U_{\mathrm{st}}\|.
+\]
+
+Ratios and parameter-halving comparisons therefore provide sensitivity
+checks for this experiment. They are not a general certified a posteriori
+estimator. The quadrature-doubling and auxiliary-parameter checks reported
+in `main_copy.tex` must be understood in that sense.
+
+# Changes to the actual experiments and to their descriptions
+
+## Current notebook settings
+
+The following table compares the configured NAFDEMG-main notebooks with
+NAP's shared parameters. The same graph and amplitudes are used throughout,
+with \(\kappa=4\) and \(\alpha\in\{0.5,0.9,1.3\}\).
+
+| Setting | NAFDEMG-main notebooks | NAP / `main_copy.tex` |
+|---|---|---|
+| Final time | \(10^{-3}\) | \(1\) |
+| Spatial study: requested sizes | Four targets from \(9\times10^{-4}\) to \(10^{-2}\) | Six targets from \(10^{-4}\) to \(10^{-2}\) |
+| Spatial study: fixed values | Target \(\tau=10^{-9}\), \(m=4\) | \(\tau=10^{-10}\), \(m=8\) |
+| Temporal study: requested steps | Four targets from \(9\times10^{-6}\) to \(10^{-4}\) | Six targets from \(10^{-4}\) to \(10^{-2}\) |
+| Temporal study: fixed values | Spatial target \(h=10^{-4}\), \(m=4\) | \(h=10^{-5}\), \(m=8\) |
+| Rational study | \(m=1,2,3,4\), spatial target \(h=10^{-4}\), target \(\tau=5\times10^{-9}\) | \(m=1,2,3,4\), \(h=10^{-5}\), \(\tau=10^{-10}\) |
+| Spatial-study reference grid | \(h_\star=5\times10^{-5}\), target \(\tau_\star=2\times10^{-10}\) | Analytic spatial error, two time quadratures |
+| Temporal/rational reference grid | \(h_\star=9\times10^{-5}\), target \(\tau_\star=10^{-9}\) | Analytic spatial error, two time quadratures |
+| Rational source | Package tables, orders 1--4 | Computed exact-beta coefficients, orders 1--8 |
+
+For a requested time step \(\eta\), both workflows construct an actual
+uniform grid with
+
+\[
+N=\lceil T/\eta\rceil,\qquad \tau=T/N.
+\]
+
+NAP includes a near-integer roundoff snap, retains only the scalar grid
+description, and limits supported exact step indices. The original helper
+also constructs the complete time vector. NAP's actual spatial sizes are
+\(h=1/\lceil\eta^{-1}\rceil\), and its regressions use the actual
+spatial and temporal values.
+
+Increasing \(T\) changes the integration interval, the decay history,
+and the part of the sine forcing sampled by the experiment. It is not a
+change that can generally be corrected by multiplying the old error by
+\(\sqrt{T_{\mathrm{new}}/T_{\mathrm{old}}}\).
+
+The old `N_finite = 4` and NAP's value 4 both generate the wave-number
+catalogue \((0,1,2,2,3,4,4)\). Indices 5 and 7 select the active modes.
+This value is not the finite element dimension, rational order, or a
+truncation of a nonzero infinite spectral tail.
+
+## `main.tex` and the current old notebooks are not identical snapshots
+
+The numerical-experiments prose in `main.tex` lists some values different
+from its current corresponding notebooks. This is a documentation issue
+separate from the mathematical equivalence proved above:
+
+* It lists alpha values \(1.0,1.2,1.4,1.6,1.8\), whereas the inspected
+  notebooks use \(0.5,0.9,1.3\).
+* It describes six spatial and temporal refinement values, whereas the
+  current notebooks use four in each study.
+* It lists temporal targets from \(9\times10^{-4}\) to \(10^{-2}\),
+  whereas the temporal notebook uses \(9\times10^{-6}\) to \(10^{-4}\).
+  With its stated \(T=10^{-3}\), most targets in the prose exceed the
+  final time and produce only one solver interval; they cannot generate
+  the intended distinct six-point temporal study under the grid rule above.
+* It lists one reference grid for all studies. The inspected spatial
+  notebook uses that grid, while the temporal and rational notebooks use
+  the reference values in the preceding table.
+* Its smooth-data discussion gives the saturated spatial prediction
+  \(2-\epsilon\), but the figure caption and original spatial plot use
+  \(\alpha-\epsilon\) or \(\alpha\). NAP uses slope 2 consistently.
+
+Consequently there are three snapshots to distinguish: the old manuscript
+description, the current old notebook settings, and the new NAP settings.
+The results and percentage claims in the old manuscript cannot be carried
+over to NAP by an algebraic change of representation.
+
+# An explicit statement of what is and is not equivalent
+
+**Proposition.** Fix a uniform tadpole mesh of common element length
+\(h=1/n\), the consistent P1 mass inner product, \(\kappa>0\),
+\(0<\alpha\leq2\), a uniform time grid, and the same positive rational
+inverse \(\mathcal R\) when \(\alpha<2\). Use the same physical modal
+data and exact spatial loads. Suppose the selected modes are resolved as
+above. Then:
+
+1. The original shifted matrix update and the scalar recurrence define
+   the same finite element iterate \(U_{h,m}^k\) for every integer \(k\).
+2. The closed coefficient formula evaluates those iterates exactly as an
+   algebraic expression.
+3. The scalar expression \(\mathcal F(k,t)\) equals their full spatial
+   squared error against the continuum solution.
+4. Integrating \(\mathcal F\) exactly gives the same target space--time
+   error norm as the matrix/reference construction is intended to measure.
+
+The proof consists of the generalized eigenvalue identity, projection
+identity, invariant-subspace induction, finite geometric sum, and
+orthogonal error decomposition derived in this note. No reference-space
+limit is used to prove the discrete evolution identity.
+
+The two reported errors at finite quadrature resolution satisfy a different
+kind of comparison. If the physical problem and final time have first been
+matched, let \(E_{\mathrm{NAP}}\) and \(E_{\mathrm{main}}\) denote the
+exact norms for their respective numerical solutions. Then
+
+\[
+\widehat E_{\mathrm{NAP}}-E_{\star,\mathrm{main}}
+=(\widehat E_{\mathrm{NAP}}-E_{\mathrm{NAP}})
++(E_{\mathrm{NAP}}-E_{\mathrm{main}})
++(E_{\mathrm{main}}-E_{\star,\mathrm{main}}).
+\]
+
+The first and last terms are error-measurement discrepancies. The middle
+term is a discrepancy between discrete solutions and obeys
+
+\[
+|E_{\mathrm{NAP}}-E_{\mathrm{main}}|
+\leq\|U_{\mathrm{NAP}}^\tau-U_{\mathrm{main}}^\tau\|_{L_2(0,T;L_2(\Gamma))}.
+\]
+
+Matching mesh, coefficients, loads, and time grid makes this middle term
+zero. Matching the time horizon alone, or matching only the rational order
+\(m\), does not. The remaining terms must be controlled by their own
+quadrature/refinement checks.
+
+For a numerical comparison of the two evaluation methods, first match the
+actual partition, \(T\), \(\tau\), \(\alpha\), all root/factor entries,
+and the exact loads. Compare the finite element states at integer solver
+times. Only after establishing that equality should the two error
+quadratures be compared. This separates evolution equivalence from
+measurement accuracy and from the changed scientific experiment.
+
+# Source guide and notation-to-code dictionary
+
+The derivations above are self-contained. These links identify where the
+mathematical objects occur in the inspected sources; they are not needed
+to supply missing equations.
+
+| Mathematical object or operation | NAFDEMG-main | NAP |
+|---|---|---|
+| Graph, continuum modes, and eigenvalue ordering | `gets.graph.tadpole()`, `tadpole.eig()`, `gets.eigen.params()` | Wave-number catalogue in `uniform_tadpole_basis()` |
+| \(P_h(10e_5)\) | `project_u0_tadpole()` | Initial coefficient 10 multiplying \(\phi_{5,h}\) |
+| \(\lambda_{j,h}\), \(g_{j,h}\), \(1-g_{j,h}\) | Implicit in FEM matrices and reference comparisons | `discrete_eigenvalues`, diagonal of `gram`, diagonal of `residual_gram` |
+| Scalar rational inverse | Package `my.get.roots()` and polynomial update construction | `my.get.roots()` and product in `rational_modal_rates()` |
+| \(\widehat a_j\), \(\mu_j\) | Implicit in the shifted solves | Returned rates and `exp(logq)` |
+| Averaged sine forcing | `average_sine_forcing()` | Sinc factor in the closed recurrence |
+| Integer-step evolution | `my.solver.frac()` inside `solve_fractional_evolution_error()` | `uniform_modal_coefficients()`; stable difference on the error path |
+| \(c_j(t)\) | `G_sin()` multiplied by the decaying exponential | `exact_modal_coefficients()` and `decayed_sine_convolution()` |
+| \(c_j(t)-b_j^k\) | Implicit after reference-space evaluation | `uniform_modal_difference()` |
+| Spatial squared error | `error` and `reference_C` quadratic form | `squared` from modal Gram and residual terms |
+| Time integration of error | Reference times and endpoint weights | `gauss_legendre_rule()`, `discrete_uniform_rule()` |
+| Reported norm | `solve_fractional_evolution_error()` | `uniform_tadpole_error()`, called by `tadpole_convergence_error()` |
+
+Original sources:
+
+* [Numerical experiments in main.tex](../../6ac76d140751a76e98ae4d0b/main.tex).
+* [Spatial study](../../NAFDEMG/conv_in_h.Rmd),
+  [temporal study](../../NAFDEMG/conv_in_tau.Rmd), and
+  [rational study](../../NAFDEMG/conv_in_m.Rmd).
+* [Graph and projection functions](../../NAFDEMG/fun/graphs_and_meshes.Rmd),
+  [fractional update and reference-error functions](../../NAFDEMG/fun/fractional_evolution.Rmd),
+  and [exact-solution functions](../../NAFDEMG/fun/exact_solutions.Rmd).
+
+New sources:
+
+* [Numerical experiments in main_copy.tex](../../6ac76d140751a76e98ae4d0b/main_copy.tex).
+* [Modal FEM evolution and error](../fun/tadpole_convergence.Rmd),
+  [coefficient selection and validation](../fun/fractional_evolution.Rmd),
+  [analytic reference and within-interval quadrature](../fun/exact_solutions.Rmd),
+  and [plot interpretation](../fun/plotting.Rmd).
+* [Shared experiment parameters](../fun/convergence_parameters.R),
+  [computed coefficient table](../matlab/computed_fractional_roots.csv), and
+  [coefficient provenance](../matlab/computed_fractional_roots.json).
+
+The numerical measurements reported in `main_copy.tex`, such as quadrature
+doubling changes and auxiliary-error percentages, are experiment results
+in that manuscript. They are not consequences of the identities alone,
+and this explanatory note does not regenerate or independently certify
+those saved results.

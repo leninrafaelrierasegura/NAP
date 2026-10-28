@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Isolated rational convergence in m</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+<link rel="stylesheet" href="/home/rierasl/Desktop/NAP/style.css" type="text/css" />
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">NAP</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Contents
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="functionality.html">Functionality</a>
+    </li>
+    <li>
+      <a href="exp1.html">Example</a>
+    </li>
+    <li>
+      <a href="conv_in_h.html">Convergence in 𝘩</a>
+    </li>
+    <li>
+      <a href="conv_in_tau.html">Convergence in τ</a>
+    </li>
+    <li>
+      <a href="conv_in_m.html">Convergence in 𝑚</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://arxiv.org/abs/0000.00000">
+    <span class="fa fa-file-pdf"></span>
+     
+  </a>
+</li>
+<li>
+  <a href="https://github.com/leninrafaelrierasegura/NAP">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Isolated rational convergence in m</h1>
+
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#choose-the-experiment"
+id="toc-choose-the-experiment">Choose the experiment</a></li>
+<li><a href="#load-and-check" id="toc-load-and-check">Load and
+check</a></li>
+<li><a href="#compute-the-isolated-error"
+id="toc-compute-the-isolated-error">Compute the isolated error</a></li>
+<li><a href="#plot-and-slopes" id="toc-plot-and-slopes">Plot and
+slopes</a></li>
+<li><a href="#numerical-checks" id="toc-numerical-checks">Numerical
+checks</a></li>
+</ul>
+</div>
+
+<p>This notebook compares rational backward Euler with exact-discrete
+fractional backward Euler on the <strong>same assembled P1 FEM
+operator</strong>. It uses a complete numerical eigendecomposition of
+the matrices assembled by MetricGraph, without assuming that projected
+continuum modes are discrete eigenfunctions. Only the rational
+approximation differs between the two evolutions.</p>
+<div id="choose-the-experiment" class="section level2">
+<h2>Choose the experiment</h2>
+<p>Edit this chunk, then run all chunks or click Knit. Results stay in
+memory and appear below. There are no run IDs, hashes, saved result
+files, or automatic refinement experiments. Knitting produces the usual
+HTML report.</p>
+<pre class="r"><code>h &lt;- 0.01
+tau &lt;- 1e-5
+m_max &lt;- 4L
+coefficient_source &lt;- &quot;computed&quot;  # &quot;computed&quot;: m &lt;= 8; &quot;package&quot;: m &lt;= 4
+computed_coefficient_file &lt;- here::here(&quot;matlab&quot;, &quot;computed_fractional_roots.csv&quot;)
+
+alpha_vector &lt;- c(0.5, 0.9, 1.3)
+T_final &lt;- 1e-3
+kappa &lt;- 4
+diffusion &lt;- 1</code></pre>
+<p>The data are <span class="math inline">\(u_0=10e_5\)</span> and <span
+class="math inline">\(f(t)=10\sin(\pi t)e_7\)</span> on the tadpole with
+edge lengths 1 and 2. <code>diffusion</code> multiplies the fractional
+power. Computed coefficients require an exact stored <span
+class="math inline">\(\beta=\alpha/2\)</span>; the supplied CSV supports
+<span class="math inline">\(\alpha=0.5,0.9,1.3\)</span>. Package roots
+use linear interpolation. The integer case <span
+class="math inline">\(\alpha=2\)</span> bypasses rational
+approximation.</p>
+</div>
+<div id="load-and-check" class="section level2">
+<h2>Load and check</h2>
+<pre class="r"><code>source(here::here(&quot;sourceifupdated.R&quot;))
+source_if_updated(&quot;fun/isolated_rational_convergence&quot;)</code></pre>
+<pre class="r"><code>knitr::opts_chunk$set(cache = FALSE, echo = TRUE, message = FALSE)
+library(Matrix)
+library(MetricGraph)
+library(ggplot2)
+
+# Load the helper Rmd without creating .R/.hash files in the project.
+# helper_file &lt;- tempfile(fileext = &quot;.R&quot;)
+# knitr::purl(here::here(&quot;fun&quot;, &quot;isolated_rational_convergence.Rmd&quot;),
+#             output = helper_file, quiet = TRUE)
+# source(helper_file, local = TRUE)
+# unlink(helper_file)
+
+coefficient_source &lt;- match.arg(coefficient_source, c(&quot;computed&quot;, &quot;package&quot;))
+stopifnot(length(h) == 1L, is.finite(h), h &gt; 0,
+          length(tau) == 1L, is.finite(tau), tau &gt; 0,
+          length(T_final) == 1L, is.finite(T_final), T_final &gt; 0,
+          length(kappa) == 1L, is.finite(kappa), kappa &gt; 0,
+          length(diffusion) == 1L, is.finite(diffusion), diffusion &gt; 0,
+          length(m_max) == 1L, is.finite(m_max), m_max &gt;= 2,
+          m_max == floor(m_max), m_max &lt;= max(rational_supported_orders(coefficient_source)),
+          length(alpha_vector) &gt; 0, !anyDuplicated(alpha_vector),
+          all(is.finite(alpha_vector)), all(alpha_vector &gt;= 0.5 &amp; alpha_vector &lt;= 2))
+m_vector &lt;- seq_len(m_max)
+# Reject unsupported coefficients before assembling the eigensystem.
+for (alpha in alpha_vector[alpha_vector != 2])
+  for (m in m_vector) my.get.roots(m, alpha / 2, coefficient_source = coefficient_source)
+
+# Keep the requested tau exactly; require an integer number of steps.
+N &lt;- round(T_final / tau)
+if (!is.finite(N) || N &lt; 1 || N &gt; 1e6 ||
+    abs(T_final / tau - N) &gt; 64 * .Machine$double.eps * max(1, N))
+  stop(&quot;Choose T_final/tau to be an integer between 1 and 1e6.&quot;)
+time_seq &lt;- (0:N) * tau
+# A complete eigensystem is dense: reject very fine meshes before assembly.
+if (3 / h &gt; 1200)
+  stop(&quot;Choose h &gt;= 0.0025 for this complete-eigensystem notebook.&quot;)
+data &lt;- isolated_tadpole_data(h, kappa)
+spectrum &lt;- isolated_discrete_spectrum(data$C, data$L)
+knitr::kable(data.frame(h_requested = h, h_min = data$h_min, h_max = data$h_max,
+  tau = tau, steps = N, dimension = nrow(data$C), source = coefficient_source))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">h_requested</th>
+<th align="right">h_min</th>
+<th align="right">h_max</th>
+<th align="right">tau</th>
+<th align="right">steps</th>
+<th align="right">dimension</th>
+<th align="left">source</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.01</td>
+<td align="right">0.01</td>
+<td align="right">0.01</td>
+<td align="right">1e-05</td>
+<td align="right">100</td>
+<td align="right">300</td>
+<td align="left">computed</td>
+</tr>
+</tbody>
+</table>
+<p><code>h</code> is the mesh-builder target; the table reports the
+actual element lengths. Every order uses exactly the same mesh and
+<code>tau</code>. Dense eigendecomposition limits this notebook to
+moderate meshes; this is not the analytic modal shortcut used in NAP’s
+other convergence notebooks.</p>
+</div>
+<div id="compute-the-isolated-error" class="section level2">
+<h2>Compute the isolated error</h2>
+<p>With <span class="math inline">\(L=\kappa^2C+G\)</span>, compute
+<span class="math inline">\(LV=CV\Lambda\)</span> and <span
+class="math inline">\(V^\top CV=I\)</span>. The reference step is <span
+class="math display">\[
+U_h^{k+1}=V\operatorname{diag}\!\left(
+\frac{1}{1+\tau\nu\lambda_j^{\alpha/2}}\right)
+V^\top(CU_h^k+\tau F^{k+1}).
+\]</span> The rational solution uses shifted sparse solves, with their
+factorizations reused at every time step. Both solutions use the same
+analytically integrated loads and interval-averaged forcing. We measure
+<span class="math display">\[
+E_m=\left[\tau\sum_{k=1}^{N}
+(U_h^k-U_{h,m}^k)^\top C(U_h^k-U_{h,m}^k)\right]^{1/2}.
+\]</span> This is their exact common right-constant space-time
+reconstruction norm, apart from floating-point error. It isolates
+rational error, rather than measuring error against the continuum
+solution.</p>
+<pre class="r"><code>rows &lt;- list()
+for (alpha in alpha_vector) {
+  reference &lt;- isolated_exact_be_reference(data$C, spectrum, data$initial,
+    data$spatial_load, time_seq, alpha, diffusion)
+  for (m in m_vector) {
+    rows[[length(rows) + 1L]] &lt;- isolated_rational_error(
+      data, spectrum, reference, m, coefficient_source = coefficient_source)
+  }
+}
+results &lt;- do.call(rbind, rows)
+
+# Classical BE control: exact and sparse implementations should agree.
+control_reference &lt;- isolated_exact_be_reference(data$C, spectrum, data$initial,
+  data$spatial_load, time_seq, alpha = 2, diffusion = diffusion)
+control &lt;- isolated_rational_error(data, spectrum, control_reference, m = 1L,
+  coefficient_source = coefficient_source)
+results$noise_indicator &lt;- pmax(results$absolute_error_disagreement,
+  control$error, .Machine$double.xmin)
+results$resolved &lt;- results$product_error &gt; 100 * results$noise_indicator
+errors &lt;- matrix(results$error, nrow = length(m_vector),
+  dimnames = list(m = m_vector, alpha = alpha_vector))
+knitr::kable(errors, format.args = list(scientific = TRUE, digits = 5))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">0.5</th>
+<th align="right">0.9</th>
+<th align="right">1.3</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">2e-06</td>
+<td align="right">1.4e-06</td>
+<td align="right">3.3e-06</td>
+</tr>
+<tr class="even">
+<td align="right">3e-07</td>
+<td align="right">6.0e-07</td>
+<td align="right">6.0e-07</td>
+</tr>
+<tr class="odd">
+<td align="right">0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">1.0e-07</td>
+</tr>
+<tr class="even">
+<td align="right">0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0.0e+00</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="plot-and-slopes" class="section level2">
+<h2>Plot and slopes</h2>
+<p>Dashed lines show the benchmark exponent <span
+class="math inline">\(-2\pi\sqrt{1-\alpha/2}\)</span>, anchored at the
+first order; their heights are not proved bound constants. Open circles
+mark errors below an empirical numerical-resolution indicator. Those
+points should not be used to claim an asymptotic convergence rate.</p>
+<pre class="r"><code>plot_data &lt;- results
+plot_data$alpha_label &lt;- factor(plot_data$alpha, levels = alpha_vector)
+guides &lt;- plot_data
+for (alpha in alpha_vector) {
+  index &lt;- which(guides$alpha == alpha)
+  guides$error[index] &lt;- guides$error[index[1]] *
+    exp(-2 * pi * sqrt(1 - alpha / 2) * (sqrt(guides$m[index]) - 1))
+}
+p_m_isolated &lt;- ggplot(plot_data, aes(sqrt(m), error, colour = alpha_label,
+                                     group = alpha_label)) +
+  geom_line() + geom_point(aes(shape = resolved), size = 2) +
+  geom_line(data = guides, linetype = &quot;dashed&quot;) +
+  scale_shape_manual(values = c(`FALSE` = 1, `TRUE` = 16)) +
+  scale_x_continuous(breaks = sqrt(m_vector), labels = m_vector) +
+  scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                     labels = scales::label_scientific()) +
+  labs(x = &quot;m (square-root positions)&quot;, y = &quot;Isolated space-time error (log scale)&quot;,
+       colour = &quot;alpha&quot;, shape = &quot;Resolved&quot;,
+       subtitle = sprintf(&quot;%s coefficients; h = %g; tau = %g&quot;, coefficient_source, h, tau)) +
+  theme_minimal() +
+  theme(legend.position = &quot;bottom&quot;,
+        plot.background = element_rect(fill = &quot;white&quot;, colour = NA))
+p_m_isolated</code></pre>
+<p><img src="conv_in_m_isolated_files/figure-html/plot-1.png" width="768" /></p>
+<pre class="r"><code>fit_slope &lt;- function(d) {
+  d &lt;- d[is.finite(d$error) &amp; d$error &gt; 0, ]
+  if (nrow(d) &lt; 2) return(NA_real_)
+  unname(coef(lm(log(error) ~ sqrt(m), data = d))[2])
+}
+slopes &lt;- do.call(rbind, lapply(alpha_vector, function(a) {
+  d &lt;- results[results$alpha == a, ]
+  data.frame(alpha = a, benchmark = -2*pi*sqrt(1-a/2),
+    all_orders_slope = fit_slope(d), resolved_orders = sum(d$resolved),
+    resolved_only_slope = fit_slope(d[d$resolved, ]))
+}))
+knitr::kable(slopes, digits = 5)</code></pre>
+<table>
+<colgroup>
+<col width="8%" />
+<col width="14%" />
+<col width="24%" />
+<col width="23%" />
+<col width="28%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">alpha</th>
+<th align="right">benchmark</th>
+<th align="right">all_orders_slope</th>
+<th align="right">resolved_orders</th>
+<th align="right">resolved_only_slope</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.5</td>
+<td align="right">-5.44140</td>
+<td align="right">-7.57920</td>
+<td align="right">4</td>
+<td align="right">-7.57920</td>
+</tr>
+<tr class="even">
+<td align="right">0.9</td>
+<td align="right">-4.65973</td>
+<td align="right">-6.29814</td>
+<td align="right">4</td>
+<td align="right">-6.29814</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3</td>
+<td align="right">-3.71718</td>
+<td align="right">-6.61452</td>
+<td align="right">4</td>
+<td align="right">-6.61452</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="numerical-checks" class="section level2">
+<h2>Numerical checks</h2>
+<p><code>product_error</code> independently evolves the rational
+solution in the complete numerical eigenbasis, evaluating the root
+product directly. Its agreement with the sparse result checks the
+implementation. The resolution indicator uses the larger of that
+disagreement and the classical BE control error; it is a diagnostic, not
+a certified error bound.</p>
+<pre class="r"><code>knitr::kable(spectrum$diagnostics, digits = 10)</code></pre>
+<table>
+<colgroup>
+<col width="8%" />
+<col width="12%" />
+<col width="12%" />
+<col width="15%" />
+<col width="18%" />
+<col width="17%" />
+<col width="13%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">dimension</th>
+<th align="right">eigenvalue_min</th>
+<th align="right">eigenvalue_max</th>
+<th align="right">relative_residual</th>
+<th align="right">C_orthogonality_error</th>
+<th align="right">estimated_dense_mib</th>
+<th align="right">elapsed_seconds</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">300</td>
+<td align="right">16</td>
+<td align="right">120016</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">13.73291</td>
+<td align="right">0.189</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(control[, c(&quot;error&quot;, &quot;product_error&quot;, &quot;final_state_gap_C&quot;)],
+             format.args = list(scientific = TRUE, digits = 5))</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">error</th>
+<th align="right">product_error</th>
+<th align="right">final_state_gap_C</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0e+00</td>
+<td align="right">0e+00</td>
+<td align="right">0e+00</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(results[, c(&quot;alpha&quot;, &quot;m&quot;, &quot;error&quot;, &quot;product_error&quot;,
+  &quot;absolute_error_disagreement&quot;, &quot;resolved&quot;)],
+  format.args = list(scientific = TRUE, digits = 5))</code></pre>
+<table>
+<colgroup>
+<col width="10%" />
+<col width="8%" />
+<col width="10%" />
+<col width="19%" />
+<col width="38%" />
+<col width="12%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">alpha</th>
+<th align="right">m</th>
+<th align="right">error</th>
+<th align="right">product_error</th>
+<th align="right">absolute_error_disagreement</th>
+<th align="left">resolved</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">5.0e-01</td>
+<td align="right">1e+00</td>
+<td align="right">2.0e-06</td>
+<td align="right">2.0e-06</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">5.0e-01</td>
+<td align="right">2e+00</td>
+<td align="right">3.0e-07</td>
+<td align="right">3.0e-07</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">5.0e-01</td>
+<td align="right">3e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">5.0e-01</td>
+<td align="right">4e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">9.0e-01</td>
+<td align="right">1e+00</td>
+<td align="right">1.4e-06</td>
+<td align="right">1.4e-06</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">9.0e-01</td>
+<td align="right">2e+00</td>
+<td align="right">6.0e-07</td>
+<td align="right">6.0e-07</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">9.0e-01</td>
+<td align="right">3e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">9.0e-01</td>
+<td align="right">4e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3e+00</td>
+<td align="right">1e+00</td>
+<td align="right">3.3e-06</td>
+<td align="right">3.3e-06</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">1.3e+00</td>
+<td align="right">2e+00</td>
+<td align="right">6.0e-07</td>
+<td align="right">6.0e-07</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3e+00</td>
+<td align="right">3e+00</td>
+<td align="right">1.0e-07</td>
+<td align="right">1.0e-07</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">1.3e+00</td>
+<td align="right">4e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0.0e+00</td>
+<td align="right">0e+00</td>
+<td align="left">TRUE</td>
+</tr>
+</tbody>
+</table>
+<p>The scalar approximation bound transfers to a solution-error upper
+bound through stability, provided it covers the discrete spectrum. These
+measured solution curves need not equal the uniform scalar-error curves:
+only discrete eigenvalues are evaluated, and the initial condition and
+forcing weight their contributions. Changing <code>h</code> or
+<code>tau</code> changes this finite-dimensional experiment.</p>
+</div>
+
+
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("show" === "show");
+});
+</script>
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

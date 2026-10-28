@@ -1,0 +1,337 @@
+---
+title: "Convergence in τ"
+date: "Last modified: `r format(Sys.time(), '%d-%m-%Y.')`"
+output:
+  html_document:
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    highlight: pygments
+    theme: flatly
+    code_folding: hide # class.source = "fold-hide" to hide code and add a button to show it
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    fig_caption: true
+    code_download: true
+    css: visual.css
+always_allow_html: true
+bibliography: 
+  - references.bib
+  - grateful-refs.bib
+header-includes:
+  - \newcommand{\ar}{\mathbb{R}}
+  - \newcommand{\llav}[1]{\left\{#1\right\}}
+  - \newcommand{\pare}[1]{\left(#1\right)}
+  - \newcommand{\Ncal}{\mathcal{N}}
+  - \newcommand{\Vcal}{\mathcal{V}}
+  - \newcommand{\Ecal}{\mathcal{E}}
+  - \newcommand{\Wcal}{\mathcal{W}}
+---
+
+Go back to the [Contents](about.html) page.
+
+<div style="color: #2c3e50; text-align: right;">
+********  
+<strong>Press Show to reveal the code chunks.</strong>  
+
+********
+</div>
+
+
+Let us set some global options for all code chunks in this document.
+
+
+```{r}
+# Create a clipboard button
+source(here::here("clipboard.R")); clipboard
+source(here::here("sourceifupdated.R"))
+source_if_updated("fun/matrix_reference/fractional_evolution")
+source_if_updated("fun/matrix_reference/graphs_and_meshes")
+source_if_updated("fun/matrix_reference/plotting")
+source_if_updated("fun/matrix_reference/metafunctions")
+source_if_updated("fun/matrix_reference/exact_solutions")
+source_if_updated("fun/matrix_reference/reference_experiments")
+```
+
+
+```{r}
+# Set seed for reproducibility
+set.seed(1982) 
+# Set global options for all code chunks
+knitr::opts_chunk$set(
+  # Disable messages printed by R code chunks
+  message = FALSE,    
+  # Disable warnings printed by R code chunks
+  warning = FALSE,    
+  # Show R code within code chunks in output
+  echo = TRUE,        
+  # Include both R code and its results in output
+  include = TRUE,     
+  # Evaluate R code chunks
+  eval = FALSE,       
+  # Enable caching of R code chunks for faster rendering
+  cache = FALSE,      
+  # Align figures in the center of the output
+  fig.align = "center",
+  # Enable retina display for high-resolution figures
+  retina = 2,
+  # Show errors in the output instead of stopping rendering
+  error = TRUE,
+  # Do not collapse code and output into a single block
+  collapse = FALSE
+)
+# Start the figure counter
+fig_count <- 0
+# Define the captioner function
+captioner <- function(caption) {
+  fig_count <<- fig_count + 1
+  paste0("Figure ", fig_count, ": ", caption)
+}
+```
+
+
+::: {.custom-box}
+To study convergence in $\tau$, we keep the spatial mesh size $h$ and rational order $m$ fixed and choose them sufficiently accurately that the temporal error dominates. The actual uniform steps are $\tau=T/N$, obtained from the requested step sizes using integer numbers of intervals. The expected temporal rate is first order. We fit $\log_{10}E=S_\tau\log_{10}\tau+\log_{10}C_\tau$ using those actual steps. Spatial, rational, and reference-quadrature errors should be checked independently so they do not mask the temporal rate.
+:::
+
+The physical equation is $u_t+\nu L^{\alpha/2}u=f$, with `diffusion` $=\nu>0$.
+Keep diffusion fixed along each refinement curve. The original meshes, package
+coefficients, interval-averaged forcing, and right-constant reference-time
+quadrature are retained. `error_method = "compressed"` evaluates the same
+reference-matrix norm using centered coefficient moments. It still advances
+every FEM/backward Euler step and needs no discrete eigenfunction identities.
+Use `error_method = "reference"` for the original accumulator. Execution
+settings (`workers`, `error_n_blocks`) do not change the mathematical problem.
+
+```{r, eval = TRUE}
+# remotes::install_github("davidbolin/rspde", ref = "devel")
+# remotes::install_github("davidbolin/metricgraph", ref = "devel")
+library(rSPDE)
+library(MetricGraph)
+library(grateful)
+
+library(ggplot2)
+library(reshape2)
+library(plotly)
+# Results stay in the private run directory; no notification setup.
+```
+
+
+
+
+
+
+```{r}
+# Parameters
+T_final <- 1
+diffusion <- 1 # nu > 0 in u_t + nu * L^(alpha/2) u = f
+workers <- 2L # independent complete cases; set 1L for serial execution
+error_method <- "compressed" # "reference" retains the original error accumulator
+run_id <- NULL # use an existing run ID only to reload matching parameters
+kappa <- 4
+N_finite <- 4 # choose even
+adjusted_N_finite <- N_finite + N_finite/2 + 1
+# Coefficients for u_0 and f
+coeff_U_0 <- 50*(1:adjusted_N_finite)^-1
+coeff_U_0[-5] <- 0
+coeff_FF <- rep(0, adjusted_N_finite)
+coeff_FF[7] <- 10
+
+AAA = 1
+OMEGA = pi
+
+# Requested time steps and fixed spatial mesh size.
+tau_targets <- 10^seq(log10(0.009), log10(0.1), length.out = 4)
+h_fixed <- 1e-3
+m_fixed <- 4
+alpha_vector <- seq(0.5, 1.5, by = 0.4)
+
+# Use the actual uniform steps in both the solver and the convergence fit.
+time_grids <- lapply(tau_targets, function(target) {
+  make_time_grid(T_final = T_final, target_step = target)
+})
+tau_vector <- vapply(time_grids, function(grid) grid$time_step, numeric(1))
+stopifnot(length(unique(tau_vector)) == length(tau_vector))
+
+# Interval averages depend only on the time grid; reuse them for every alpha.
+g_averages <- lapply(time_grids, function(grid) {
+  average_sine_forcing(grid$time_seq, A = AAA, omega = OMEGA)
+})
+```
+
+
+
+```{r}
+# Reference quadrature and error accumulation.
+overkill_time_step <- 1e-4
+overkill_h <- 1e-4
+error_verbose <- TRUE
+
+study_parameters <- list(
+  study = "tau", T_final = T_final, diffusion = diffusion, kappa = kappa,
+  N_finite = N_finite, initial = coeff_U_0, forcing = coeff_FF,
+  A = AAA, omega = OMEGA, alpha = alpha_vector, axis = tau_targets,
+  fixed_h = h_fixed, fixed_m = m_fixed, time_steps = tau_vector, reference_h = overkill_h,
+  reference_time_step_target = overkill_time_step, error_method = error_method,
+  coefficient_source = "rSPDE package",
+  package_versions = vapply(c("Matrix", "MetricGraph", "rSPDE"),
+                           function(p) as.character(utils::packageVersion(p)), character(1)))
+run_dir <- reference_experiment_run("tau", study_parameters, run_id)
+result_file <- file.path(run_dir, "errors_projected_tau.RData")
+cat("Run ID:", basename(run_dir), "\nPrivate results:", run_dir, "\n")
+
+overkill_graph <- gets.graph.tadpole(h = overkill_h)
+overkill_graph$compute_fem()
+overkill_C <- overkill_graph$mesh$C
+```
+
+
+```{r}
+error_n_blocks <- 1L
+# Preview modeled memory before allocating the reference time vector or solving.
+# estimated_gib excludes FEM/solver objects and other session memory by default.
+error_memory <- estimate_error_memory(
+  n_reference_nodes = nrow(overkill_C),
+  n_exact_modes = if (error_method == "compressed")
+    sum(coeff_U_0 != 0 | coeff_FF != 0) else NULL,
+  n_reference_samples = ceiling(T_final / overkill_time_step),
+  n_blocks = unique(c(error_n_blocks, 10, 100, 1000, 10000, 100000, 1000000)),
+  n_solver_steps = vapply(time_grids, function(grid) grid$N, numeric(1))
+)
+print(error_memory, digits = 3, row.names = FALSE)
+# Set error_n_blocks above to the desired count before running the experiment.
+```
+
+
+```{r}
+reference_grid <- make_time_grid(
+  T_final = T_final, target_step = overkill_time_step
+)
+overkill_time_step <- reference_grid$time_step
+overkill_time_seq <- reference_grid$time_seq
+
+# The spatial discretization is fixed for every time step and alpha.
+graph <- gets.graph.tadpole(h = h_fixed)
+graph$compute_fem()
+C <- graph$mesh$C
+L <- kappa^2 * C + graph$mesh$G
+Psi <- graph$fem_basis(overkill_graph$get_mesh_locations())
+stopifnot(all(coeff_U_0[-5] == 0))
+U_0 <- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
+
+# Reference spatial modes and loads are independent of alpha, tau, and m.
+reference_eigen_params <- gets.eigen.params(
+  N_finite = N_finite, kappa = kappa,
+  alpha = alpha_vector[1], graph = overkill_graph
+)
+reference_eigenvalues <- reference_eigen_params$EIGENVAL
+overkill_EIGENFUN <- reference_eigen_params$EIGENFUN
+active_modes <- which(coeff_U_0 != 0 | coeff_FF != 0)
+exact_basis <- overkill_EIGENFUN[, active_modes, drop = FALSE]
+exact_initial <- coeff_U_0[active_modes]
+exact_forcing <- coeff_FF[active_modes]
+spatial_modes <- t(Psi) %*% overkill_C %*% overkill_EIGENFUN
+spatial_load <- as.numeric(spatial_modes %*% coeff_FF)
+error_projection <- if (error_method == "compressed")
+  prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
+m_values <- c()
+```
+
+
+```{r, eval = FALSE, class.source = "fold-show"}
+# Only the coordinator saves results; refuse overwriting an existing run.
+stopifnot(!file.exists(result_file))
+errors_projected <- matrix(NA_real_, length(tau_vector), length(alpha_vector))
+for (j in seq_along(alpha_vector)) {
+  alpha <- alpha_vector[j]
+  beta <- alpha / 2
+  exact_rates <- diffusion * reference_eigenvalues[active_modes]^beta
+  coefficients_at_time <- function(t) exact_modal_coefficients(
+    t, exact_rates, exact_initial, exact_forcing, A = AAA, omega = OMEGA)
+  exact_at_time <- function(t) exact_basis %*% coefficients_at_time(t)
+
+  cases <- run_reference_cases(seq_along(tau_vector), function(i) {
+    time_grid <- time_grids[[i]]
+    time_step <- time_grid$time_step
+    time_seq <- time_grid$time_seq
+    g_average <- g_averages[[i]]
+    m <- m_fixed
+    my_op_frac <- my.fractional.operators.frac(
+      L = L, beta = beta, C = C, scale.factor = kappa^2,
+      m = m, time_step = time_step, diffusion = diffusion)
+    solve_fractional_evolution_error(
+      my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
+      Psi, overkill_C, overkill_time_seq, exact_at_time,
+      n_blocks = error_n_blocks, verbose = error_verbose,
+      error_method = error_method, coefficients_at_time = coefficients_at_time,
+      error_projection = error_projection)
+  }, workers = workers)
+  errors_projected[, j] <- vapply(cases, identity, numeric(1))
+}
+save(errors_projected, study_parameters, file = result_file)
+```
+
+```{r}
+# Load the errors_projected data
+saved <- new.env()
+load(result_file, envir = saved)
+stopifnot(identical(saved$study_parameters, study_parameters))
+errors_projected <- saved$errors_projected
+```
+
+
+
+```{r}
+observed_rates <- numeric(length(alpha_vector))
+for (u in 1:length(alpha_vector)) {
+  observed_rates[u] <- coef(lm(log10(errors_projected[, u]) ~ log10(tau_vector)))[2]
+}
+
+theoretical_rates <- rep(1, length(alpha_vector))
+
+
+p_tau_tadpole <- error.convergence.plotter(x_axis_vector = tau_vector, 
+                                   alpha_vector, 
+                                   errors_projected, 
+                                   theoretical_rates, 
+                                   observed_rates,
+                                   line_equation_fun = loglog_line_equation,
+                                   fig_title = expression("Convergence in " * italic(tau)),
+                                   x_axis_label = expression(italic(tau)))
+
+p_tau_nicer_tadpole <- errorConvergencePlotterLatex(x_axis_vector = tau_vector, 
+                                 alpha_vector, 
+                                 errors_projected, 
+                                 theoretical_rates, 
+                                 observed_rates,
+                                 line_equation_fun = loglog_line_equation,
+                                 fig_title = "$\\mbox{Convergence in }\\tau$",
+                                 x_axis_label = "$\\tau\\quad(\\log_{10}\\mbox{ scale})$",
+                                 y_axis_label = "$\\|u-U_{h,m}^{\\tau}\\|_{L_2(\\Gamma\\times[0,T])}\\quad(\\log_{10}\\mbox{ scale})$",
+                                 color_label = "$\\quad\\quad\\;\\;\\alpha\\;|\\;\\mathtt{theo}\\;|\\;\\;\\mathtt{obs}\\;\\;|\\%\\mathtt{re}$")
+
+ggsave(file.path(run_dir, "conv_rates_tau_tadpole.png"), width = 4, height = 5, plot = p_tau_tadpole, dpi = 300)
+myggsave(p_tau_nicer_tadpole, width = 4, height = 5, use_mathpazo = TRUE,
+         output_dir = file.path(run_dir, "tikzpic"), copy_to_presentation = FALSE)
+save(p_tau_tadpole, file = file.path(run_dir, "p_tau_tadpole.RData"))
+save(p_tau_nicer_tadpole, file = file.path(run_dir, "p_tau_nicer_tadpole.RData"))
+```
+
+
+```{r, eval = FALSE, fig.align='center', out.width="400px", out.height="500px", fig.cap = captioner("Comparison between theoretical and observed convergence behavior for the $L_2(\\Gamma\\times(0,T))$-error with respect to $\\tau$ on a $\\text{log}_{10}$–$\\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case.")}
+knitr::include_graphics(file.path(run_dir, "tikzpic", "p_tau_nicer_tadpole_with_mathpazo.pdf"))
+```
+
+
+
+
+
+Results and figures are saved under `run_dir`. No notifications are sent.
+
+# References
+
+```{r, eval = TRUE}
+if (exists("run_dir")) cite_packages(output = "paragraph", out.dir = run_dir)
+```

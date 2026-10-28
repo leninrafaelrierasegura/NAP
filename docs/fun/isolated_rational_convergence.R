@@ -1,0 +1,520 @@
+## -----------------------------------------------------------------------------------------------
+gets.graph.tadpole <- function(h) {
+  edge1 <- rbind(c(0, 0), c(1, 0))
+  theta <- seq(-pi, pi, length.out = 10000)
+  edge2 <- cbind(1 + 1/pi + cos(theta)/pi, sin(theta)/pi)
+  graph <- MetricGraph::metric_graph$new(edges = list(edge1, edge2), verbose = 0)
+  graph$set_manual_edge_lengths(edge_lengths = c(1, 2))
+  graph$build_mesh(h = h)
+  graph
+}
+
+
+## -----------------------------------------------------------------------------------------------
+trig_hat_integrals <- function(a, b, w, A = 0, B = 0) {
+    h <- b - a
+    z <- w * h/2
+    theta <- w * (a + b)/2
+    if (abs(z) < 0.001) {
+        S <- 1 - z^2/6 + z^4/120 - z^6/5040
+        Q <- z/3 - z^3/30 + z^5/840 - z^7/45360
+    }
+    else {
+        S <- sin(z)/z
+        Q <- (sin(z) - z * cos(z))/z^2
+    }
+    v <- A * cos(theta) + B * sin(theta)
+    q <- A * sin(theta) - B * cos(theta)
+    h/2 * c(left = S * v + Q * q, right = S * v - Q * q)
+}
+
+
+## -----------------------------------------------------------------------------------------------
+project_u0_tadpole <- function(graph, amplitude = 10) {
+    C <- graph$mesh$C
+    PtE <- graph$mesh$PtE
+    lengths <- graph$get_edge_lengths()
+    stopifnot(!is.null(C), length(lengths) == 2L, nrow(C) == 2L + nrow(PtE), length(amplitude) == 1L, 
+        is.finite(amplitude))
+    local_load <- function(a, b, w, A, B) {
+        h <- b - a
+        z <- w * h/2
+        theta <- w * (a + b)/2
+        if (abs(z) < 0.001) {
+            S <- 1 - z^2/6 + z^4/120 - z^6/5040
+            Q <- z/3 - z^3/30 + z^5/840 - z^7/45360
+        }
+        else {
+            S <- sin(z)/z
+            Q <- (sin(z) - z * cos(z))/z^2
+        }
+        v <- A * cos(theta) + B * sin(theta)
+        q <- A * sin(theta) - B * cos(theta)
+        h/2 * c(S * v + Q * q, S * v - Q * q)
+    }
+    b0 <- numeric(nrow(C))
+    w <- 3 * pi/2
+    for (edge in 1:2) {
+        idx <- which(PtE[, 1] == edge)
+        idx <- idx[order(PtE[idx, 2])]
+        x <- c(0, lengths[edge] * PtE[idx, 2], lengths[edge])
+        start_node <- if (edge == 1L) 
+            1L
+        else 2L
+        nodes <- c(start_node, 2L + idx, 2L)
+        A <- if (edge == 1L) 
+            2 * amplitude/sqrt(3)
+        else 0
+        B <- if (edge == 2L) 
+            amplitude/sqrt(3)
+        else 0
+        for (j in seq_len(length(x) - 1L)) {
+            load <- local_load(x[j], x[j + 1L], w, A, B)
+            b0[nodes[j]] <- b0[nodes[j]] + load[1]
+            b0[nodes[j + 1L]] <- b0[nodes[j + 1L]] + load[2]
+        }
+    }
+    as.numeric(solve(C, b0))
+}
+
+
+## -----------------------------------------------------------------------------------------------
+poly.from.roots <- function(roots) {
+    coef <- 1
+    for (r in roots) {
+        coef <- convolve(coef, c(1, -r), type = "open")
+    }
+    return(coef)
+}
+
+
+## -----------------------------------------------------------------------------------------------
+compute.partial.fraction.param <- function(factor, pr_roots, pl_roots, time_step, scaling, stable = FALSE) {
+    if (stable) {
+        direct_polynomial <- function(roots) {
+            coefficients <- 1
+            for (r in roots) coefficients <- c(-r * coefficients, 0) + c(0, coefficients)
+            coefficients
+        }
+        strength <- (scaling * time_step)/factor
+        if (!is.finite(strength) || strength <= 0) 
+            stop("Invalid or underflowed scaled time step in the rational update.")
+        pr_coef <- c(0, direct_polynomial(pr_roots))
+        pl_coef <- direct_polynomial(pl_roots)
+        factor_pr_coef <- pr_coef
+        pr_plus_pl_coef <- factor_pr_coef + strength * pl_coef
+        p <- polyroot(rev(pr_plus_pl_coef))
+        stopifnot(all(abs(Im(p)) <= 1e-10 * pmax(1, abs(Re(p)))), all(Re(p) < 0))
+        p <- Re(p)
+        derivative <- function(roots, x) sum(vapply(seq_along(roots), function(j) -roots[j] * prod(1 - 
+            roots[-j] * x), numeric(1)))
+        r <- vapply(p, function(x) {
+            -strength * prod(1 - pl_roots * x)/(derivative(pr_roots, x) + strength * derivative(pl_roots, 
+                x))
+        }, numeric(1))
+        if (length(p) != length(pl_roots) || any(!is.finite(r)) || any(r <= 0)) 
+            stop("Unstable rational update: residues must be finite and positive.")
+        z <- 10^seq(0, 12, length.out = 65L)
+        P <- vapply(z, function(x) prod(1 - pr_roots * x), numeric(1))
+        Q <- vapply(z, function(x) prod(1 - pl_roots * x), numeric(1))
+        expected <- P/(P + strength * Q)
+        reconstructed <- rowSums(vapply(seq_along(p), function(j) r[j]/(z - p[j]), numeric(length(z))))
+        if (any(!is.finite(reconstructed)) || max(abs(reconstructed - expected)) > 5e-09) 
+            stop("Unstable rational update: partial-fraction reconstruction failed.")
+        res <- list(r = r, p = p, k = numeric(0))
+        return(list(r = res$r, p = res$p, k = res$k))
+    }
+    pr_coef <- c(0, poly.from.roots(pr_roots))
+    pl_coef <- poly.from.roots(pl_roots)
+    factor_pr_coef <- pr_coef
+    pr_plus_pl_coef <- factor_pr_coef + ((scaling * time_step)/factor) * pl_coef
+    p <- polyroot(rev(pr_plus_pl_coef))
+    stopifnot(all(abs(Im(p)) <= 1e-10 * pmax(1, abs(Re(p)))), all(Re(p) < 0))
+    p <- Re(p)
+    eval_poly <- function(coef, x) {
+        Reduce(function(value, a) value * x + a, coef, init = 0)
+    }
+    r <- vapply(seq_along(p), function(j) {
+        eval_poly(factor_pr_coef, p[j])/(pr_plus_pl_coef[1] * prod(p[j] - p[-j]))
+    }, numeric(1))
+    res <- list(r = r, p = p, k = numeric(0))
+    return(list(r = res$r, p = res$p, k = res$k))
+}
+
+
+## -----------------------------------------------------------------------------------------------
+my.fractional.operators.frac <- function(L, beta, C, scale.factor, m = 1, time_step, diffusion = 1, fractional_roots = NULL) {
+    stopifnot(length(diffusion) == 1L, is.finite(diffusion), diffusion > 0, length(time_step) == 1L, 
+        is.finite(time_step), time_step > 0, length(beta) == 1L, is.finite(beta), beta > 0, beta <= 1, 
+        length(scale.factor) == 1L, is.finite(scale.factor), scale.factor > 0)
+    L <- L/scale.factor
+    if (beta == 1) {
+        L <- L * scale.factor^beta
+        return(list(C = C, L = L, m = m, beta = beta, diffusion = diffusion, LHS = C + time_step * diffusion * 
+            L, factorization = Matrix::Cholesky(Matrix::forceSymmetric(C + time_step * diffusion * L), 
+            LDL = FALSE)))
+    }
+    else {
+        scaling <- diffusion * scale.factor^beta
+        roots <- if (is.null(fractional_roots)) 
+            my.get.roots(m, beta)
+        else fractional_roots
+        if (!is.null(fractional_roots)) {
+            values <- c(roots$pr_roots, roots$pl_roots)
+            stopifnot(length(roots$factor) == 1L, is.finite(roots$factor), roots$factor > 0, length(roots$pr_roots) == 
+                m, length(roots$pl_roots) == m + 1L, is.numeric(values), !is.complex(values), all(is.finite(values)), 
+                all(values < 0))
+        }
+        poles_rs_k <- compute.partial.fraction.param(factor = roots$factor, pr_roots = roots$pr_roots, 
+            pl_roots = roots$pl_roots, time_step = time_step, scaling = scaling, stable = !is.null(fractional_roots))
+        partial_fraction_terms <- list()
+        for (i in 1:(m + 1)) {
+            partial_fraction_terms[[i]] <- (L - poles_rs_k$p[i] * C)
+        }
+        return(list(C = C, L = L, m = m, beta = beta, partial_fraction_terms = partial_fraction_terms, 
+            residues = poles_rs_k$r, poles = poles_rs_k$p, diffusion = diffusion, factorizations = lapply(partial_fraction_terms, 
+                function(A) {
+                  Matrix::Cholesky(Matrix::forceSymmetric(A), LDL = FALSE)
+                })))
+    }
+}
+
+
+## -----------------------------------------------------------------------------------------------
+my.solver.frac <- function(obj, v) {
+    beta <- obj$beta
+    m <- obj$m
+    if (beta == 1) {
+        return(if (!is.null(obj$factorization)) solve(obj$factorization, v, system = "A") else solve(obj$LHS, 
+            v))
+    }
+    else {
+        partial_fraction_terms <- obj$partial_fraction_terms
+        residues <- obj$residues
+        output <- v * 0
+        for (i in seq_len(m + 1L)) {
+            solved <- if (!is.null(obj$factorizations)) {
+                solve(obj$factorizations[[i]], v, system = "A")
+            }
+            else solve(partial_fraction_terms[[i]], v)
+            output <- output + residues[i] * solved
+        }
+        return(output)
+    }
+}
+
+
+## -----------------------------------------------------------------------------------------------
+average_sine_forcing <- function(time_seq, A = 1, omega = pi) {
+    dt <- diff(time_seq)
+    stopifnot(length(time_seq) >= 2L, all(is.finite(time_seq)), all(dt > 0))
+    midpoint <- head(time_seq, -1) + dt/2
+    z <- omega * dt/2
+    sinc_z <- rep(1, length(z))
+    nonzero <- z != 0
+    sinc_z[nonzero] <- sin(z[nonzero])/z[nonzero]
+    averages <- A * sin(omega * midpoint) * sinc_z
+    c(0, averages)
+}
+
+
+## -----------------------------------------------------------------------------------------------
+rational_supported_orders <- function(coefficient_source = "package") {
+    coefficient_source <- match.arg(coefficient_source, c("package", "computed"))
+    if (coefficient_source == "package") 
+        1:4
+    else 1:8
+}
+
+
+## -----------------------------------------------------------------------------------------------
+read_computed_fractional_roots <- function() {
+    path <- computed_coefficient_file
+    if (!file.exists(path)) 
+        stop("Missing computed coefficients: ", path)
+    tab <- read.csv(path, stringsAsFactors = FALSE)
+    if (!identical(names(tab), c("m", "beta", "kind", "index", "value")) || !all(vapply(tab[c("m", "beta", 
+        "index", "value")], is.numeric, logical(1))) || !all(is.finite(as.matrix(tab[c("m", "beta", "index", 
+        "value")]))) || !all(tab$m %in% 1:8) || !all(tab$beta >= 0.25 & tab$beta < 1) || !all(tab$kind %in% 
+        c("factor", "rc", "rb")) || anyDuplicated(tab[c("m", "beta", "kind", "index")])) 
+        stop("Malformed computed coefficient artifact.")
+    tab
+}
+
+
+## -----------------------------------------------------------------------------------------------
+validate_fractional_roots <- function(roots, m) {
+    all_roots <- c(roots$pr_roots, roots$pl_roots)
+    if (length(roots$pr_roots) != m || length(roots$pl_roots) != m + 1L || length(roots$factor) != 1L || 
+        !is.finite(roots$factor) || roots$factor <= 0 || !is.numeric(all_roots) || is.complex(all_roots) || 
+        any(!is.finite(all_roots)) || any(all_roots >= 0)) 
+        stop("Fractional coefficients need a positive factor and real negative roots.")
+    numerator <- sort(roots$pr_roots)
+    denominator <- sort(roots$pl_roots)
+    if (any(denominator[-length(denominator)] >= numerator) || any(numerator >= denominator[-1L])) 
+        stop("Fractional coefficient roots do not interlace; this approximation is unsafe.")
+    roots
+}
+
+
+## -----------------------------------------------------------------------------------------------
+my.get.roots <- function(m, beta, interpolation = c("linear", "cubic"), coefficient_source = "package") {
+    coefficient_source <- match.arg(coefficient_source, c("package", "computed"))
+    interpolation <- match.arg(interpolation)
+    orders <- rational_supported_orders(coefficient_source)
+    if (length(m) != 1L || !is.finite(m) || !(m %in% orders)) 
+        stop("Coefficient source '", coefficient_source, "' supports m = ", paste(orders, collapse = ", "), 
+            " only.")
+    if (length(beta) != 1L || !is.finite(beta) || beta < 0.25 || beta >= 1) 
+        stop("Fractional evolution tables require 0.25 <= beta < 1; beta = 1 uses the exact solver.")
+    if (coefficient_source == "computed") {
+        tab <- read_computed_fractional_roots()
+        rows <- tab[tab$m == m & abs(tab$beta - beta) <= 32 * .Machine$double.eps * max(1, abs(beta)), 
+            ]
+        if (!nrow(rows)) 
+            stop("Computed coefficients are unavailable at beta = ", format(beta, digits = 16), ". Available beta: ", 
+                paste(sort(unique(tab$beta)), collapse = ", "), ". Generate and validate new coefficients; beta interpolation is disabled.")
+        values <- function(kind, indices) {
+            part <- rows[rows$kind == kind, ]
+            if (nrow(part) != length(indices) || !setequal(part$index, indices)) 
+                stop("Computed coefficient entries are incomplete for m = ", m, ".")
+            part$value[match(indices, part$index)]
+        }
+        return(validate_fractional_roots(list(factor = values("factor", 0), pr_roots = values("rc", seq_len(m)), 
+            pl_roots = values("rb", seq_len(m + 1L))), m))
+    }
+    mt <- get(paste0("m", m, "table"), envir = asNamespace("rSPDE"))
+    interpolate <- function(column) {
+        if (interpolation == "linear") 
+            approx(mt$beta, mt[[column]], beta)$y
+        else splinefun(mt$beta, mt[[column]], method = "fmm")(beta)
+    }
+    rb <- rep(0, m + 1)
+    rc <- rep(0, m)
+    if (m == 1) {
+        rc = interpolate("rc")
+    }
+    else {
+        rc = sapply(1:m, function(i) {
+            interpolate(paste0("rc.", i))
+        })
+    }
+    rb = sapply(1:(m + 1), function(i) {
+        interpolate(paste0("rb.", i))
+    })
+    factor = interpolate("factor")
+    return(validate_fractional_roots(list(pl_roots = rb, pr_roots = rc, factor = factor), m))
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_discrete_spectrum <- function(C, L, max_dimension = 1200L, max_dense_mib = 1024, residual_tolerance = 1e-08, 
+    orthogonality_tolerance = 1e-10) {
+    n <- nrow(C)
+    stopifnot(n >= 1L, ncol(C) == n, identical(dim(L), dim(C)), isSymmetric(C, tol = 1e-12), isSymmetric(L, 
+        tol = 1e-12), length(max_dimension) == 1L, is.finite(max_dimension), max_dimension >= 1, length(max_dense_mib) == 
+        1L, is.finite(max_dense_mib), max_dense_mib > 0, is.finite(residual_tolerance), residual_tolerance > 
+        0, is.finite(orthogonality_tolerance), orthogonality_tolerance > 0)
+    estimated_mib <- 20 * 8 * as.double(n)^2/1024^2
+    if (n > max_dimension || estimated_mib > max_dense_mib) 
+        stop("Complete eigendecomposition refused before dense allocation: dimension ", n, ", estimated temporary storage ", 
+            round(estimated_mib, 1), " MiB. Choose a moderate isolated-study mesh or explicitly raise the guards.")
+    started <- proc.time()[["elapsed"]]
+    dense_C <- as.matrix(C)
+    dense_L <- as.matrix(L)
+    stopifnot(all(is.finite(dense_C)), all(is.finite(dense_L)))
+    R <- chol(dense_C)
+    Rinv <- backsolve(R, diag(n))
+    symmetric <- crossprod(Rinv, dense_L %*% Rinv)
+    ee <- eigen((symmetric + t(symmetric))/2, symmetric = TRUE)
+    stopifnot(all(is.finite(ee$values)), all(ee$values > 0))
+    V <- backsolve(R, ee$vectors)
+    CV <- C %*% V
+    LV <- L %*% V
+    residual <- as.matrix(LV - sweep(as.matrix(CV), 2L, ee$values, `*`))
+    denominator <- sqrt(colSums(as.matrix(LV)^2)) + abs(ee$values) * sqrt(colSums(as.matrix(CV)^2))
+    residual_error <- max(sqrt(colSums(residual^2))/pmax(denominator, .Machine$double.xmin))
+    orthogonality_error <- max(abs(crossprod(V, CV) - diag(n)))
+    if (residual_error > residual_tolerance || orthogonality_error > orthogonality_tolerance) 
+        stop("Numerical eigensystem failed validation: residual = ", residual_error, ", C-orthogonality = ", 
+            orthogonality_error)
+    list(values = ee$values, vectors = V, diagnostics = data.frame(dimension = n, eigenvalue_min = min(ee$values), 
+        eigenvalue_max = max(ee$values), relative_residual = residual_error, C_orthogonality_error = orthogonality_error, 
+        estimated_dense_mib = estimated_mib, elapsed_seconds = proc.time()[["elapsed"]] - started))
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_exact_be_reference <- function(C, spectrum, initial, spatial_load, time_seq, alpha, diffusion = 1, 
+    A = 1, omega = pi, max_history_mib = 256) {
+    n <- nrow(C)
+    stopifnot(length(initial) == n, length(spatial_load) == n, all(is.finite(initial)), all(is.finite(spatial_load)), 
+        length(time_seq) >= 2L, all(is.finite(time_seq)), all(diff(time_seq) > 0), length(alpha) == 1L, 
+        is.finite(alpha), alpha > 0, alpha <= 2, length(diffusion) == 1L, is.finite(diffusion), diffusion > 
+            0, length(A) == 1L, is.finite(A), length(omega) == 1L, is.finite(omega), is.finite(max_history_mib), 
+        max_history_mib > 0, identical(dim(spectrum$vectors), c(n, n)), length(spectrum$values) == n)
+    dt <- diff(time_seq)[1L]
+    stopifnot(max(abs(diff(time_seq) - dt)) <= 128 * .Machine$double.eps * max(1, abs(tail(time_seq, 
+        1L))))
+    history_mib <- 2 * 8 * as.double(n) * length(time_seq)/1024^2
+    if (history_mib > max_history_mib) 
+        stop("Exact reference history exceeds max_history_mib; use a moderate time grid.")
+    V <- spectrum$vectors
+    x <- as.numeric(crossprod(V, C %*% initial))
+    f <- as.numeric(crossprod(V, spatial_load))
+    rates <- diffusion * spectrum$values^(alpha/2)
+    mu <- 1/(1 + dt * rates)
+    g <- average_sine_forcing(time_seq, A = A, omega = omega)
+    states <- coefficients <- matrix(0, n, length(time_seq))
+    states[, 1L] <- initial
+    coefficients[, 1L] <- x
+    y <- x
+    for (k in seq_len(length(time_seq) - 1L)) {
+        y <- mu * (y + dt * f * g[k + 1L])
+        coefficients[, k + 1L] <- y
+        states[, k + 1L] <- as.numeric(V %*% y)
+    }
+    list(states = states, coefficients = coefficients, initial_coefficients = x, forcing_coefficients = f, 
+        exact_rates = rates, g_average = g, dt = dt, time_seq = time_seq, alpha = alpha, diffusion = diffusion, 
+        history_mib = history_mib)
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_tadpole_data <- function(h, kappa = 4, initial_amplitude = 10, forcing_amplitude = 10) {
+    stopifnot(length(h) == 1L, is.finite(h), h > 0, length(kappa) == 1L, is.finite(kappa), kappa > 0, 
+        is.finite(initial_amplitude), is.finite(forcing_amplitude))
+    graph <- gets.graph.tadpole(h)
+    graph$compute_fem()
+    C <- graph$mesh$C
+    L <- kappa^2 * C + graph$mesh$G
+    PtE <- graph$mesh$PtE
+    lengths <- graph$get_edge_lengths()
+    stopifnot(length(lengths) == 2L, max(abs(lengths - c(1, 2))) < 1e-12, nrow(C) == 2L + nrow(PtE))
+    load <- numeric(nrow(C))
+    element_lengths <- numeric()
+    for (edge in 1:2) {
+        idx <- which(PtE[, 1L] == edge)
+        idx <- idx[order(PtE[idx, 2L])]
+        coordinates <- c(0, lengths[edge] * PtE[idx, 2L], lengths[edge])
+        nodes <- c(if (edge == 1L) 1L else 2L, 2L + idx, 2L)
+        element_lengths <- c(element_lengths, diff(coordinates))
+        for (i in seq_len(length(coordinates) - 1L)) {
+            pair <- trig_hat_integrals(coordinates[i], coordinates[i + 1L], 2 * pi, A = forcing_amplitude * 
+                sqrt(2/3))
+            load[nodes[i]] <- load[nodes[i]] + pair[1L]
+            load[nodes[i + 1L]] <- load[nodes[i + 1L]] + pair[2L]
+        }
+    }
+    list(C = C, L = L, initial = project_u0_tadpole(graph, initial_amplitude), spatial_load = load, kappa = kappa, 
+        h_requested = h, h_min = min(element_lengths), h_max = max(element_lengths))
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_rational_rates <- function(eigenvalues, alpha, m, kappa, diffusion = 1, coefficient_source = "package", 
+    coefficient_file = isolated_default_coefficient_file(), roots = NULL) {
+    coefficient_source <- match.arg(coefficient_source, c("package", "computed"))
+    orders <- if (coefficient_source == "computed") 
+        1:8
+    else 1:4
+    stopifnot(all(is.finite(eigenvalues)), all(eigenvalues > 0), length(alpha) == 1L, alpha >= 0.5, alpha <= 
+        2, length(m) == 1L, m %in% orders, is.finite(diffusion), diffusion > 0, is.finite(kappa), kappa > 
+        0)
+    if (alpha == 2) 
+        return(diffusion * eigenvalues)
+    if (is.null(roots)) 
+        roots <- isolated_fractional_roots(m, alpha/2, coefficient_source, coefficient_file)
+    stopifnot(is.finite(roots$factor), roots$factor > 0, all(is.finite(c(roots$pr_roots, roots$pl_roots))), 
+        all(c(roots$pr_roots, roots$pl_roots) < 0))
+    z <- eigenvalues/kappa^2
+    log_inverse <- log(roots$factor) + vapply(z, function(x) sum(log1p(-roots$pr_roots * x)) - sum(log1p(-roots$pl_roots * 
+        x)), numeric(1))
+    rates <- diffusion * kappa^alpha * exp(-log_inverse)
+    stopifnot(all(is.finite(rates)), all(rates > 0))
+    rates
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_beta_bracket <- function(m, beta) {
+    table <- get(paste0("m", m, "table"), envir = asNamespace("rSPDE"))
+    tolerance <- 32 * .Machine$double.eps * max(1, abs(beta))
+    exact <- any(abs(table$beta - beta) <= tolerance)
+    list(exact = exact, lower = max(table$beta[table$beta <= beta + tolerance]), upper = min(table$beta[table$beta >= 
+        beta - tolerance]))
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_rational_error <- function(data, spectrum, reference, m, excitation_tolerance = 1e-08, coefficient_source = "package", 
+    coefficient_file = isolated_default_coefficient_file(), coefficient_table = NULL) {
+    coefficient_source <- match.arg(coefficient_source, c("package", "computed"))
+    started <- proc.time()[["elapsed"]]
+    stopifnot(nrow(reference$states) == nrow(data$C), ncol(reference$states) == length(reference$time_seq))
+    roots <- if (reference$alpha == 2) 
+        NULL
+    else isolated_fractional_roots(m, reference$alpha/2, coefficient_source, coefficient_file, coefficient_table)
+    op <- my.fractional.operators.frac(L = data$L, beta = reference$alpha/2, C = data$C, scale.factor = data$kappa^2, 
+        m = m, time_step = reference$dt, diffusion = reference$diffusion, fractional_roots = if (coefficient_source == 
+            "computed") 
+            roots
+        else NULL)
+    rates <- isolated_rational_rates(spectrum$values, reference$alpha, m, data$kappa, reference$diffusion, 
+        coefficient_source, coefficient_file, roots)
+    mu <- 1/(1 + reference$dt * rates)
+    y <- reference$initial_coefficients
+    u <- as.numeric(data$initial)
+    total <- spectral_total <- compensation <- spectral_compensation <- 0
+    for (k in seq_len(length(reference$time_seq) - 1L)) {
+        forcing <- reference$g_average[k + 1L]
+        rhs <- data$C %*% u + reference$dt * data$spatial_load * forcing
+        u <- as.numeric(my.solver.frac(op, rhs))
+        delta <- reference$states[, k + 1L] - u
+        value <- reference$dt * sum(delta * (data$C %*% delta))
+        adjusted <- value - compensation
+        updated <- total + adjusted
+        compensation <- (updated - total) - adjusted
+        total <- updated
+        y <- mu * (y + reference$dt * reference$forcing_coefficients * forcing)
+        dy <- reference$coefficients[, k + 1L] - y
+        value <- reference$dt * sum(dy^2)
+        adjusted <- value - spectral_compensation
+        updated <- spectral_total + adjusted
+        spectral_compensation <- (updated - spectral_total) - adjusted
+        spectral_total <- updated
+    }
+    sparse_error <- sqrt(max(0, total))
+    product_error <- sqrt(max(0, spectral_total))
+    gap <- u - as.numeric(spectrum$vectors %*% y)
+    final_gap <- sqrt(max(0, sum(gap * (data$C %*% gap))))
+    excited <- abs(reference$initial_coefficients) > excitation_tolerance * max(abs(reference$initial_coefficients)) | 
+        abs(reference$forcing_coefficients) > excitation_tolerance * max(abs(reference$forcing_coefficients))
+    relative_rate_error <- rates/reference$exact_rates - 1
+    bracket <- if (reference$alpha == 2) 
+        list(exact = TRUE, lower = 1, upper = 1)
+    else if (coefficient_source == "computed") 
+        list(exact = TRUE, lower = reference$alpha/2, upper = reference$alpha/2)
+    else isolated_beta_bracket(m, reference$alpha/2)
+    data.frame(alpha = reference$alpha, diffusion = reference$diffusion, m = m, error = sparse_error, 
+        product_error = product_error, absolute_error_disagreement = abs(sparse_error - product_error), 
+        relative_error_disagreement = abs(sparse_error - product_error)/max(product_error, .Machine$double.xmin), 
+        final_state_gap_C = final_gap, max_relative_rate_error_full = max(abs(relative_rate_error)), 
+        max_relative_rate_error_excited = if (any(excited)) 
+            max(abs(relative_rate_error[excited]))
+        else 0, excited_numerical_modes = sum(excited), coefficient_source = coefficient_source, coefficient_beta_exact = bracket$exact, 
+        beta_exact_in_package_table = if (coefficient_source == "package") 
+            bracket$exact
+        else NA, beta_table_lower = bracket$lower, beta_table_upper = bracket$upper, elapsed_seconds = proc.time()[["elapsed"]] - 
+            started)
+}
+
+
+## -----------------------------------------------------------------------------------------------
+isolated_default_coefficient_file <- function() computed_coefficient_file
+isolated_fractional_roots <- function(m, beta, coefficient_source = "package",
+                                    coefficient_file = isolated_default_coefficient_file(),
+                                    coefficient_table = NULL) {
+  my.get.roots(m, beta, interpolation = "linear", coefficient_source = coefficient_source)
+}
+
