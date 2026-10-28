@@ -126,7 +126,7 @@ library(plotly)
 ```{r}
 # Parameters
 T_final <- 1
-diffusion <- 1 # nu > 0 in u_t + nu * L^(alpha/2) u = f
+diffusion <- 1e-3 # nu > 0 in u_t + nu * L^(alpha/2) u = f
 workers <- 2L # independent complete cases; set 1L for serial execution
 error_method <- "compressed" # "reference" retains the original error accumulator
 run_id <- NULL # use an existing run ID only to reload matching parameters
@@ -143,7 +143,7 @@ AAA = 1
 OMEGA = pi
 
 # Requested time steps and fixed spatial mesh size.
-tau_targets <- 10^seq(log10(0.009), log10(0.1), length.out = 4)
+tau_targets <- 10^seq(log10(0.005), log10(0.5), length.out = 4)
 h_fixed <- 1e-3
 m_fixed <- 4
 alpha_vector <- seq(0.5, 1.5, by = 0.4)
@@ -165,8 +165,8 @@ g_averages <- lapply(time_grids, function(grid) {
 
 ```{r}
 # Reference quadrature and error accumulation.
-overkill_time_step <- 1e-4
-overkill_h <- 1e-4
+overkill_time_step <- 1e-5
+overkill_h <- 1e-5
 error_verbose <- TRUE
 
 study_parameters <- list(
@@ -320,7 +320,7 @@ save(p_tau_nicer_tadpole, file = file.path(run_dir, "p_tau_nicer_tadpole.RData")
 ```
 
 
-```{r, eval = FALSE, fig.align='center', out.width="400px", out.height="500px", fig.cap = captioner("Comparison between theoretical and observed convergence behavior for the $L_2(\\Gamma\\times(0,T))$-error with respect to $\\tau$ on a $\\text{log}_{10}$–$\\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case.")}
+```{r, eval = TRUE, fig.align='center', out.width="400px", out.height="500px", fig.cap = captioner("Comparison between theoretical and observed convergence behavior for the $L_2(\\Gamma\\times(0,T))$-error with respect to $\\tau$ on a $\\text{log}_{10}$–$\\text{log}_{10}$ scale. Dashed lines indicate the theoretical rates, and solid lines represent the observed error curves. The legend below each plot shows the value of $\\alpha$ along with the corresponding theoretical ('theo'), and observed ('obs') rates for each case.")}
 knitr::include_graphics(file.path(run_dir, "tikzpic", "p_tau_nicer_tadpole_with_mathpazo.pdf"))
 ```
 

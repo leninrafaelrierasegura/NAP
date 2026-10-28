@@ -23,13 +23,13 @@ refinement experiments. Knitting produces the usual HTML report.
 
 ```{r settings}
 h <- 0.01
-tau <- 1e-5
+tau <- 1e-4
 m_max <- 4L
-coefficient_source <- "package"  # "computed": m <= 8; "package": m <= 4
+coefficient_source <- "computed"  # "computed": m <= 8; "package": m <= 4
 computed_coefficient_file <- here::here("matlab", "computed_fractional_roots.csv")
 
 alpha_vector <- c(0.5, 0.9, 1.3)
-T_final <- 1e-3
+T_final <- 1
 kappa <- 4
 diffusion <- 1
 ```
@@ -215,8 +215,8 @@ contributions. Changing `h` or `tau` changes this finite-dimensional experiment.
 ## Scalar rational-approximation error
 
 This section uses `coefficient_source` for every noninteger `alpha`
-in `alpha_vector`, with $m=1,2,3,4$, independently of `m_max`
-above. Write $\beta=\alpha/2$. The stored roots define
+in `alpha_vector`, with $m=1,\ldots,\mathtt{m\_max}$, using the same
+`m_vector` as the matrix-error plot. Write $\beta=\alpha/2$. The stored roots define
 \[
 \rho_{m,\beta}(t)=\mathrm{factor}\,
 \frac{\prod_{j=1}^{m}(t-r_{c,j})}
@@ -239,7 +239,7 @@ step. The integer case $\alpha=2$ is omitted because the solver evaluates it
 exactly without CSV coefficients.
 
 ```{r scalar-error-data}
-scalar_m_vector <- 1:4
+scalar_m_vector <- m_vector
 scalar_alpha_vector <- alpha_vector[alpha_vector != 2]
 scalar_x_max <- 1e3
 scalar_grid_points <- 10001L
@@ -341,12 +341,12 @@ q_{m,\beta}(x)=x\rho_{m,\beta}(x)
      {\prod_{j=1}^{m+1}(x-r_{b,j})}.
 \]
 These plots use `coefficient_source`
-and all noninteger values in `alpha_vector`, with $m=1,2,3,4$.
+and all noninteger values in `alpha_vector`, with orders from `m_vector`.
 The grid is the exact reciprocal of the preceding scalar plot's grid on
 $[1,1000]$. Their sampled maximum errors therefore agree up to roundoff.
 
 ```{r unit-interval-error-data}
-unit_m_vector <- 1:4
+unit_m_vector <- m_vector
 unit_alpha_vector <- alpha_vector[alpha_vector != 2]
 unit_x <- sort(1 / scalar_x)
 unit_rows <- list()
@@ -460,7 +460,7 @@ for this supremum norm.
 
 The thesis example uses BRASIL partial-fraction coefficients with orders
 up to 14 and ten uniformly spaced samples in each interval. Here we retain
-the selected root tables, orders 1 to 4, and dense logarithmic sampling.
+the selected root tables, orders from `m_vector`, and dense logarithmic sampling.
 Reciprocity gives equality within either coefficient family; it does not
 require their convergence rates to coincide.
 
@@ -470,7 +470,7 @@ reciprocal_domain <- match.arg(reciprocal_domain, c("order-dependent", "common")
 reciprocal_rows <- list()
 for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
   reciprocal_beta <- reciprocal_alpha / 2
-  for (reciprocal_m in 1:4) {
+  for (reciprocal_m in m_vector) {
     reciprocal_delta <- if (reciprocal_domain == "order-dependent")
       10^(-(5 + reciprocal_m) / 2) else 1e-3
     reciprocal_z <- exp(seq(0, log(1 / reciprocal_delta), length.out = 20001L))
@@ -532,7 +532,7 @@ if (!is.null(reciprocal_checks)) {
     geom_line() + geom_point(size = 2) +
     geom_line(data = reciprocal_guides, linetype = "dashed") +
     facet_wrap(~ domain, nrow = 1) +
-    scale_x_continuous(breaks = sqrt(1:4), labels = 1:4) +
+    scale_x_continuous(breaks = sqrt(m_vector), labels = m_vector) +
     scale_y_continuous(trans = scales::log_trans(base = exp(1)),
                        labels = scales::label_scientific()) +
     labs(x = "m (square-root positions)",
