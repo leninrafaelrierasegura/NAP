@@ -303,3 +303,36 @@ project_u0_tadpole <- function(graph, amplitude = 10) {
 
   as.numeric(solve(C, b0))
 }
+
+
+## -----------------------------------------------------------------------------
+assemble_e7_load_tadpole <- function(graph) {
+  C <- graph$mesh$C
+  PtE <- graph$mesh$PtE
+  lengths <- graph$get_edge_lengths()
+
+  stopifnot(
+    !is.null(C),
+    length(lengths) == 2L,
+    nrow(C) == 2L + nrow(PtE)
+  )
+
+  b7 <- numeric(nrow(C))
+  for (edge in 1:2) {
+    idx <- which(PtE[, 1] == edge)
+    idx <- idx[order(PtE[idx, 2])]
+    x <- c(0, lengths[edge] * PtE[idx, 2], lengths[edge])
+
+    start_node <- if (edge == 1L) 1L else 2L
+    nodes <- c(start_node, 2L + idx, 2L)
+
+    for (j in seq_len(length(x) - 1L)) {
+      load <- trig_hat_integrals(x[j], x[j + 1L],
+                                w = 2*pi, A = sqrt(2/3), B = 0)
+      b7[nodes[j]] <- b7[nodes[j]] + load[1]
+      b7[nodes[j + 1L]] <- b7[nodes[j + 1L]] + load[2]
+    }
+  }
+
+  b7
+}

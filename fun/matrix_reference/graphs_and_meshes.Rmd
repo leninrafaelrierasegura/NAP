@@ -87,7 +87,7 @@ library(plotly)
 ```
 
 
-Graph and mesh construction, eigenpairs on tadpoles, rectangles and spheres, and tadpole initial-value projection.
+Graph and mesh construction, eigenpairs on tadpoles, rectangles and spheres, and analytic tadpole load assembly and initial-value projection.
 
 ### Function `gets.graph.tadpole()`
 
@@ -405,5 +405,49 @@ project_u0_tadpole <- function(graph, amplitude = 10) {
   }
 
   as.numeric(solve(C, b0))
+}
+```
+
+### Function `assemble_e7_load_tadpole()`
+
+For the tadpole with edge lengths $1$ and $2$, the seventh eigenfunction in
+`gets.eigen.params()` is $e_7(x)=\sqrt{2/3}\cos(2\pi x)$ on both edges.
+This function assembles $(\mathbf b_7)_i=(e_7,\psi_h^i)_{L_2(\Gamma)}$
+using analytic integrals against each interval's two linear basis functions.
+Contributions from the stem and both endpoints of the loop accumulate at the
+shared junction. The returned vector is a unit-amplitude load: multiply it by
+the forcing coefficient, without solving a mass-matrix system. No reference
+mesh is used in this assembly.
+
+```{r}
+assemble_e7_load_tadpole <- function(graph) {
+  C <- graph$mesh$C
+  PtE <- graph$mesh$PtE
+  lengths <- graph$get_edge_lengths()
+
+  stopifnot(
+    !is.null(C),
+    length(lengths) == 2L,
+    nrow(C) == 2L + nrow(PtE)
+  )
+
+  b7 <- numeric(nrow(C))
+  for (edge in 1:2) {
+    idx <- which(PtE[, 1] == edge)
+    idx <- idx[order(PtE[idx, 2])]
+    x <- c(0, lengths[edge] * PtE[idx, 2], lengths[edge])
+
+    start_node <- if (edge == 1L) 1L else 2L
+    nodes <- c(start_node, 2L + idx, 2L)
+
+    for (j in seq_len(length(x) - 1L)) {
+      load <- trig_hat_integrals(x[j], x[j + 1L],
+                                w = 2*pi, A = sqrt(2/3), B = 0)
+      b7[nodes[j]] <- b7[nodes[j]] + load[1]
+      b7[nodes[j + 1L]] <- b7[nodes[j + 1L]] + load[2]
+    }
+  }
+
+  b7
 }
 ```

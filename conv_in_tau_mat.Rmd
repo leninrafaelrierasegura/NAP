@@ -104,6 +104,8 @@ reference-matrix norm using centered coefficient moments. It still advances
 every FEM/backward Euler step and needs no discrete eigenfunction identities.
 Use `error_method = "reference"` for the original accumulator. Execution
 settings (`workers`, `error_n_blocks`) do not change the mathematical problem.
+The spatial forcing load $(e_7,\psi_h^i)_{L_2(\Gamma)}$ is assembled
+analytically on the solver mesh. The reference mesh is used for the error norm.
 
 Set the global `eval` option above to `TRUE` to reload the saved errors and
 regenerate the plots. The heavy setup and convergence computation remain in an
@@ -146,12 +148,14 @@ coeff_U_0 <- 50*(1:adjusted_N_finite)^-1
 coeff_U_0[-5] <- 0
 coeff_FF <- rep(0, adjusted_N_finite)
 coeff_FF[7] <- 10
+# The analytic forcing load currently supports only the seventh eigenfunction.
+stopifnot(length(coeff_FF) >= 7L, all(coeff_FF[-7] == 0))
 
 AAA = 1
 OMEGA = pi
 
 # Requested time steps and fixed spatial mesh size.
-tau_targets <- 10^seq(log10(0.005), log10(0.5), length.out = 4)
+tau_targets <- 10^seq(log10(0.005), log10(0.5), length.out = 6)
 h_fixed <- 1e-3
 m_fixed <- 4
 alpha_vector <- seq(0.5, 1.9, 0.2)
@@ -222,8 +226,7 @@ active_modes <- which(coeff_U_0 != 0 | coeff_FF != 0)
 exact_basis <- overkill_EIGENFUN[, active_modes, drop = FALSE]
 exact_initial <- coeff_U_0[active_modes]
 exact_forcing <- coeff_FF[active_modes]
-spatial_modes <- t(Psi) %*% overkill_C %*% overkill_EIGENFUN
-spatial_load <- as.numeric(spatial_modes %*% coeff_FF)
+spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
 error_projection <- if (error_method == "compressed")
   prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
 m_values <- c()
