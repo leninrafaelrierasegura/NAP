@@ -1,4 +1,39 @@
+library(ggplot2)
 
+loglog_line_equation <- function(x1, y1, slope) {
+  b <- log10(y1 / (x1 ^ slope))
+  
+  function(x) {
+    (x ^ slope) * (10 ^ b)
+  }
+}
+exp_line_equation <- function(x1, y1, slope) {
+  lnC <- log(y1) - slope * x1
+  
+  function(x) {
+    exp(lnC + slope * x)
+  }
+}
+compute_guiding_lines <- function(x_axis_vector, errors, theoretical_rates, line_equation_fun) {
+  guiding_lines <- matrix(NA, nrow = length(x_axis_vector), ncol = length(theoretical_rates))
+  
+  for (j in seq_along(theoretical_rates)) {
+    guiding_lines_aux <- matrix(NA, nrow = length(x_axis_vector), ncol = length(x_axis_vector))
+    
+    for (k in seq_along(x_axis_vector)) {
+      point_x1 <- x_axis_vector[k]
+      point_y1 <- errors[k, j]
+      slope <- theoretical_rates[j]
+      
+      line <- line_equation_fun(x1 = point_x1, y1 = point_y1, slope = slope)
+      guiding_lines_aux[, k] <- line(x_axis_vector)
+    }
+    
+    guiding_lines[, j] <- rowMeans(guiding_lines_aux)
+  }
+  
+  return(guiding_lines)
+}
 
 error.convergence.plotter <- function(x_axis_vector, 
                                       alpha_vector, 

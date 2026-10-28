@@ -323,6 +323,14 @@ id="toc-compute-the-isolated-error">Compute the isolated error</a></li>
 slopes</a></li>
 <li><a href="#numerical-checks" id="toc-numerical-checks">Numerical
 checks</a></li>
+<li><a href="#scalar-rational-approximation-error"
+id="toc-scalar-rational-approximation-error">Scalar
+rational-approximation error</a></li>
+<li><a href="#scalar-error-on-0.0011"
+id="toc-scalar-error-on-0.0011">Scalar error on [0.001,1]</a></li>
+<li><a href="#compare-exactly-reciprocal-intervals"
+id="toc-compare-exactly-reciprocal-intervals">Compare exactly reciprocal
+intervals</a></li>
 </ul>
 </div>
 
@@ -341,7 +349,7 @@ HTML report.</p>
 <pre class="r"><code>h &lt;- 0.01
 tau &lt;- 1e-5
 m_max &lt;- 4L
-coefficient_source &lt;- &quot;computed&quot;  # &quot;computed&quot;: m &lt;= 8; &quot;package&quot;: m &lt;= 4
+coefficient_source &lt;- &quot;package&quot;  # &quot;computed&quot;: m &lt;= 8; &quot;package&quot;: m &lt;= 4
 computed_coefficient_file &lt;- here::here(&quot;matlab&quot;, &quot;computed_fractional_roots.csv&quot;)
 
 alpha_vector &lt;- c(0.5, 0.9, 1.3)
@@ -422,7 +430,7 @@ knitr::kable(data.frame(h_requested = h, h_min = data$h_min, h_max = data$h_max,
 <td align="right">1e-05</td>
 <td align="right">100</td>
 <td align="right">300</td>
-<td align="left">computed</td>
+<td align="left">package</td>
 </tr>
 </tbody>
 </table>
@@ -494,13 +502,13 @@ knitr::kable(errors, format.args = list(scientific = TRUE, digits = 5))</code></
 </tr>
 <tr class="odd">
 <td align="right">0e+00</td>
-<td align="right">0.0e+00</td>
 <td align="right">1.0e-07</td>
+<td align="right">2.0e-07</td>
 </tr>
 <tr class="even">
 <td align="right">0e+00</td>
 <td align="right">0.0e+00</td>
-<td align="right">0.0e+00</td>
+<td align="right">2.0e-07</td>
 </tr>
 </tbody>
 </table>
@@ -569,23 +577,23 @@ knitr::kable(slopes, digits = 5)</code></pre>
 <tr class="odd">
 <td align="right">0.5</td>
 <td align="right">-5.44140</td>
-<td align="right">-7.57920</td>
+<td align="right">-7.57921</td>
 <td align="right">4</td>
-<td align="right">-7.57920</td>
+<td align="right">-7.57921</td>
 </tr>
 <tr class="even">
 <td align="right">0.9</td>
 <td align="right">-4.65973</td>
-<td align="right">-6.29814</td>
+<td align="right">-3.65029</td>
 <td align="right">4</td>
-<td align="right">-6.29814</td>
+<td align="right">-3.65029</td>
 </tr>
 <tr class="odd">
 <td align="right">1.3</td>
 <td align="right">-3.71718</td>
-<td align="right">-6.61452</td>
+<td align="right">-3.05587</td>
 <td align="right">4</td>
-<td align="right">-6.61452</td>
+<td align="right">-3.05587</td>
 </tr>
 </tbody>
 </table>
@@ -628,7 +636,7 @@ a certified error bound.</p>
 <td align="right">0</td>
 <td align="right">0</td>
 <td align="right">13.73291</td>
-<td align="right">0.189</td>
+<td align="right">0.188</td>
 </tr>
 </tbody>
 </table>
@@ -724,8 +732,8 @@ a certified error bound.</p>
 <tr class="odd">
 <td align="right">9.0e-01</td>
 <td align="right">3e+00</td>
-<td align="right">0.0e+00</td>
-<td align="right">0.0e+00</td>
+<td align="right">1.0e-07</td>
+<td align="right">1.0e-07</td>
 <td align="right">0e+00</td>
 <td align="left">TRUE</td>
 </tr>
@@ -756,16 +764,16 @@ a certified error bound.</p>
 <tr class="odd">
 <td align="right">1.3e+00</td>
 <td align="right">3e+00</td>
-<td align="right">1.0e-07</td>
-<td align="right">1.0e-07</td>
+<td align="right">2.0e-07</td>
+<td align="right">2.0e-07</td>
 <td align="right">0e+00</td>
 <td align="left">TRUE</td>
 </tr>
 <tr class="even">
 <td align="right">1.3e+00</td>
 <td align="right">4e+00</td>
-<td align="right">0.0e+00</td>
-<td align="right">0.0e+00</td>
+<td align="right">2.0e-07</td>
+<td align="right">2.0e-07</td>
 <td align="right">0e+00</td>
 <td align="left">TRUE</td>
 </tr>
@@ -777,6 +785,470 @@ measured solution curves need not equal the uniform scalar-error curves:
 only discrete eigenvalues are evaluated, and the initial condition and
 forcing weight their contributions. Changing <code>h</code> or
 <code>tau</code> changes this finite-dimensional experiment.</p>
+</div>
+<div id="scalar-rational-approximation-error" class="section level2">
+<h2>Scalar rational-approximation error</h2>
+<p>This section uses <code>coefficient_source</code> for every
+noninteger <code>alpha</code> in <code>alpha_vector</code>, with <span
+class="math inline">\(m=1,2,3,4\)</span>, independently of
+<code>m_max</code> above. Write <span
+class="math inline">\(\beta=\alpha/2\)</span>. The stored roots define
+<span class="math display">\[
+\rho_{m,\beta}(t)=\mathrm{factor}\,
+\frac{\prod_{j=1}^{m}(t-r_{c,j})}
+     {\prod_{j=1}^{m+1}(t-r_{b,j})}
+\approx t^{\beta-1}.
+\]</span> The inverse-power approximation used by the solver is
+therefore <span class="math display">\[
+r_{m,\beta}(x)=\frac{\rho_{m,\beta}(1/x)}{x}
+=\mathrm{factor}\,
+\frac{\prod_{j=1}^{m}(1-r_{c,j}x)}
+     {\prod_{j=1}^{m+1}(1-r_{b,j}x)}
+\approx x^{-\beta}.
+\]</span> We plot <span
+class="math inline">\(|r_{m,\beta}(x)-x^{-\beta}|\)</span> on the common
+interval <span class="math inline">\([1,10^3]\)</span>. This is
+contained in every coefficient-generation interval <span
+class="math inline">\([1,10^{(5+m)/2}]\)</span>, so all orders are
+compared on the same domain. These are scalar function errors; they are
+independent of the mesh and time step. The integer case <span
+class="math inline">\(\alpha=2\)</span> is omitted because the solver
+evaluates it exactly without CSV coefficients.</p>
+<pre class="r"><code>scalar_m_vector &lt;- 1:4
+scalar_alpha_vector &lt;- alpha_vector[alpha_vector != 2]
+scalar_x_max &lt;- 1e3
+scalar_grid_points &lt;- 10001L
+scalar_x &lt;- exp(seq(0, log(scalar_x_max), length.out = scalar_grid_points))
+
+scalar_rows &lt;- list()
+for (scalar_alpha in scalar_alpha_vector) {
+  scalar_beta &lt;- scalar_alpha / 2
+  for (scalar_m in scalar_m_vector) {
+    scalar_roots &lt;- my.get.roots(scalar_m, scalar_beta,
+                                coefficient_source = coefficient_source)
+    # Evaluate products in log form and avoid subtracting nearly equal values.
+    scalar_log_r &lt;- log(scalar_roots$factor) +
+      rowSums(log1p(-outer(scalar_x, scalar_roots$pr_roots))) -
+      rowSums(log1p(-outer(scalar_x, scalar_roots$pl_roots)))
+    scalar_error &lt;- abs(exp(-scalar_beta * log(scalar_x)) *
+                          expm1(scalar_log_r + scalar_beta * log(scalar_x)))
+    stopifnot(all(is.finite(scalar_error)))
+    scalar_rows[[length(scalar_rows) + 1L]] &lt;- data.frame(
+      alpha = scalar_alpha, m = scalar_m, x = scalar_x,
+      absolute_error = scalar_error)
+  }
+}
+scalar_errors &lt;- if (length(scalar_rows)) do.call(rbind, scalar_rows) else NULL
+if (!is.null(scalar_errors)) {
+  scalar_errors$alpha_label &lt;- factor(scalar_errors$alpha,
+    levels = scalar_alpha_vector, labels = paste(&quot;alpha =&quot;, scalar_alpha_vector))
+  scalar_errors$m_label &lt;- factor(scalar_errors$m, levels = scalar_m_vector)
+  scalar_max_errors &lt;- aggregate(absolute_error ~ alpha + m, scalar_errors, max)
+  knitr::kable(scalar_max_errors,
+    col.names = c(&quot;alpha&quot;, &quot;m&quot;, &quot;Sampled maximum absolute error&quot;),
+    format.args = list(scientific = TRUE, digits = 5))
+}</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">alpha</th>
+<th align="right">m</th>
+<th align="right">Sampled maximum absolute error</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">5.0e-01</td>
+<td align="right">1e+00</td>
+<td align="right">4.1242e-02</td>
+</tr>
+<tr class="even">
+<td align="right">9.0e-01</td>
+<td align="right">1e+00</td>
+<td align="right">2.3842e-02</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3e+00</td>
+<td align="right">1e+00</td>
+<td align="right">9.9737e-03</td>
+</tr>
+<tr class="even">
+<td align="right">5.0e-01</td>
+<td align="right">2e+00</td>
+<td align="right">1.9635e-02</td>
+</tr>
+<tr class="odd">
+<td align="right">9.0e-01</td>
+<td align="right">2e+00</td>
+<td align="right">8.7067e-03</td>
+</tr>
+<tr class="even">
+<td align="right">1.3e+00</td>
+<td align="right">2e+00</td>
+<td align="right">2.7755e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">5.0e-01</td>
+<td align="right">3e+00</td>
+<td align="right">1.0590e-02</td>
+</tr>
+<tr class="even">
+<td align="right">9.0e-01</td>
+<td align="right">3e+00</td>
+<td align="right">4.7721e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3e+00</td>
+<td align="right">3e+00</td>
+<td align="right">1.2408e-03</td>
+</tr>
+<tr class="even">
+<td align="right">5.0e-01</td>
+<td align="right">4e+00</td>
+<td align="right">4.6741e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">9.0e-01</td>
+<td align="right">4e+00</td>
+<td align="right">1.6767e-03</td>
+</tr>
+<tr class="even">
+<td align="right">1.3e+00</td>
+<td align="right">4e+00</td>
+<td align="right">5.1900e-04</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>if (!is.null(scalar_errors)) {
+  p_scalar_error &lt;- ggplot(scalar_errors,
+    aes(x, absolute_error, colour = m_label, group = m_label)) +
+    geom_line(linewidth = 0.6) +
+    facet_wrap(~ alpha_label, nrow = 1) +
+    scale_x_log10() +
+    scale_y_log10(labels = scales::label_scientific()) +
+    labs(x = &quot;x (log scale)&quot;,
+      y = &quot;Absolute error |r_m(x) - x^(-alpha/2)| (log scale)&quot;,
+      colour = &quot;m&quot;, subtitle = sprintf(&quot;%s coefficients; common interval [1, 1000]&quot;,
+                                        coefficient_source),
+      caption = &quot;Dips occur where the rational approximation crosses the target function.&quot;) +
+    theme_minimal() + theme(legend.position = &quot;bottom&quot;)
+  print(p_scalar_error)
+}</code></pre>
+<p><img src="conv_in_m_isolated_files/figure-html/scalar-error-curves-1.png" width="960" /></p>
+<p>The maximum below is sampled on a logarithmic grid, including both
+endpoints; it is not a certified uniform error bound. For comparison
+with the matrix-error plot, the axes use the same <span
+class="math inline">\(\sqrt{m}\)</span> positions and natural-log error
+scale. Dashed lines use the same benchmark exponent <span
+class="math inline">\(-2\pi\sqrt{1-\alpha/2}\)</span>, anchored at each
+scalar error at <span class="math inline">\(m=1\)</span>; they are
+reference slopes, not proved scalar-error bounds.</p>
+<pre class="r"><code>if (!is.null(scalar_errors)) {
+  scalar_max_errors$alpha_label &lt;- factor(scalar_max_errors$alpha,
+                                         levels = scalar_alpha_vector)
+  scalar_guides &lt;- scalar_max_errors
+  for (scalar_alpha in scalar_alpha_vector) {
+    scalar_index &lt;- which(scalar_guides$alpha == scalar_alpha)
+    scalar_anchor &lt;- scalar_index[scalar_guides$m[scalar_index] == 1L]
+    scalar_guides$absolute_error[scalar_index] &lt;-
+      scalar_max_errors$absolute_error[scalar_anchor] *
+      exp(-2 * pi * sqrt(1 - scalar_alpha / 2) *
+            (sqrt(scalar_guides$m[scalar_index]) - 1))
+  }
+  p_scalar_error_m &lt;- ggplot(scalar_max_errors,
+    aes(sqrt(m), absolute_error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(size = 2) +
+    geom_line(data = scalar_guides, linetype = &quot;dashed&quot;) +
+    scale_x_continuous(breaks = sqrt(scalar_m_vector), labels = scalar_m_vector) +
+    scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                       labels = scales::label_scientific()) +
+    labs(x = &quot;m (square-root positions)&quot;,
+      y = &quot;Sampled maximum absolute scalar error (natural-log scale)&quot;, colour = &quot;alpha&quot;,
+      subtitle = sprintf(&quot;%s coefficients; common interval [1, 1000]&quot;, coefficient_source)) +
+    theme_minimal() +
+    theme(legend.position = &quot;bottom&quot;,
+          plot.background = element_rect(fill = &quot;white&quot;, colour = NA))
+  print(p_scalar_error_m)
+}</code></pre>
+<p><img src="conv_in_m_isolated_files/figure-html/scalar-error-convergence-1.png" width="768" /></p>
+</div>
+<div id="scalar-error-on-0.0011" class="section level2">
+<h2>Scalar error on [0.001,1]</h2>
+<p>On <span class="math inline">\([0.001,1]\)</span> we compare the
+bounded function <span class="math inline">\(x^\beta\)</span>, <span
+class="math inline">\(\beta=\alpha/2\)</span>, with the transformed
+rational approximation <span class="math display">\[
+q_{m,\beta}(x)=x\rho_{m,\beta}(x)
+=x\,\mathrm{factor}\,
+\frac{\prod_{j=1}^{m}(x-r_{c,j})}
+     {\prod_{j=1}^{m+1}(x-r_{b,j})}.
+\]</span> These plots use <code>coefficient_source</code> and all
+noninteger values in <code>alpha_vector</code>, with <span
+class="math inline">\(m=1,2,3,4\)</span>. The grid is the exact
+reciprocal of the preceding scalar plot’s grid on <span
+class="math inline">\([1,1000]\)</span>. Their sampled maximum errors
+therefore agree up to roundoff.</p>
+<pre class="r"><code>unit_m_vector &lt;- 1:4
+unit_alpha_vector &lt;- alpha_vector[alpha_vector != 2]
+unit_x &lt;- sort(1 / scalar_x)
+unit_rows &lt;- list()
+for (unit_alpha in unit_alpha_vector) {
+  unit_beta &lt;- unit_alpha / 2
+  for (unit_m in unit_m_vector) {
+    unit_roots &lt;- my.get.roots(unit_m, unit_beta,
+                              coefficient_source = coefficient_source)
+    unit_log_rho &lt;- log(unit_roots$factor) +
+      rowSums(log(outer(unit_x, -unit_roots$pr_roots, &quot;+&quot;))) -
+      rowSums(log(outer(unit_x, -unit_roots$pl_roots, &quot;+&quot;)))
+    unit_log_x &lt;- log(unit_x)
+    unit_error &lt;- abs(exp(unit_beta * unit_log_x) *
+      expm1(unit_log_rho + (1 - unit_beta) * unit_log_x))
+    stopifnot(all(is.finite(unit_error)))
+    unit_rows[[length(unit_rows) + 1L]] &lt;- data.frame(
+      alpha = unit_alpha, m = unit_m, x = unit_x, absolute_error = unit_error)
+  }
+}
+unit_errors &lt;- if (length(unit_rows)) do.call(rbind, unit_rows) else NULL
+if (!is.null(unit_errors)) {
+  unit_errors$alpha_label &lt;- factor(unit_errors$alpha, levels = unit_alpha_vector,
+                                   labels = paste(&quot;alpha =&quot;, unit_alpha_vector))
+  unit_errors$m_label &lt;- factor(unit_errors$m, levels = unit_m_vector)
+  unit_max_errors &lt;- aggregate(absolute_error ~ alpha + m, unit_errors, max)
+  knitr::kable(unit_max_errors,
+    col.names = c(&quot;alpha&quot;, &quot;m&quot;, &quot;Sampled maximum absolute error on [0.001,1]&quot;),
+    format.args = list(scientific = TRUE, digits = 5))
+}</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">alpha</th>
+<th align="right">m</th>
+<th align="right">Sampled maximum absolute error on [0.001,1]</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">5.0e-01</td>
+<td align="right">1e+00</td>
+<td align="right">4.1242e-02</td>
+</tr>
+<tr class="even">
+<td align="right">9.0e-01</td>
+<td align="right">1e+00</td>
+<td align="right">2.3842e-02</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3e+00</td>
+<td align="right">1e+00</td>
+<td align="right">9.9737e-03</td>
+</tr>
+<tr class="even">
+<td align="right">5.0e-01</td>
+<td align="right">2e+00</td>
+<td align="right">1.9635e-02</td>
+</tr>
+<tr class="odd">
+<td align="right">9.0e-01</td>
+<td align="right">2e+00</td>
+<td align="right">8.7067e-03</td>
+</tr>
+<tr class="even">
+<td align="right">1.3e+00</td>
+<td align="right">2e+00</td>
+<td align="right">2.7755e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">5.0e-01</td>
+<td align="right">3e+00</td>
+<td align="right">1.0590e-02</td>
+</tr>
+<tr class="even">
+<td align="right">9.0e-01</td>
+<td align="right">3e+00</td>
+<td align="right">4.7721e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3e+00</td>
+<td align="right">3e+00</td>
+<td align="right">1.2408e-03</td>
+</tr>
+<tr class="even">
+<td align="right">5.0e-01</td>
+<td align="right">4e+00</td>
+<td align="right">4.6741e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">9.0e-01</td>
+<td align="right">4e+00</td>
+<td align="right">1.6767e-03</td>
+</tr>
+<tr class="even">
+<td align="right">1.3e+00</td>
+<td align="right">4e+00</td>
+<td align="right">5.1900e-04</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>if (!is.null(unit_errors)) {
+  p_unit_error &lt;- ggplot(unit_errors,
+    aes(x, absolute_error, colour = m_label, group = m_label)) +
+    geom_line(linewidth = 0.6) +
+    facet_wrap(~ alpha_label, nrow = 1) +
+    scale_x_continuous(limits = c(0.001, 1), breaks = c(0.001, 0.25, 0.5, 0.75, 1)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    labs(x = &quot;x&quot;, y = &quot;Absolute error |x rho_m(x) - x^(alpha/2)|&quot;,
+      colour = &quot;m&quot;,
+      subtitle = sprintf(&quot;%s coefficients; interval [0.001, 1]&quot;, coefficient_source)) +
+    theme_minimal() +
+    theme(legend.position = &quot;bottom&quot;,
+          plot.background = element_rect(fill = &quot;white&quot;, colour = NA))
+  print(p_unit_error)
+}</code></pre>
+<p><img src="conv_in_m_isolated_files/figure-html/unit-interval-error-curves-1.png" width="960" /></p>
+<p>For comparison with the matrix-error plot, the convergence plot uses
+<span class="math inline">\(\sqrt{m}\)</span> positions and a
+natural-log error scale, with the same reference exponent <span
+class="math inline">\(-2\pi\sqrt{1-\alpha/2}\)</span> anchored at <span
+class="math inline">\(m=1\)</span>. These dashed lines are comparison
+slopes, not proved bounds for <span
+class="math inline">\(|q_{m,\beta}(x)-x^\beta|\)</span>. The maxima are
+sampled, not certified uniform bounds.</p>
+<pre class="r"><code>if (!is.null(unit_errors)) {
+  unit_max_errors$alpha_label &lt;- factor(unit_max_errors$alpha,
+                                       levels = unit_alpha_vector)
+  unit_guides &lt;- unit_max_errors
+  for (unit_alpha in unit_alpha_vector) {
+    unit_index &lt;- which(unit_guides$alpha == unit_alpha)
+    unit_anchor &lt;- unit_index[unit_guides$m[unit_index] == 1L]
+    unit_guides$absolute_error[unit_index] &lt;-
+      unit_max_errors$absolute_error[unit_anchor] *
+      exp(-2 * pi * sqrt(1 - unit_alpha / 2) *
+            (sqrt(unit_guides$m[unit_index]) - 1))
+  }
+  p_unit_error_m &lt;- ggplot(unit_max_errors,
+    aes(sqrt(m), absolute_error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(size = 2) +
+    geom_line(data = unit_guides, linetype = &quot;dashed&quot;) +
+    scale_x_continuous(breaks = sqrt(unit_m_vector), labels = unit_m_vector) +
+    scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                       labels = scales::label_scientific()) +
+    labs(x = &quot;m (square-root positions)&quot;,
+      y = &quot;Sampled maximum absolute error on [0.001,1] (natural-log scale)&quot;,
+      colour = &quot;alpha&quot;,
+      subtitle = sprintf(&quot;%s coefficients; target x^(alpha/2)&quot;, coefficient_source)) +
+    theme_minimal() +
+    theme(legend.position = &quot;bottom&quot;,
+          plot.background = element_rect(fill = &quot;white&quot;, colour = NA))
+  print(p_unit_error_m)
+}</code></pre>
+<p><img src="conv_in_m_isolated_files/figure-html/unit-interval-error-convergence-1.png" width="768" /></p>
+</div>
+<div id="compare-exactly-reciprocal-intervals" class="section level2">
+<h2>Compare exactly reciprocal intervals</h2>
+<p>The two preceding convergence plots measure errors on the exactly
+reciprocal fixed intervals <span class="math inline">\([1,1000]\)</span>
+and <span class="math inline">\([0.001,1]\)</span>. The following
+comparison also allows order-dependent intervals, as in the thesis
+example.</p>
+<p>For <span class="math inline">\(z=1/x\)</span> the approximations
+satisfy the exact identity <span class="math display">\[
+q_{m,\beta}(x)=x\rho_{m,\beta}(x)=r_{m,\beta}(1/x),
+\qquad
+|q_{m,\beta}(x)-x^\beta|
+=|r_{m,\beta}(z)-z^{-\beta}|.
+\]</span> Consequently, <span class="math display">\[
+\sup_{z\in[1,1/\delta_m]}|r_{m,\beta}(z)-z^{-\beta}|
+=\sup_{x\in[\delta_m,1]}|q_{m,\beta}(x)-x^\beta|.
+\]</span> The comparison below uses the thesis convention <span
+class="math inline">\(\delta_m=10^{-(5+m)/2}\)</span> by default. Set
+<code>reciprocal_domain</code> to <code>"common"</code> to compare the
+earlier fixed intervals <span class="math inline">\([1,1000]\)</span>
+and <span class="math inline">\([0.001,1]\)</span> instead. Both errors
+are evaluated independently on exactly reciprocal grids, so their
+sampled maxima should agree up to roundoff. No Jacobian is needed for
+this supremum norm.</p>
+<p>The thesis example uses BRASIL partial-fraction coefficients with
+orders up to 14 and ten uniformly spaced samples in each interval. Here
+we retain the selected root tables, orders 1 to 4, and dense logarithmic
+sampling. Reciprocity gives equality within either coefficient family;
+it does not require their convergence rates to coincide.</p>
+<pre class="r"><code>reciprocal_domain &lt;- &quot;order-dependent&quot;  # &quot;common&quot; uses [1,1000] and [0.001,1].
+reciprocal_domain &lt;- match.arg(reciprocal_domain, c(&quot;order-dependent&quot;, &quot;common&quot;))
+reciprocal_rows &lt;- list()
+for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
+  reciprocal_beta &lt;- reciprocal_alpha / 2
+  for (reciprocal_m in 1:4) {
+    reciprocal_delta &lt;- if (reciprocal_domain == &quot;order-dependent&quot;)
+      10^(-(5 + reciprocal_m) / 2) else 1e-3
+    reciprocal_z &lt;- exp(seq(0, log(1 / reciprocal_delta), length.out = 20001L))
+    reciprocal_x &lt;- 1 / reciprocal_z
+    reciprocal_roots &lt;- my.get.roots(reciprocal_m, reciprocal_beta,
+                                     coefficient_source = coefficient_source)
+    reciprocal_log_r &lt;- log(reciprocal_roots$factor) +
+      rowSums(log1p(-outer(reciprocal_z, reciprocal_roots$pr_roots))) -
+      rowSums(log1p(-outer(reciprocal_z, reciprocal_roots$pl_roots)))
+    reciprocal_log_rho &lt;- log(reciprocal_roots$factor) +
+      rowSums(log(outer(reciprocal_x, -reciprocal_roots$pr_roots, &quot;+&quot;))) -
+      rowSums(log(outer(reciprocal_x, -reciprocal_roots$pl_roots, &quot;+&quot;)))
+    reciprocal_large_error &lt;- abs(reciprocal_z^(-reciprocal_beta) *
+      expm1(reciprocal_log_r + reciprocal_beta * log(reciprocal_z)))
+    reciprocal_unit_error &lt;- abs(reciprocal_x^reciprocal_beta *
+      expm1(reciprocal_log_rho + (1 - reciprocal_beta) * log(reciprocal_x)))
+    reciprocal_gap &lt;- max(abs(reciprocal_large_error - reciprocal_unit_error))
+    stopifnot(all(is.finite(c(reciprocal_large_error, reciprocal_unit_error))),
+              reciprocal_gap &lt;= 1e-12)
+    reciprocal_rows[[length(reciprocal_rows) + 1L]] &lt;- data.frame(
+      alpha = reciprocal_alpha, m = reciprocal_m, delta = reciprocal_delta,
+      large_interval_error = max(reciprocal_large_error),
+      reciprocal_interval_error = max(reciprocal_unit_error),
+      max_pointwise_disagreement = reciprocal_gap)
+  }
+}
+reciprocal_checks &lt;- if (length(reciprocal_rows)) do.call(rbind, reciprocal_rows) else NULL
+if (!is.null(reciprocal_checks)) {
+  knitr::kable(reciprocal_checks,
+    format.args = list(scientific = TRUE, digits = 5))
+  reciprocal_labels &lt;- if (reciprocal_domain == &quot;order-dependent&quot;)
+    c(&quot;z in [1, 1/delta_m]&quot;, &quot;x in [delta_m, 1]&quot;) else
+    c(&quot;z in [1, 1000]&quot;, &quot;x in [0.001, 1]&quot;)
+  reciprocal_plot_data &lt;- rbind(
+    data.frame(alpha = reciprocal_checks$alpha, m = reciprocal_checks$m,
+      error = reciprocal_checks$large_interval_error, domain = reciprocal_labels[1]),
+    data.frame(alpha = reciprocal_checks$alpha, m = reciprocal_checks$m,
+      error = reciprocal_checks$reciprocal_interval_error, domain = reciprocal_labels[2]))
+  reciprocal_plot_data$alpha_label &lt;- factor(reciprocal_plot_data$alpha,
+                                            levels = alpha_vector[alpha_vector != 2])
+  reciprocal_plot_data$domain &lt;- factor(reciprocal_plot_data$domain,
+                                        levels = reciprocal_labels)
+  reciprocal_guides &lt;- reciprocal_plot_data
+  for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
+    reciprocal_index &lt;- which(reciprocal_guides$alpha == reciprocal_alpha)
+    reciprocal_anchor &lt;- reciprocal_checks$large_interval_error[
+      reciprocal_checks$alpha == reciprocal_alpha &amp; reciprocal_checks$m == 1L]
+    reciprocal_guides$error[reciprocal_index] &lt;- reciprocal_anchor *
+      exp(-2 * pi * sqrt(1 - reciprocal_alpha / 2) *
+            (sqrt(reciprocal_guides$m[reciprocal_index]) - 1))
+  }
+}</code></pre>
+<pre class="r"><code>if (!is.null(reciprocal_checks)) {
+  p_reciprocal_error_m &lt;- ggplot(reciprocal_plot_data,
+    aes(sqrt(m), error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(size = 2) +
+    geom_line(data = reciprocal_guides, linetype = &quot;dashed&quot;) +
+    facet_wrap(~ domain, nrow = 1) +
+    scale_x_continuous(breaks = sqrt(1:4), labels = 1:4) +
+    scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                       labels = scales::label_scientific()) +
+    labs(x = &quot;m (square-root positions)&quot;,
+      y = &quot;Sampled maximum absolute error (natural-log scale)&quot;, colour = &quot;alpha&quot;,
+      subtitle = sprintf(&quot;%s coefficients; exactly reciprocal grids&quot;, coefficient_source),
+      caption = &quot;Dashed: matrix-error reference slopes anchored at m = 1; comparison only.&quot;) +
+    theme_minimal() +
+    theme(legend.position = &quot;bottom&quot;,
+          plot.background = element_rect(fill = &quot;white&quot;, colour = NA))
+  print(p_reciprocal_error_m)
+}</code></pre>
+<p><img src="conv_in_m_isolated_files/figure-html/reciprocal-error-comparison-plot-1.png" width="1056" /></p>
 </div>
 
 
