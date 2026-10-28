@@ -30,6 +30,8 @@ header-includes:
   - \newcommand{\Wcal}{\mathcal{W}}
 ---
 
+
+
 These functions select and validate the rational coefficients used to
 approximate the inverse fractional spatial operator. Let
 \(L_h\) be the continuous piecewise linear finite element approximation of

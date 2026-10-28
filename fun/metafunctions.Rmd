@@ -30,6 +30,7 @@ header-includes:
   - \newcommand{\Wcal}{\mathcal{W}}
 ---
 
+
 This file contains the export helper used after the three convergence
 notebooks compute the errors and construct their plots. It preserves the
 mathematical labels and reference curves already present in each plot; it

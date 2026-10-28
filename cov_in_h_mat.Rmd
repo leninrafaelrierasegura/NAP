@@ -150,7 +150,7 @@ AAA = 1
 OMEGA = pi
 
 h_vector <- 10^seq(log10(0.005), log10(0.5), length.out = 4)
-alpha_vector <- seq(0.5, 1.5, by = 0.4)
+alpha_vector <- seq(0.5, 1.9, 0.2)
 
 # Keep the rational order and actual uniform time grid fixed across all runs.
 m_fixed <- 4

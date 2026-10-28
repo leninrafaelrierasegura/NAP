@@ -28,7 +28,7 @@ m_max <- 4L
 coefficient_source <- "computed"  # "computed": m <= 8; "package": m <= 4
 computed_coefficient_file <- here::here("matlab", "computed_fractional_roots.csv")
 
-alpha_vector <- c(0.5, 0.9, 1.3)
+alpha_vector <- seq(0.5, 1.9, 0.2)
 T_final <- 1
 kappa <- 4
 diffusion <- 1

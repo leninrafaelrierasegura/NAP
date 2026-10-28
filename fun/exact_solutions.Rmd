@@ -34,6 +34,8 @@ These functions evaluate the analytic reference solution and the
 within-interval quadrature used to measure its error against the numerical
 solution. Write
 
+
+
 \[
 L=\kappa^2-\Delta_\Gamma,\qquad \beta=\alpha/2,\qquad
 \partial_t u+D L^\beta u=f,\qquad u(0)=u_0.

@@ -30,6 +30,7 @@ header-includes:
   - \newcommand{\Wcal}{\mathcal{W}}
 ---
 
+
 These functions visualize the space--time errors computed by the three
 convergence notebooks. Each column of `errors` corresponds to one value of
 `alpha_vector`, and each row to an entry of `x_axis_vector`. The plotted

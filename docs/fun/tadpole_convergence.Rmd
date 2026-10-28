@@ -13,6 +13,7 @@ u_0=\sum_{j\in\mathcal J}x_je_j,\qquad
 f(t)=A\sin(\omega t)\sum_{j\in\mathcal J}y_je_j.
 \]
 
+
 The eigenfunctions \(e_j\) are orthonormal in \(L_2(\Gamma)\).
 The benchmark uses \(D=1\), \(T=1\), \(\kappa=4\),
 \(\mathcal J=\{5,7\}\), \((x_5,x_7)=(10,0)\),

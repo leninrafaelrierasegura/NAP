@@ -6,7 +6,7 @@ convergence_parameters <- list(
   initial = c(10, 0), forcing = c(0, 10), A = 1, omega = pi,
   quadrature_order = 4L, step_sum_order = 64L
 )
-alpha_vector <- c(0.5, 0.9, 1.3)
+alpha_vector <- seq(0.5, 1.9, 0.1)
 study_range <- 10^seq(-4, -2, length.out = 6)
 m_fixed <- 8L
 m_vector <- 1:4

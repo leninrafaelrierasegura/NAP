@@ -146,7 +146,7 @@ OMEGA = pi
 tau_targets <- 10^seq(log10(0.005), log10(0.5), length.out = 4)
 h_fixed <- 1e-3
 m_fixed <- 4
-alpha_vector <- seq(0.5, 1.5, by = 0.4)
+alpha_vector <- seq(0.5, 1.9, 0.2)
 
 # Use the actual uniform steps in both the solver and the convergence fit.
 time_grids <- lapply(tau_targets, function(target) {

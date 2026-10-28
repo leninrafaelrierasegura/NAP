@@ -1,19 +1,26 @@
 % Isolated audit: never executes or overwrites the repository generator outputs.
 % Set audit_output_dir to a NEW diagnostic directory before calling this script.
 % Optionally set chebfun_path; the audit does not call savepath.
+% Defaults: beta = (0.5:0.1:1.9)/2 and orders 1:10. Override with
+% audit_beta_values and audit_orders (use 1:8 for the computed root table).
 % Example (use an existing Chebfun installation):
 % chebfun_path='/path/to/chebfun'; audit_output_dir='/tmp/new-order-audit';
-% run('/path/to/NAFDEMG/tests/audit_rational_generation.m');
+% audit_orders=1:8;
+% run('/path/to/NAP/matlab/audit_rational_generation.m');
 if exist('chebfun_path','var'), addpath(chebfun_path); end
 if isempty(which('chebpade')), error('Add Chebfun to the path before running this audit.'); end
 if ~exist('audit_output_dir','var'), error('An isolated output directory is required.'); end
 if ~isfolder(audit_output_dir), mkdir(audit_output_dir); end
+if ~exist('audit_beta_values','var'), audit_beta_values = (5:19)/20; end
+if ~exist('audit_orders','var'), audit_orders = 1:10; end
+validateattributes(audit_beta_values,{'numeric'},{'vector','real','finite','>=',0.25,'<',1});
+validateattributes(audit_orders,{'numeric'},{'vector','integer','positive','finite'});
 fprintf('MATLAB %s\n', version);
 fprintf('Chebfun %s\n', which('chebfun'));
 summary_rows = {};
 generated = struct('m',{},'beta',{},'factor',{},'rc',{},'rb',{},'p_cheb',{},'q_cheb',{},'p_monomial',{},'q_monomial',{});
-for m = 1:10
-  for beta = [0.25 0.45 0.65]
+for m = audit_orders(:).'
+  for beta = audit_beta_values(:).'
     fprintf('Auditing m=%d beta=%.2f\n',m,beta);
     lastwarn('');
     elapsed = tic;
@@ -81,10 +88,18 @@ for k = 1:length(generated)
   for j=1:length(g.rb), coefficient_rows(end+1,:)={g.m,g.beta,'rb',j,real(g.rb(j))}; end
 end
 coefficients=cell2table(coefficient_rows,'VariableNames',{'m','beta','kind','index','value'});
-writetable(coefficients,fullfile(audit_output_dir,'isolated_generated_coefficients.csv'));
+% Format beta with two decimal places; keep coefficient values at round-trip precision.
+fid=fopen(fullfile(audit_output_dir,'isolated_generated_coefficients.csv'),'w');
+cleaner=onCleanup(@() fclose(fid));
+fprintf(fid,'m,beta,kind,index,value\n');
+for k=1:height(coefficients)
+  fprintf(fid,'%d,%.2f,%s,%d,%.17g\n',coefficients.m(k),coefficients.beta(k),...
+    coefficients.kind{k},coefficients.index(k),coefficients.value(k));
+end
+clear cleaner;
 disp(result(:,{'m','beta','roots_numerically_real','roots_negative','roots_interlaced','active_rate_error_direct','active_rate_error_exported','error'}));
 
-% Export every polynomial representation at round-trip double precision.
+% Export polynomial values at round-trip precision and beta with two decimal places.
 fid=fopen(fullfile(audit_output_dir,'polynomial_representations.csv'),'w');
 cleaner=onCleanup(@() fclose(fid));
 fprintf(fid,'m,beta,kind,index,value\n');
@@ -94,7 +109,7 @@ for k=1:length(generated)
     field=kind{1}; values=g.(field);
     for j=1:length(values)
       if ~isreal(values(j)), continue; end
-      fprintf(fid,'%d,%.17g,%s,%d,%.17g\n',g.m,g.beta,field,j,values(j));
+      fprintf(fid,'%d,%.2f,%s,%d,%.17g\n',g.m,g.beta,field,j,values(j));
     end
   end
 end
