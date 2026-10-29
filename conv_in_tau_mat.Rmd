@@ -180,7 +180,6 @@ error_n_blocks <- 1L
 ```
 
 
-
 ```{r, eval = FALSE, class.source = "fold-show"}
 # Heavy setup and convergence computation: run manually to replace saved results.
 overkill_graph <- gets.graph.tadpole(h = overkill_h)
