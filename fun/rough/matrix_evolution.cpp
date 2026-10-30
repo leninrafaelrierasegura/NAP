@@ -75,7 +75,8 @@ Rcpp::List rough_matrix_evolve_cpp(
     if ((k & 4095)==0) Rcpp::checkUserInterrupt();
     rhs.noalias()=C*u;
     rhs.noalias()+=tau*load;
-    next=remainder*mass_factor.solve(rhs);
+    next.setZero();
+    if (remainder!=0.0) next=remainder*mass_factor.solve(rhs);
     for (int i=0; i<m; ++i) next.noalias()+=residues[i]*factors[i]->solve(rhs);
     u.swap(next);
     double variance_sum=0;

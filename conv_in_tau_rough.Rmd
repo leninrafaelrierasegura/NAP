@@ -64,8 +64,9 @@ E(\tau)=\|u-U_{h,m}^{\tau}\|_{L_2(0,T;L_2(\Gamma))}
 $$
 against the exact continuum solution, including its unresolved infinite tail.
 For each $\alpha$, the mesh, rational order, and diffusion coefficient remain
-fixed as $\tau$ varies. They are chosen so that spatial and rational errors
-remain small compared with the temporal error over the reported range.
+fixed as $\tau$ varies. Their physical settings are retained from the
+BRASIL baseline to isolate the effect of changing the rational coefficients.
+The new fixed-order rational error can mask temporal convergence.
 The reference slope is $1$ for every $\alpha$.
 :::
 
@@ -90,8 +91,13 @@ matrices and integrals accounts for the full graph. This is the same FEM
 matrix evolution used in the spatial experiment; it uses no discrete
 eigenfunction recurrence.
 
-The rational inverse uses positive BRASIL coefficients from `rSPDE`, including
-its constant term. All shifted factorizations are reused within a run.
+The rational inverse uses order-eight operator-based root/factor coefficients
+read directly at $\beta=\alpha/2$ from
+`matlab/computed_fractional_roots.csv`, without interpolation. The inverse
+representation is proper and its backward Euler update has no constant term.
+All shifted factorizations are reused within a run. The
+[coefficient comparison](rough_operator_comparison.html) also includes
+order four and the preserved BRASIL baseline.
 The error uses the consistent mass norm, a stable spatial projection residual,
 and exact time moments for the right-constant reconstruction. Modes
 $j\geq J$ on a mesh $h=2^{-J}$ have zero load but remain in the exact
@@ -139,9 +145,10 @@ knitr::kable(rates,digits=c(1,1,4,2),
 
 The observed slopes range from
 `r sprintf("%.4f", min(rates$observed))` to
-`r sprintf("%.4f", max(rates$observed))`, consistent with first-order
-temporal convergence. Spatial and rational refinement checks confirm that
-their error floors do not mask this behavior.
+`r sprintf("%.4f", max(rates$observed))`. The reference order remains one,
+but the fixed operator approximation introduces a visible error floor for
+some values of $\alpha$. The matched comparison reports how this changes
+both the error levels and the slopes relative to the BRASIL baseline.
 
 ```{r errors, echo=FALSE, results='asis'}
 errors <- data.frame(tau=paste0("1/",p$N),

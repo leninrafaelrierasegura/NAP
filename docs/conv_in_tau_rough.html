@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Convergence in 𝜏 with rough forcing</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<script src="site_libs/navigation-1.1/sourceembed.js"></script>
+<link href="site_libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet" />
+<script src="site_libs/pagedtable-1.1/js/pagedtable.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+.sourceCode .row {
+  width: 100%;
+}
+.sourceCode {
+  overflow-x: auto;
+}
+.code-folding-btn {
+  margin-right: -30px;
+}
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+<style type="text/css">
+#rmd-source-code {
+  display: none;
+}
+</style>
+
+
+<link rel="stylesheet" href="visual.css" type="text/css" />
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">NAP</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Contents
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="functionality.html">Functionality</a>
+    </li>
+    <li>
+      <a href="exp1.html">Example</a>
+    </li>
+    <li>
+      <a href="conv_in_h.html">Convergence in 𝘩</a>
+    </li>
+    <li>
+      <a href="conv_in_tau.html">Convergence in τ</a>
+    </li>
+    <li>
+      <a href="conv_in_m.html">Convergence in 𝑚</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://arxiv.org/abs/0000.00000">
+    <span class="fa fa-file-pdf"></span>
+     
+  </a>
+</li>
+<li>
+  <a href="https://github.com/leninrafaelrierasegura/NAP">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+<li role="separator" class="divider"></li>
+<li><a id="rmd-download-source" href="#">Download Rmd</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Convergence in 𝜏 with rough forcing</h1>
+<h4 class="date">Last modified: 30-10-2026.</h4>
+
+</div>
+
+
+<p>Go back to the <a href="about.html">Contents</a> page.</p>
+<div id="problem-and-exact-solution" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> Problem and exact
+solution</h1>
+<p>Use the same tadpole and the same infinite rough forcing as in <a
+href="conv_in_h_rough.html">the spatial experiment</a>. The stem has
+length <span class="math inline">\(1\)</span>, the loop has length <span
+class="math inline">\(2\)</span>, and <span class="math display">\[
+\partial_tu+\nu_\alpha L^{\alpha/2}u=g,\qquad u(0)=0,
+\qquad L=\kappa^2-\Delta_\Gamma,\quad \kappa=4,\quad T=1.
+\]</span> The forcing is fixed across all meshes and all values of <span
+class="math inline">\(\alpha\)</span>: <span class="math display">\[
+g=\sum_{j=1}^{\infty}\frac1j\phi_j,
+\qquad
+\phi_j(s)=
+\begin{cases}
+0,&amp;s\text{ on the stem},\\
+\sin(2^j\pi x),&amp;s=x\in[0,2]\text{ on the loop}.
+\end{cases}
+\]</span> These orthonormal eigenfunctions have eigenvalues <span
+class="math inline">\(\mu_j=\kappa^2+\pi^2 2^{2j}\)</span>. Thus <span
+class="math inline">\(g\in L_2(\Gamma)\)</span> but <span
+class="math inline">\(g\notin\dot H^s(\Gamma)\)</span> for every <span
+class="math inline">\(s&gt;0\)</span>. Writing <span
+class="math inline">\(a_j=\nu_\alpha\mu_j^{\alpha/2}\)</span>, the exact
+solution is <span class="math display">\[
+u(s,t)=\sum_{j=1}^{\infty}\frac{1-e^{-a_jt}}{j\,a_j}\phi_j(s).
+\]</span></p>
+<div class="custom-box">
+<p>Backward Euler has first-order temporal convergence. Here we measure
+<span class="math display">\[
+E(\tau)=\|u-U_{h,m}^{\tau}\|_{L_2(0,T;L_2(\Gamma))}
+\]</span> against the exact continuum solution, including its unresolved
+infinite tail. For each <span class="math inline">\(\alpha\)</span>, the
+mesh, rational order, and diffusion coefficient remain fixed as <span
+class="math inline">\(\tau\)</span> varies. Their physical settings are
+retained from the BRASIL baseline to isolate the effect of changing the
+rational coefficients. The new fixed-order rational error can mask
+temporal convergence. The reference slope is <span
+class="math inline">\(1\)</span> for every <span
+class="math inline">\(\alpha\)</span>.</p>
+</div>
+</div>
+<div id="matrix-discretization-and-settings" class="section level1"
+number="2">
+<h1><span class="header-section-number">2</span> Matrix discretization
+and settings</h1>
+<p>To compare temporal rates on the same time grid, choose <span
+class="math display">\[
+\nu_\alpha=(\kappa^2+4\pi^2)^{-\alpha/2},
+\qquad a_1=\nu_\alpha\mu_1^{\alpha/2}=1.
+\]</span> This puts the slowest forced mode on the same time scale for
+every <span class="math inline">\(\alpha\)</span>. The diffusion
+coefficient is held fixed along each curve. This temporal experiment
+uses these coefficients instead of the unit diffusion used in the
+spatial experiment.</p>
+<p>The solver uses consistent P1 mass and stiffness matrices, analytic
+sine–hat loads, and shifted sparse solves at every backward Euler step.
+The matrices are assembled directly on the invariant quarter-loop <span
+class="math inline">\([0,1/2]\)</span>, with Dirichlet endpoints. Signed
+reflections recover the full loop solution and the stem solution is
+zero. A factor of four in the matrices and integrals accounts for the
+full graph. This is the same FEM matrix evolution used in the spatial
+experiment; it uses no discrete eigenfunction recurrence.</p>
+<p>The rational inverse uses order-eight operator-based root/factor
+coefficients read directly at <span
+class="math inline">\(\beta=\alpha/2\)</span> from
+<code>matlab/computed_fractional_roots.csv</code>, without
+interpolation. The inverse representation is proper and its backward
+Euler update has no constant term. All shifted factorizations are reused
+within a run. The <a href="rough_operator_comparison.html">coefficient
+comparison</a> also includes order four and the preserved BRASIL
+baseline. The error uses the consistent mass norm, a stable spatial
+projection residual, and exact time moments for the right-constant
+reconstruction. Modes <span class="math inline">\(j\geq J\)</span> on a
+mesh <span class="math inline">\(h=2^{-J}\)</span> have zero load but
+remain in the exact error through a certified infinite-tail sum. There
+is no reference-grid sampling or replacement of the forcing by a finite
+series.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>alpha_vector <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fl">0.5</span>,<span class="fl">1.9</span>,<span class="fl">0.2</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>N_vector <span class="ot">&lt;-</span> p<span class="sc">$</span>N</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>tau_vector <span class="ot">&lt;-</span> p<span class="sc">$</span>T_final<span class="sc">/</span>N_vector</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>h_fixed <span class="ot">&lt;-</span> <span class="dv">2</span><span class="sc">^-</span>p<span class="sc">$</span>J</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>diffusion <span class="ot">&lt;-</span> p<span class="sc">$</span>diffusion</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>m_fixed <span class="ot">&lt;-</span> p<span class="sc">$</span>rational_orders</span></code></pre></div>
+<p>The actual uniform time steps are <span
+class="math inline">\(\tau=T/N\)</span> for <span
+class="math inline">\(N=5,10,20,40,80,160\)</span>. The following
+settings remain fixed along each temporal refinement curve:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="right"><span class="math inline">\(\alpha\)</span></th>
+<th align="right"><span class="math inline">\(h\)</span></th>
+<th align="right"><span class="math inline">\(\nu_\alpha\)</span></th>
+<th align="right"><span class="math inline">\(m\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.5</td>
+<td align="right">1/1048576</td>
+<td align="right">0.36641141</td>
+<td align="right">8</td>
+</tr>
+<tr class="even">
+<td align="right">0.7</td>
+<td align="right">1/65536</td>
+<td align="right">0.24522039</td>
+<td align="right">8</td>
+</tr>
+<tr class="odd">
+<td align="right">0.9</td>
+<td align="right">1/8192</td>
+<td align="right">0.16411345</td>
+<td align="right">8</td>
+</tr>
+<tr class="even">
+<td align="right">1.1</td>
+<td align="right">1/2048</td>
+<td align="right">0.10983273</td>
+<td align="right">8</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3</td>
+<td align="right">1/1024</td>
+<td align="right">0.07350542</td>
+<td align="right">8</td>
+</tr>
+<tr class="even">
+<td align="right">1.5</td>
+<td align="right">1/512</td>
+<td align="right">0.04919341</td>
+<td align="right">8</td>
+</tr>
+<tr class="odd">
+<td align="right">1.7</td>
+<td align="right">1/256</td>
+<td align="right">0.03292263</td>
+<td align="right">8</td>
+</tr>
+<tr class="even">
+<td align="right">1.9</td>
+<td align="right">1/256</td>
+<td align="right">0.02203343</td>
+<td align="right">8</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="results" class="section level1" number="3">
+<h1><span class="header-section-number">3</span> Results</h1>
+<p>Solid lines and markers show the computed matrix-solver errors.
+Dashed lines have slope <span class="math inline">\(1\)</span>, with
+constants fitted over the three finest time steps, <span
+class="math inline">\(\tau=1/40,1/80,1/160\)</span>. The same three
+steps are used for the reported regression slopes. Separate panels make
+all eight curves visible.</p>
+<div class="figure" style="text-align: center">
+<img src="data_files/rough_tau/conv_tau_rough.png" alt="Temporal convergence for the fixed infinite rough forcing. Each dashed line has slope one. The mesh, diffusion coefficient, and rational order are fixed within each panel." width="760px" />
+<p class="caption">
+Temporal convergence for the fixed infinite rough forcing. Each dashed
+line has slope one. The mesh, diffusion coefficient, and rational order
+are fixed within each panel.
+</p>
+</div>
+<table>
+<caption>Temporal regression slopes over the three finest time
+steps.</caption>
+<thead>
+<tr class="header">
+<th align="right"><span class="math inline">\(\alpha\)</span></th>
+<th align="right">Reference</th>
+<th align="right">Observed slope</th>
+<th align="right">Relative error (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.5</td>
+<td align="right">1</td>
+<td align="right">0.6588</td>
+<td align="right">34.12</td>
+</tr>
+<tr class="even">
+<td align="right">0.7</td>
+<td align="right">1</td>
+<td align="right">0.9178</td>
+<td align="right">8.22</td>
+</tr>
+<tr class="odd">
+<td align="right">0.9</td>
+<td align="right">1</td>
+<td align="right">0.9751</td>
+<td align="right">2.49</td>
+</tr>
+<tr class="even">
+<td align="right">1.1</td>
+<td align="right">1</td>
+<td align="right">0.9909</td>
+<td align="right">0.91</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3</td>
+<td align="right">1</td>
+<td align="right">0.9937</td>
+<td align="right">0.63</td>
+</tr>
+<tr class="even">
+<td align="right">1.5</td>
+<td align="right">1</td>
+<td align="right">0.9940</td>
+<td align="right">0.60</td>
+</tr>
+<tr class="odd">
+<td align="right">1.7</td>
+<td align="right">1</td>
+<td align="right">0.9936</td>
+<td align="right">0.64</td>
+</tr>
+<tr class="even">
+<td align="right">1.9</td>
+<td align="right">1</td>
+<td align="right">0.9939</td>
+<td align="right">0.61</td>
+</tr>
+</tbody>
+</table>
+<p>The observed slopes range from 0.6588 to 0.9940. The reference order
+remains one, but the fixed operator approximation introduces a visible
+error floor for some values of <span
+class="math inline">\(\alpha\)</span>. The matched comparison reports
+how this changes both the error levels and the slopes relative to the
+BRASIL baseline.</p>
+<div style="overflow-x:auto">
+<table class="table table-condensed" style="font-size:13px; white-space:nowrap">
+<caption>
+Computed space–time errors.
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+<span class="math inline">\(\tau\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=0.5\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=0.7\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=0.9\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.1\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.3\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.5\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.7\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.9\)</span>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+1/5
+</td>
+<td style="text-align:left;">
+6.387504e-02
+</td>
+<td style="text-align:left;">
+6.246660e-02
+</td>
+<td style="text-align:left;">
+6.142893e-02
+</td>
+<td style="text-align:left;">
+6.061116e-02
+</td>
+<td style="text-align:left;">
+5.994869e-02
+</td>
+<td style="text-align:left;">
+5.940196e-02
+</td>
+<td style="text-align:left;">
+5.894366e-02
+</td>
+<td style="text-align:left;">
+5.855566e-02
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/10
+</td>
+<td style="text-align:left;">
+3.320404e-02
+</td>
+<td style="text-align:left;">
+3.240962e-02
+</td>
+<td style="text-align:left;">
+3.186942e-02
+</td>
+<td style="text-align:left;">
+3.144657e-02
+</td>
+<td style="text-align:left;">
+3.110343e-02
+</td>
+<td style="text-align:left;">
+3.081876e-02
+</td>
+<td style="text-align:left;">
+3.057859e-02
+</td>
+<td style="text-align:left;">
+3.037326e-02
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/20
+</td>
+<td style="text-align:left;">
+1.709915e-02
+</td>
+<td style="text-align:left;">
+1.654290e-02
+</td>
+<td style="text-align:left;">
+1.625105e-02
+</td>
+<td style="text-align:left;">
+1.603256e-02
+</td>
+<td style="text-align:left;">
+1.585779e-02
+</td>
+<td style="text-align:left;">
+1.571296e-02
+</td>
+<td style="text-align:left;">
+1.559057e-02
+</td>
+<td style="text-align:left;">
+1.548507e-02
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/40
+</td>
+<td style="text-align:left;">
+8.987688e-03
+</td>
+<td style="text-align:left;">
+8.403820e-03
+</td>
+<td style="text-align:left;">
+8.218542e-03
+</td>
+<td style="text-align:left;">
+8.099365e-03
+</td>
+<td style="text-align:left;">
+8.009912e-03
+</td>
+<td style="text-align:left;">
+7.936863e-03
+</td>
+<td style="text-align:left;">
+7.875483e-03
+</td>
+<td style="text-align:left;">
+7.821864e-03
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/80
+</td>
+<td style="text-align:left;">
+5.165260e-03
+</td>
+<td style="text-align:left;">
+4.322342e-03
+</td>
+<td style="text-align:left;">
+4.153157e-03
+</td>
+<td style="text-align:left;">
+4.074585e-03
+</td>
+<td style="text-align:left;">
+4.026548e-03
+</td>
+<td style="text-align:left;">
+3.989596e-03
+</td>
+<td style="text-align:left;">
+3.959344e-03
+</td>
+<td style="text-align:left;">
+3.931945e-03
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/160
+</td>
+<td style="text-align:left;">
+3.605748e-03
+</td>
+<td style="text-align:left;">
+2.354496e-03
+</td>
+<td style="text-align:left;">
+2.126922e-03
+</td>
+<td style="text-align:left;">
+2.050425e-03
+</td>
+<td style="text-align:left;">
+2.019955e-03
+</td>
+<td style="text-align:left;">
+2.000740e-03
+</td>
+<td style="text-align:left;">
+1.986518e-03
+</td>
+<td style="text-align:left;">
+1.971950e-03
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiQ29udmVyZ2VuY2UgaW4g8J2cjyB3aXRoIHJvdWdoIGZvcmNpbmciCmRhdGU6ICJMYXN0IG1vZGlmaWVkOiBgciBmb3JtYXQoU3lzLnRpbWUoKSwgJyVkLSVtLSVZLicsIHR6ID0gJ0FzaWEvUml5YWRoJylgIgpvdXRwdXQ6CiAgaHRtbF9kb2N1bWVudDoKICAgIG1hdGhqYXg6ICJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvbnBtL21hdGhqYXhAMy9lczUvdGV4LW1tbC1jaHRtbC5qcyIKICAgIGhpZ2hsaWdodDogcHlnbWVudHMKICAgIHRoZW1lOiBmbGF0bHkKICAgIGNvZGVfZm9sZGluZzogaGlkZQogICAgZGZfcHJpbnQ6IHBhZ2VkCiAgICB0b2M6IHRydWUKICAgIHRvY19mbG9hdDoKICAgICAgY29sbGFwc2VkOiB0cnVlCiAgICAgIHNtb290aF9zY3JvbGw6IHRydWUKICAgIG51bWJlcl9zZWN0aW9uczogdHJ1ZQogICAgZmlnX2NhcHRpb246IHRydWUKICAgIGNvZGVfZG93bmxvYWQ6IHRydWUKICAgIGNzczogdmlzdWFsLmNzcwphbHdheXNfYWxsb3dfaHRtbDogdHJ1ZQotLS0KCkdvIGJhY2sgdG8gdGhlIFtDb250ZW50c10oYWJvdXQuaHRtbCkgcGFnZS4KCmBgYHtyIHNldHVwLCBpbmNsdWRlPUZBTFNFfQprbml0cjo6b3B0c19jaHVuayRzZXQobWVzc2FnZT1GQUxTRSx3YXJuaW5nPUZBTFNFLGVycm9yPUZBTFNFLAogIGVjaG89VFJVRSxjYWNoZT1GQUxTRSxmaWcuYWxpZ249ImNlbnRlciIsZHBpPTE1MCkKc291cmNlKCJmdW4vcm91Z2gvdGF1L2xvYWQuUiIpCnJvdWdoX3RhdV9yZXN1bHQgPC0gcmVhZFJEUygiZGF0YV9maWxlcy9yb3VnaF90YXVfcmVzdWx0cy5yZHMiKQpzdG9waWZub3QoaWRlbnRpY2FsKHJvdWdoX3RhdV9yZXN1bHQkcGFyYW1ldGVycyxyb3VnaF90YXVfcGFyYW1ldGVycygpKSkKcCA8LSByb3VnaF90YXVfcmVzdWx0JHBhcmFtZXRlcnMKYGBgCgojIFByb2JsZW0gYW5kIGV4YWN0IHNvbHV0aW9uCgpVc2UgdGhlIHNhbWUgdGFkcG9sZSBhbmQgdGhlIHNhbWUgaW5maW5pdGUgcm91Z2ggZm9yY2luZyBhcyBpbgpbdGhlIHNwYXRpYWwgZXhwZXJpbWVudF0oY29udl9pbl9oX3JvdWdoLmh0bWwpLiBUaGUgc3RlbSBoYXMgbGVuZ3RoICQxJCwKdGhlIGxvb3AgaGFzIGxlbmd0aCAkMiQsIGFuZAokJApccGFydGlhbF90dStcbnVfXGFscGhhIExee1xhbHBoYS8yfXU9ZyxccXF1YWQgdSgwKT0wLApccXF1YWQgTD1ca2FwcGFeMi1cRGVsdGFfXEdhbW1hLFxxdWFkIFxrYXBwYT00LFxxdWFkIFQ9MS4KJCQKVGhlIGZvcmNpbmcgaXMgZml4ZWQgYWNyb3NzIGFsbCBtZXNoZXMgYW5kIGFsbCB2YWx1ZXMgb2YgJFxhbHBoYSQ6CiQkCmc9XHN1bV97aj0xfV57XGluZnR5fVxmcmFjMWpccGhpX2osClxxcXVhZApccGhpX2oocyk9ClxiZWdpbntjYXNlc30KMCwmc1x0ZXh0eyBvbiB0aGUgc3RlbX0sXFwKXHNpbigyXmpccGkgeCksJnM9eFxpblswLDJdXHRleHR7IG9uIHRoZSBsb29wfS4KXGVuZHtjYXNlc30KJCQKVGhlc2Ugb3J0aG9ub3JtYWwgZWlnZW5mdW5jdGlvbnMgaGF2ZSBlaWdlbnZhbHVlcwokXG11X2o9XGthcHBhXjIrXHBpXjIgMl57Mmp9JC4gVGh1cyAkZ1xpbiBMXzIoXEdhbW1hKSQgYnV0CiRnXG5vdGluXGRvdCBIXnMoXEdhbW1hKSQgZm9yIGV2ZXJ5ICRzPjAkLiBXcml0aW5nCiRhX2o9XG51X1xhbHBoYVxtdV9qXntcYWxwaGEvMn0kLCB0aGUgZXhhY3Qgc29sdXRpb24gaXMKJCQKdShzLHQpPVxzdW1fe2o9MX1ee1xpbmZ0eX1cZnJhY3sxLWVeey1hX2p0fX17alwsYV9qfVxwaGlfaihzKS4KJCQKCjo6OiB7LmN1c3RvbS1ib3h9CkJhY2t3YXJkIEV1bGVyIGhhcyBmaXJzdC1vcmRlciB0ZW1wb3JhbCBjb252ZXJnZW5jZS4gSGVyZSB3ZSBtZWFzdXJlCiQkCkUoXHRhdSk9XHx1LVVfe2gsbX1ee1x0YXV9XHxfe0xfMigwLFQ7TF8yKFxHYW1tYSkpfQokJAphZ2FpbnN0IHRoZSBleGFjdCBjb250aW51dW0gc29sdXRpb24sIGluY2x1ZGluZyBpdHMgdW5yZXNvbHZlZCBpbmZpbml0ZSB0YWlsLgpGb3IgZWFjaCAkXGFscGhhJCwgdGhlIG1lc2gsIHJhdGlvbmFsIG9yZGVyLCBhbmQgZGlmZnVzaW9uIGNvZWZmaWNpZW50IHJlbWFpbgpmaXhlZCBhcyAkXHRhdSQgdmFyaWVzLiBUaGVpciBwaHlzaWNhbCBzZXR0aW5ncyBhcmUgcmV0YWluZWQgZnJvbSB0aGUKQlJBU0lMIGJhc2VsaW5lIHRvIGlzb2xhdGUgdGhlIGVmZmVjdCBvZiBjaGFuZ2luZyB0aGUgcmF0aW9uYWwgY29lZmZpY2llbnRzLgpUaGUgbmV3IGZpeGVkLW9yZGVyIHJhdGlvbmFsIGVycm9yIGNhbiBtYXNrIHRlbXBvcmFsIGNvbnZlcmdlbmNlLgpUaGUgcmVmZXJlbmNlIHNsb3BlIGlzICQxJCBmb3IgZXZlcnkgJFxhbHBoYSQuCjo6OgoKIyBNYXRyaXggZGlzY3JldGl6YXRpb24gYW5kIHNldHRpbmdzCgpUbyBjb21wYXJlIHRlbXBvcmFsIHJhdGVzIG9uIHRoZSBzYW1lIHRpbWUgZ3JpZCwgY2hvb3NlCiQkClxudV9cYWxwaGE9KFxrYXBwYV4yKzRccGleMileey1cYWxwaGEvMn0sClxxcXVhZCBhXzE9XG51X1xhbHBoYVxtdV8xXntcYWxwaGEvMn09MS4KJCQKVGhpcyBwdXRzIHRoZSBzbG93ZXN0IGZvcmNlZCBtb2RlIG9uIHRoZSBzYW1lIHRpbWUgc2NhbGUgZm9yIGV2ZXJ5CiRcYWxwaGEkLiBUaGUgZGlmZnVzaW9uIGNvZWZmaWNpZW50IGlzIGhlbGQgZml4ZWQgYWxvbmcgZWFjaCBjdXJ2ZS4KVGhpcyB0ZW1wb3JhbCBleHBlcmltZW50IHVzZXMgdGhlc2UgY29lZmZpY2llbnRzIGluc3RlYWQgb2YgdGhlIHVuaXQKZGlmZnVzaW9uIHVzZWQgaW4gdGhlIHNwYXRpYWwgZXhwZXJpbWVudC4KClRoZSBzb2x2ZXIgdXNlcyBjb25zaXN0ZW50IFAxIG1hc3MgYW5kIHN0aWZmbmVzcyBtYXRyaWNlcywgYW5hbHl0aWMKc2luZeKAk2hhdCBsb2FkcywgYW5kIHNoaWZ0ZWQgc3BhcnNlIHNvbHZlcyBhdCBldmVyeSBiYWNrd2FyZCBFdWxlciBzdGVwLgpUaGUgbWF0cmljZXMgYXJlIGFzc2VtYmxlZCBkaXJlY3RseSBvbiB0aGUgaW52YXJpYW50IHF1YXJ0ZXItbG9vcAokWzAsMS8yXSQsIHdpdGggRGlyaWNobGV0IGVuZHBvaW50cy4gU2lnbmVkIHJlZmxlY3Rpb25zIHJlY292ZXIgdGhlIGZ1bGwKbG9vcCBzb2x1dGlvbiBhbmQgdGhlIHN0ZW0gc29sdXRpb24gaXMgemVyby4gQSBmYWN0b3Igb2YgZm91ciBpbiB0aGUKbWF0cmljZXMgYW5kIGludGVncmFscyBhY2NvdW50cyBmb3IgdGhlIGZ1bGwgZ3JhcGguIFRoaXMgaXMgdGhlIHNhbWUgRkVNCm1hdHJpeCBldm9sdXRpb24gdXNlZCBpbiB0aGUgc3BhdGlhbCBleHBlcmltZW50OyBpdCB1c2VzIG5vIGRpc2NyZXRlCmVpZ2VuZnVuY3Rpb24gcmVjdXJyZW5jZS4KClRoZSByYXRpb25hbCBpbnZlcnNlIHVzZXMgb3JkZXItZWlnaHQgb3BlcmF0b3ItYmFzZWQgcm9vdC9mYWN0b3IgY29lZmZpY2llbnRzCnJlYWQgZGlyZWN0bHkgYXQgJFxiZXRhPVxhbHBoYS8yJCBmcm9tCmBtYXRsYWIvY29tcHV0ZWRfZnJhY3Rpb25hbF9yb290cy5jc3ZgLCB3aXRob3V0IGludGVycG9sYXRpb24uIFRoZSBpbnZlcnNlCnJlcHJlc2VudGF0aW9uIGlzIHByb3BlciBhbmQgaXRzIGJhY2t3YXJkIEV1bGVyIHVwZGF0ZSBoYXMgbm8gY29uc3RhbnQgdGVybS4KQWxsIHNoaWZ0ZWQgZmFjdG9yaXphdGlvbnMgYXJlIHJldXNlZCB3aXRoaW4gYSBydW4uIFRoZQpbY29lZmZpY2llbnQgY29tcGFyaXNvbl0ocm91Z2hfb3BlcmF0b3JfY29tcGFyaXNvbi5odG1sKSBhbHNvIGluY2x1ZGVzCm9yZGVyIGZvdXIgYW5kIHRoZSBwcmVzZXJ2ZWQgQlJBU0lMIGJhc2VsaW5lLgpUaGUgZXJyb3IgdXNlcyB0aGUgY29uc2lzdGVudCBtYXNzIG5vcm0sIGEgc3RhYmxlIHNwYXRpYWwgcHJvamVjdGlvbiByZXNpZHVhbCwKYW5kIGV4YWN0IHRpbWUgbW9tZW50cyBmb3IgdGhlIHJpZ2h0LWNvbnN0YW50IHJlY29uc3RydWN0aW9uLiBNb2RlcwokalxnZXEgSiQgb24gYSBtZXNoICRoPTJeey1KfSQgaGF2ZSB6ZXJvIGxvYWQgYnV0IHJlbWFpbiBpbiB0aGUgZXhhY3QKZXJyb3IgdGhyb3VnaCBhIGNlcnRpZmllZCBpbmZpbml0ZS10YWlsIHN1bS4gVGhlcmUgaXMgbm8gcmVmZXJlbmNlLWdyaWQKc2FtcGxpbmcgb3IgcmVwbGFjZW1lbnQgb2YgdGhlIGZvcmNpbmcgYnkgYSBmaW5pdGUgc2VyaWVzLgoKYGBge3IgcGFyYW1ldGVyc30KYWxwaGFfdmVjdG9yIDwtIHNlcSgwLjUsMS45LDAuMikKTl92ZWN0b3IgPC0gcCROCnRhdV92ZWN0b3IgPC0gcCRUX2ZpbmFsL05fdmVjdG9yCmhfZml4ZWQgPC0gMl4tcCRKCmRpZmZ1c2lvbiA8LSBwJGRpZmZ1c2lvbgptX2ZpeGVkIDwtIHAkcmF0aW9uYWxfb3JkZXJzCmBgYAoKVGhlIGFjdHVhbCB1bmlmb3JtIHRpbWUgc3RlcHMgYXJlICRcdGF1PVQvTiQgZm9yCiROPTUsMTAsMjAsNDAsODAsMTYwJC4gVGhlIGZvbGxvd2luZyBzZXR0aW5ncyByZW1haW4gZml4ZWQgYWxvbmcgZWFjaAp0ZW1wb3JhbCByZWZpbmVtZW50IGN1cnZlOgoKYGBge3Igc2V0dGluZ3MsIGVjaG89RkFMU0V9CmtuaXRyOjprYWJsZShkYXRhLmZyYW1lKGFscGhhPXAkYWxwaGEsCiAgaD1wYXN0ZTAoIjEvIiwyXnAkSiksbnU9Zm9ybWF0QyhwJGRpZmZ1c2lvbixmb3JtYXQ9ImYiLGRpZ2l0cz04KSwKICBtPXAkcmF0aW9uYWxfb3JkZXJzKSwKICBjb2wubmFtZXM9YygiJFxcYWxwaGEkIiwiJGgkIiwiJFxcbnVfXFxhbHBoYSQiLCIkbSQiKSwKICBhbGlnbj1jKCJyIiwiciIsInIiLCJyIikpCmBgYAoKIyBSZXN1bHRzCgpTb2xpZCBsaW5lcyBhbmQgbWFya2VycyBzaG93IHRoZSBjb21wdXRlZCBtYXRyaXgtc29sdmVyIGVycm9ycy4gRGFzaGVkCmxpbmVzIGhhdmUgc2xvcGUgJDEkLCB3aXRoIGNvbnN0YW50cyBmaXR0ZWQgb3ZlciB0aGUgdGhyZWUgZmluZXN0IHRpbWUKc3RlcHMsICRcdGF1PTEvNDAsMS84MCwxLzE2MCQuIFRoZSBzYW1lIHRocmVlIHN0ZXBzIGFyZSB1c2VkIGZvciB0aGUKcmVwb3J0ZWQgcmVncmVzc2lvbiBzbG9wZXMuIFNlcGFyYXRlIHBhbmVscyBtYWtlIGFsbCBlaWdodCBjdXJ2ZXMgdmlzaWJsZS4KCmBgYHtyIGNvbnZlcmdlbmNlLCBlY2hvPUZBTFNFLCBvdXQud2lkdGg9Ijc2MHB4IiwgZmlnLmNhcD0iVGVtcG9yYWwgY29udmVyZ2VuY2UgZm9yIHRoZSBmaXhlZCBpbmZpbml0ZSByb3VnaCBmb3JjaW5nLiBFYWNoIGRhc2hlZCBsaW5lIGhhcyBzbG9wZSBvbmUuIFRoZSBtZXNoLCBkaWZmdXNpb24gY29lZmZpY2llbnQsIGFuZCByYXRpb25hbCBvcmRlciBhcmUgZml4ZWQgd2l0aGluIGVhY2ggcGFuZWwuIn0Ka25pdHI6OmluY2x1ZGVfZ3JhcGhpY3MoImRhdGFfZmlsZXMvcm91Z2hfdGF1L2NvbnZfdGF1X3JvdWdoLnBuZyIpCmBgYAoKYGBge3IgcmF0ZXMsIGVjaG89RkFMU0V9CnJhdGVzIDwtIHJvdWdoX3RhdV9yZXN1bHQkcmF0ZXMKa25pdHI6OmthYmxlKHJhdGVzLGRpZ2l0cz1jKDEsMSw0LDIpLAogIGNvbC5uYW1lcz1jKCIkXFxhbHBoYSQiLCJSZWZlcmVuY2UiLCJPYnNlcnZlZCBzbG9wZSIsIlJlbGF0aXZlIGVycm9yICglKSIpLAogIGNhcHRpb249IlRlbXBvcmFsIHJlZ3Jlc3Npb24gc2xvcGVzIG92ZXIgdGhlIHRocmVlIGZpbmVzdCB0aW1lIHN0ZXBzLiIpCmBgYAoKVGhlIG9ic2VydmVkIHNsb3BlcyByYW5nZSBmcm9tCmByIHNwcmludGYoIiUuNGYiLCBtaW4ocmF0ZXMkb2JzZXJ2ZWQpKWAgdG8KYHIgc3ByaW50ZigiJS40ZiIsIG1heChyYXRlcyRvYnNlcnZlZCkpYC4gVGhlIHJlZmVyZW5jZSBvcmRlciByZW1haW5zIG9uZSwKYnV0IHRoZSBmaXhlZCBvcGVyYXRvciBhcHByb3hpbWF0aW9uIGludHJvZHVjZXMgYSB2aXNpYmxlIGVycm9yIGZsb29yIGZvcgpzb21lIHZhbHVlcyBvZiAkXGFscGhhJC4gVGhlIG1hdGNoZWQgY29tcGFyaXNvbiByZXBvcnRzIGhvdyB0aGlzIGNoYW5nZXMKYm90aCB0aGUgZXJyb3IgbGV2ZWxzIGFuZCB0aGUgc2xvcGVzIHJlbGF0aXZlIHRvIHRoZSBCUkFTSUwgYmFzZWxpbmUuCgpgYGB7ciBlcnJvcnMsIGVjaG89RkFMU0UsIHJlc3VsdHM9J2FzaXMnfQplcnJvcnMgPC0gZGF0YS5mcmFtZSh0YXU9cGFzdGUwKCIxLyIscCROKSwKICBhcHBseShyb3VnaF90YXVfcmVzdWx0JGVycm9ycywyTCxmdW5jdGlvbih4KWZvcm1hdEMoeCxmb3JtYXQ9ImUiLGRpZ2l0cz02KSkpCm5hbWVzKGVycm9ycykgPC0gYygiJFxcdGF1JCIscGFzdGUwKCIkXFxhbHBoYT0iLHAkYWxwaGEsIiQiKSkKY2F0KCc8ZGl2IHN0eWxlPSJvdmVyZmxvdy14OmF1dG8iPlxuJywKICBrbml0cjo6a2FibGUoZXJyb3JzLGZvcm1hdD0iaHRtbCIsY2FwdGlvbj0iQ29tcHV0ZWQgc3BhY2XigJN0aW1lIGVycm9ycy4iLAogICAgdGFibGUuYXR0cj0nY2xhc3M9InRhYmxlIHRhYmxlLWNvbmRlbnNlZCIgc3R5bGU9ImZvbnQtc2l6ZToxM3B4OyB3aGl0ZS1zcGFjZTpub3dyYXAiJyksCiAgJ1xuPC9kaXY+XG4nKQpgYGAK</div>
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeSourceEmbed("conv_in_tau_rough.Rmd");
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

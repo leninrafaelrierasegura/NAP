@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Convergence in 𝘩 with rough forcing</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<script src="site_libs/navigation-1.1/sourceembed.js"></script>
+<link href="site_libs/pagedtable-1.1/css/pagedtable.css" rel="stylesheet" />
+<script src="site_libs/pagedtable-1.1/js/pagedtable.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
+<style type="text/css" data-origin="pandoc">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+.sourceCode .row {
+  width: 100%;
+}
+.sourceCode {
+  overflow-x: auto;
+}
+.code-folding-btn {
+  margin-right: -30px;
+}
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+<style type="text/css">
+#rmd-source-code {
+  display: none;
+}
+</style>
+
+
+<link rel="stylesheet" href="visual.css" type="text/css" />
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">NAP</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Contents
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="functionality.html">Functionality</a>
+    </li>
+    <li>
+      <a href="exp1.html">Example</a>
+    </li>
+    <li>
+      <a href="conv_in_h.html">Convergence in 𝘩</a>
+    </li>
+    <li>
+      <a href="conv_in_tau.html">Convergence in τ</a>
+    </li>
+    <li>
+      <a href="conv_in_m.html">Convergence in 𝑚</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://arxiv.org/abs/0000.00000">
+    <span class="fa fa-file-pdf"></span>
+     
+  </a>
+</li>
+<li>
+  <a href="https://github.com/leninrafaelrierasegura/NAP">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+<li role="separator" class="divider"></li>
+<li><a id="rmd-download-source" href="#">Download Rmd</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Convergence in 𝘩 with rough forcing</h1>
+<h4 class="date">Last modified: 30-10-2026.</h4>
+
+</div>
+
+
+<p>Go back to the <a href="about.html">Contents</a> page.</p>
+<div id="problem-and-exact-solution" class="section level1" number="1">
+<h1><span class="header-section-number">1</span> Problem and exact
+solution</h1>
+<p>On the tadpole graph with stem length <span
+class="math inline">\(1\)</span> and loop length <span
+class="math inline">\(2\)</span>, let <span
+class="math inline">\(L=\kappa^2-\Delta_\Gamma\)</span> and consider
+<span class="math display">\[
+\partial_tu+\nu L^{\alpha/2}u=g,\qquad u(0)=0,
+\qquad T=1,\quad\nu=1,\quad\kappa=4.
+\]</span> Use the same forcing for every <span
+class="math inline">\(\alpha\)</span>: <span class="math display">\[
+g=\sum_{j=1}^{\infty}\frac1j\phi_j,
+\qquad
+\phi_j(s)=
+\begin{cases}
+0,&amp;s\text{ on the stem},\\
+\sin(2^j\pi x),&amp;s=x\in[0,2]\text{ on the loop}.
+\end{cases}
+\]</span> These orthonormal Kirchhoff eigenfunctions have eigenvalues
+<span class="math inline">\(\mu_j=\kappa^2+\pi^2 2^{2j}\)</span>. The
+series defines an <span class="math inline">\(L_2(\Gamma)\)</span>
+forcing: <span
+class="math inline">\(\|g\|_{L_2(\Gamma)}^2=\sum_{j\geq1}j^{-2}&lt;\infty\)</span>.
+For every <span class="math inline">\(s&gt;0\)</span>, <span
+class="math inline">\(\sum_{j\geq1}\mu_j^s/j^2=\infty\)</span>, so <span
+class="math inline">\(g\)</span> has no positive spectral Sobolev
+regularity. Writing <span
+class="math inline">\(a_j=\nu\mu_j^{\alpha/2}\)</span> gives the exact
+solution <span class="math display">\[
+u(s,t)=\sum_{j=1}^{\infty}\frac{1-e^{-a_jt}}{j\,a_j}\phi_j(s).
+\]</span></p>
+<div class="custom-box">
+<p>Theorem <code>lastlasttheorem</code> in <code>main.tex</code> gives
+the spatial term <span
+class="math inline">\(h^{\alpha-\epsilon}\)</span> because <span
+class="math inline">\(s_f=0\)</span> and <span
+class="math inline">\(u_0=0\)</span> belongs to every spectral Sobolev
+space. For this particular forcing, uniform P1 meshes with <span
+class="math inline">\(h_J=2^{-J}\)</span> give the sharper asymptotic
+behavior <span class="math display">\[
+E_{h_J}:=\|u-U_{h_J,m}^{\tau}\|_{L_2(0,T;L_2(\Gamma))}
+\asymp\frac{h_J^\alpha}{J},\qquad0&lt;\alpha&lt;2,
+\]</span> when temporal and rational errors are negligible. Thus the raw
+slope tends to <span class="math inline">\(\alpha\)</span>; plotting
+<span class="math inline">\(J E_{h_J}\)</span> removes the leading
+logarithmic factor.</p>
+</div>
+</div>
+<div id="matrix-discretization-and-error" class="section level1"
+number="2">
+<h1><span class="header-section-number">2</span> Matrix discretization
+and error</h1>
+<p>The consistent P1 mass and stiffness matrices are assembled on the
+tadpole with <code>MetricGraph</code>. Every backward Euler step
+advances the FEM coefficient vector by shifted sparse matrix solves,
+using the same matrix update as <code>cov_in_h_mat.Rmd</code>. The
+rational inverse uses the operator-based root/factor representation with
+order <span class="math inline">\(m=8\)</span>. Coefficients are read
+directly at <span class="math inline">\(\beta=\alpha/2\)</span> from
+<code>matlab/computed_fractional_roots.csv</code>; no interpolation in
+<span class="math inline">\(\beta\)</span> is used. These locally
+generated Cheb–Padé coefficients are distinct from the installed
+<code>rSPDE</code> tables. The degree-<span
+class="math inline">\(m\)</span> numerator and degree-<span
+class="math inline">\((m+1)\)</span> denominator give <span
+class="math inline">\(m+1\)</span> shifted solves and no constant term
+in the update. Factorizations are reused.</p>
+<p>This branch retains the same meshes, diffusion, and time steps as the
+BRASIL baseline. The <a
+href="rough_operator_comparison.html">coefficient comparison</a> also
+reports order <span class="math inline">\(m=4\)</span> and preserves the
+original BRASIL results.</p>
+<p>The forcing is supported on the loop and has exact reflection
+symmetries. The shifted FEM matrices are restricted to that invariant
+nodal subspace, and the full graph solution is recovered by signed
+reflections. This is the same FEM matrix evolution; no discrete
+eigenfunction recurrence is used.</p>
+<p>The load is assembled by analytic sine–hat integrals. On a mesh <span
+class="math inline">\(h_J=2^{-J}\)</span>, the modes <span
+class="math inline">\(j\geq J\)</span> have zero <span
+class="math inline">\(L_2\)</span> projection onto <span
+class="math inline">\(V_{h_J}\)</span>. They remain part of the exact
+solution and its error. Their squared contribution is <span
+class="math display">\[
+E_{\mathrm{tail}}^2=
+\sum_{j=J}^{\infty}\frac1{j^2a_j^2}
+\left[T-\frac{2(1-e^{-a_jT})}{a_j}
++\frac{1-e^{-2a_jT}}{2a_j}\right].
+\]</span> The omitted remainder of this infinite sum is bounded by a
+geometric series and is at most <span
+class="math inline">\(10^{-13}\)</span> of its accumulated value. For
+the resolved modes, the FEM mass norm, the spatial projection residual,
+and exact time moments evaluate the error of the right-constant
+reconstruction on each solver interval. No reference-mesh sampling or
+finite-mode replacement of <span class="math inline">\(g\)</span> is
+used.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a>J_vector <span class="ot">&lt;-</span> p<span class="sc">$</span>J</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>h_vector <span class="ot">&lt;-</span> <span class="dv">2</span><span class="sc">^-</span>J_vector</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>alpha_vector <span class="ot">&lt;-</span> <span class="fu">seq</span>(<span class="fl">0.5</span>, <span class="fl">1.9</span>, <span class="fl">0.2</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="fu">stopifnot</span>(<span class="fu">isTRUE</span>(<span class="fu">all.equal</span>(alpha_vector, p<span class="sc">$</span>alpha)))</span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>m_fixed <span class="ot">&lt;-</span> p<span class="sc">$</span>rational_order</span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>time_steps <span class="ot">&lt;-</span> p<span class="sc">$</span>time_steps</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>T_final <span class="ot">&lt;-</span> p<span class="sc">$</span>T_final</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a>diffusion <span class="ot">&lt;-</span> p<span class="sc">$</span>diffusion</span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a>kappa <span class="ot">&lt;-</span> p<span class="sc">$</span>kappa</span></code></pre></div>
+<p>The time step and rational order are fixed along each spatial
+refinement curve. The final settings are:</p>
+<table>
+<thead>
+<tr class="header">
+<th align="right"><span class="math inline">\(\alpha\)</span></th>
+<th align="right"><span class="math inline">\(\tau\)</span></th>
+<th align="right"><span class="math inline">\(m\)</span></th>
+<th align="left"><span class="math inline">\(h\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.5</td>
+<td align="right">5.000000e-04</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="even">
+<td align="right">0.7</td>
+<td align="right">1.250000e-04</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="odd">
+<td align="right">0.9</td>
+<td align="right">3.333333e-05</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="even">
+<td align="right">1.1</td>
+<td align="right">1.000000e-05</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3</td>
+<td align="right">3.125000e-06</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="even">
+<td align="right">1.5</td>
+<td align="right">1.000000e-06</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="odd">
+<td align="right">1.7</td>
+<td align="right">4.000000e-07</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+<tr class="even">
+<td align="right">1.9</td>
+<td align="right">2.000000e-07</td>
+<td align="right">8</td>
+<td align="left">1/32, 1/64, 1/128, 1/256, 1/512</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="results" class="section level1" number="3">
+<h1><span class="header-section-number">3</span> Results</h1>
+<p>The solid curves show the computed matrix-solver errors. Dashed
+curves in the first figure follow <span class="math inline">\(C_\alpha
+h^\alpha/J\)</span>; dashed curves in the second follow <span
+class="math inline">\(C_\alpha h^\alpha\)</span>. Their constants are
+fitted over the three finest meshes, <span
+class="math inline">\(h=1/128,1/256,1/512\)</span>.</p>
+<div class="figure" style="text-align: center">
+<img src="data_files/rough/conv_h_rough_raw.png" alt="Spatial error for the fixed rough forcing. Dashed curves follow h^alpha/J; solid curves and markers are the matrix-solver results." width="650px" />
+<p class="caption">
+Spatial error for the fixed rough forcing. Dashed curves follow
+h^alpha/J; solid curves and markers are the matrix-solver results.
+</p>
+</div>
+<div class="figure" style="text-align: center">
+<img src="data_files/rough/conv_h_rough_corrected.png" alt="Logarithmically corrected error J E_h, where J=log_2(1/h). Dashed lines have slope alpha." width="650px" />
+<p class="caption">
+Logarithmically corrected error J E_h, where J=log_2(1/h). Dashed lines
+have slope alpha.
+</p>
+</div>
+<table>
+<caption>Regression slopes over the three finest meshes.</caption>
+<colgroup>
+<col width="12%" />
+<col width="13%" />
+<col width="13%" />
+<col width="21%" />
+<col width="39%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right"><span class="math inline">\(\alpha\)</span></th>
+<th align="right">Reference</th>
+<th align="right">Raw slope</th>
+<th align="right">Corrected slope</th>
+<th align="right">Corrected relative error (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.5</td>
+<td align="right">0.5</td>
+<td align="right">0.6556</td>
+<td align="right">0.4743</td>
+<td align="right">5.13</td>
+</tr>
+<tr class="even">
+<td align="right">0.7</td>
+<td align="right">0.7</td>
+<td align="right">0.8628</td>
+<td align="right">0.6815</td>
+<td align="right">2.65</td>
+</tr>
+<tr class="odd">
+<td align="right">0.9</td>
+<td align="right">0.9</td>
+<td align="right">1.0561</td>
+<td align="right">0.8748</td>
+<td align="right">2.80</td>
+</tr>
+<tr class="even">
+<td align="right">1.1</td>
+<td align="right">1.1</td>
+<td align="right">1.2499</td>
+<td align="right">1.0686</td>
+<td align="right">2.85</td>
+</tr>
+<tr class="odd">
+<td align="right">1.3</td>
+<td align="right">1.3</td>
+<td align="right">1.4599</td>
+<td align="right">1.2787</td>
+<td align="right">1.64</td>
+</tr>
+<tr class="even">
+<td align="right">1.5</td>
+<td align="right">1.5</td>
+<td align="right">1.6915</td>
+<td align="right">1.5103</td>
+<td align="right">0.68</td>
+</tr>
+<tr class="odd">
+<td align="right">1.7</td>
+<td align="right">1.7</td>
+<td align="right">1.8890</td>
+<td align="right">1.7077</td>
+<td align="right">0.45</td>
+</tr>
+<tr class="even">
+<td align="right">1.9</td>
+<td align="right">1.9</td>
+<td align="right">1.9728</td>
+<td align="right">1.7916</td>
+<td align="right">5.71</td>
+</tr>
+</tbody>
+</table>
+<p>The logarithmic correction accounts for the factor <span
+class="math inline">\(1/J\)</span> in the ideal spatial error model. The
+measured error also contains the fixed-order rational approximation
+error. If that contribution dominates, multiplying by <span
+class="math inline">\(J\)</span> cannot restore the ideal spatial slope.
+The matched coefficient comparison separates that effect from the finite
+spatial refinement range. For <span
+class="math inline">\(\alpha\)</span> close to <span
+class="math inline">\(2\)</span>, the second-order contribution from low
+modes can remain significant over this mesh range, so the limiting
+corrected slope can take longer to appear.</p>
+<div style="overflow-x:auto">
+<table class="table table-condensed" style="font-size:13px; white-space:nowrap">
+<caption>
+Computed space–time errors.
+</caption>
+<thead>
+<tr>
+<th style="text-align:left;">
+<span class="math inline">\(h\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=0.5\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=0.7\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=0.9\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.1\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.3\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.5\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.7\)</span>
+</th>
+<th style="text-align:left;">
+<span class="math inline">\(\alpha=1.9\)</span>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+1/32
+</td>
+<td style="text-align:left;">
+2.362819e-02
+</td>
+<td style="text-align:left;">
+9.325661e-03
+</td>
+<td style="text-align:left;">
+3.712528e-03
+</td>
+<td style="text-align:left;">
+1.520209e-03
+</td>
+<td style="text-align:left;">
+6.551189e-04
+</td>
+<td style="text-align:left;">
+3.064658e-04
+</td>
+<td style="text-align:left;">
+1.596948e-04
+</td>
+<td style="text-align:left;">
+9.248909e-05
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/64
+</td>
+<td style="text-align:left;">
+1.441733e-02
+</td>
+<td style="text-align:left;">
+4.869464e-03
+</td>
+<td style="text-align:left;">
+1.668878e-03
+</td>
+<td style="text-align:left;">
+5.898465e-04
+</td>
+<td style="text-align:left;">
+2.202123e-04
+</td>
+<td style="text-align:left;">
+9.062837e-05
+</td>
+<td style="text-align:left;">
+4.311796e-05
+</td>
+<td style="text-align:left;">
+2.384487e-05
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/128
+</td>
+<td style="text-align:left;">
+8.974050e-03
+</td>
+<td style="text-align:left;">
+2.611970e-03
+</td>
+<td style="text-align:left;">
+7.756285e-04
+</td>
+<td style="text-align:left;">
+2.375526e-04
+</td>
+<td style="text-align:left;">
+7.656949e-05
+</td>
+<td style="text-align:left;">
+2.732076e-05
+</td>
+<td style="text-align:left;">
+1.166167e-05
+</td>
+<td style="text-align:left;">
+6.116258e-06
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/256
+</td>
+<td style="text-align:left;">
+5.671096e-03
+</td>
+<td style="text-align:left;">
+1.425349e-03
+</td>
+<td style="text-align:left;">
+3.660513e-04
+</td>
+<td style="text-align:left;">
+9.692717e-05
+</td>
+<td style="text-align:left;">
+2.688211e-05
+</td>
+<td style="text-align:left;">
+8.259903e-06
+</td>
+<td style="text-align:left;">
+3.139020e-06
+</td>
+<td style="text-align:left;">
+1.561457e-06
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1/512
+</td>
+<td style="text-align:left;">
+3.616348e-03
+</td>
+<td style="text-align:left;">
+7.898335e-04
+</td>
+<td style="text-align:left;">
+1.793947e-04
+</td>
+<td style="text-align:left;">
+4.199992e-05
+</td>
+<td style="text-align:left;">
+1.011783e-05
+</td>
+<td style="text-align:left;">
+2.618706e-06
+</td>
+<td style="text-align:left;">
+8.501513e-07
+</td>
+<td style="text-align:left;">
+3.969282e-07
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="rmd-source-code">LS0tCnRpdGxlOiAiQ29udmVyZ2VuY2UgaW4g8J2YqSB3aXRoIHJvdWdoIGZvcmNpbmciCmRhdGU6ICJMYXN0IG1vZGlmaWVkOiBgciBmb3JtYXQoU3lzLnRpbWUoKSwgJyVkLSVtLSVZLicsIHR6ID0gJ0FzaWEvUml5YWRoJylgIgpvdXRwdXQ6CiAgaHRtbF9kb2N1bWVudDoKICAgIG1hdGhqYXg6ICJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvbnBtL21hdGhqYXhAMy9lczUvdGV4LW1tbC1jaHRtbC5qcyIKICAgIGhpZ2hsaWdodDogcHlnbWVudHMKICAgIHRoZW1lOiBmbGF0bHkKICAgIGNvZGVfZm9sZGluZzogaGlkZQogICAgZGZfcHJpbnQ6IHBhZ2VkCiAgICB0b2M6IHRydWUKICAgIHRvY19mbG9hdDoKICAgICAgY29sbGFwc2VkOiB0cnVlCiAgICAgIHNtb290aF9zY3JvbGw6IHRydWUKICAgIG51bWJlcl9zZWN0aW9uczogdHJ1ZQogICAgZmlnX2NhcHRpb246IHRydWUKICAgIGNvZGVfZG93bmxvYWQ6IHRydWUKICAgIGNzczogdmlzdWFsLmNzcwphbHdheXNfYWxsb3dfaHRtbDogdHJ1ZQotLS0KCkdvIGJhY2sgdG8gdGhlIFtDb250ZW50c10oYWJvdXQuaHRtbCkgcGFnZS4KCmBgYHtyIHNldHVwLCBpbmNsdWRlPUZBTFNFfQprbml0cjo6b3B0c19jaHVuayRzZXQobWVzc2FnZSA9IEZBTFNFLCB3YXJuaW5nID0gRkFMU0UsIGVycm9yID0gRkFMU0UsCiAgZWNobyA9IFRSVUUsIGNhY2hlID0gRkFMU0UsIGZpZy5hbGlnbiA9ICJjZW50ZXIiLCBkcGkgPSAxNTApCnNvdXJjZSgiZnVuL3JvdWdoL2xvYWQuUiIpCnJvdWdoX3Jlc3VsdCA8LSByZWFkUkRTKCJkYXRhX2ZpbGVzL3JvdWdoX2hfcmVzdWx0cy5yZHMiKQpzdG9waWZub3QoaWRlbnRpY2FsKHJvdWdoX3Jlc3VsdCRwYXJhbWV0ZXJzLCByb3VnaF9wYXJhbWV0ZXJzKCkpKQpwIDwtIHJvdWdoX3Jlc3VsdCRwYXJhbWV0ZXJzCmBgYAoKIyBQcm9ibGVtIGFuZCBleGFjdCBzb2x1dGlvbgoKT24gdGhlIHRhZHBvbGUgZ3JhcGggd2l0aCBzdGVtIGxlbmd0aCAkMSQgYW5kIGxvb3AgbGVuZ3RoICQyJCwgbGV0CiRMPVxrYXBwYV4yLVxEZWx0YV9cR2FtbWEkIGFuZCBjb25zaWRlcgokJApccGFydGlhbF90dStcbnUgTF57XGFscGhhLzJ9dT1nLFxxcXVhZCB1KDApPTAsClxxcXVhZCBUPTEsXHF1YWRcbnU9MSxccXVhZFxrYXBwYT00LgokJApVc2UgdGhlIHNhbWUgZm9yY2luZyBmb3IgZXZlcnkgJFxhbHBoYSQ6CiQkCmc9XHN1bV97aj0xfV57XGluZnR5fVxmcmFjMWpccGhpX2osClxxcXVhZApccGhpX2oocyk9ClxiZWdpbntjYXNlc30KMCwmc1x0ZXh0eyBvbiB0aGUgc3RlbX0sXFwKXHNpbigyXmpccGkgeCksJnM9eFxpblswLDJdXHRleHR7IG9uIHRoZSBsb29wfS4KXGVuZHtjYXNlc30KJCQKVGhlc2Ugb3J0aG9ub3JtYWwgS2lyY2hob2ZmIGVpZ2VuZnVuY3Rpb25zIGhhdmUgZWlnZW52YWx1ZXMKJFxtdV9qPVxrYXBwYV4yK1xwaV4yIDJeezJqfSQuIFRoZSBzZXJpZXMgZGVmaW5lcyBhbiAkTF8yKFxHYW1tYSkkIGZvcmNpbmc6CiRcfGdcfF97TF8yKFxHYW1tYSl9XjI9XHN1bV97alxnZXExfWpeey0yfTxcaW5mdHkkLgpGb3IgZXZlcnkgJHM+MCQsICRcc3VtX3tqXGdlcTF9XG11X2pecy9qXjI9XGluZnR5JCwgc28gJGckIGhhcyBubyBwb3NpdGl2ZQpzcGVjdHJhbCBTb2JvbGV2IHJlZ3VsYXJpdHkuIFdyaXRpbmcgJGFfaj1cbnVcbXVfal57XGFscGhhLzJ9JCBnaXZlcyB0aGUgZXhhY3Qgc29sdXRpb24KJCQKdShzLHQpPVxzdW1fe2o9MX1ee1xpbmZ0eX1cZnJhY3sxLWVeey1hX2p0fX17alwsYV9qfVxwaGlfaihzKS4KJCQKCjo6OiB7LmN1c3RvbS1ib3h9ClRoZW9yZW0gYGxhc3RsYXN0dGhlb3JlbWAgaW4gYG1haW4udGV4YCBnaXZlcyB0aGUgc3BhdGlhbCB0ZXJtCiRoXntcYWxwaGEtXGVwc2lsb259JCBiZWNhdXNlICRzX2Y9MCQgYW5kICR1XzA9MCQgYmVsb25ncyB0byBldmVyeSBzcGVjdHJhbApTb2JvbGV2IHNwYWNlLiBGb3IgdGhpcyBwYXJ0aWN1bGFyIGZvcmNpbmcsIHVuaWZvcm0gUDEgbWVzaGVzIHdpdGgKJGhfSj0yXnstSn0kIGdpdmUgdGhlIHNoYXJwZXIgYXN5bXB0b3RpYyBiZWhhdmlvcgokJApFX3toX0p9Oj1cfHUtVV97aF9KLG19XntcdGF1fVx8X3tMXzIoMCxUO0xfMihcR2FtbWEpKX0KXGFzeW1wXGZyYWN7aF9KXlxhbHBoYX17Sn0sXHFxdWFkMDxcYWxwaGE8MiwKJCQKd2hlbiB0ZW1wb3JhbCBhbmQgcmF0aW9uYWwgZXJyb3JzIGFyZSBuZWdsaWdpYmxlLiBUaHVzIHRoZSByYXcgc2xvcGUgdGVuZHMKdG8gJFxhbHBoYSQ7IHBsb3R0aW5nICRKIEVfe2hfSn0kIHJlbW92ZXMgdGhlIGxlYWRpbmcgbG9nYXJpdGhtaWMgZmFjdG9yLgo6OjoKCiMgTWF0cml4IGRpc2NyZXRpemF0aW9uIGFuZCBlcnJvcgoKVGhlIGNvbnNpc3RlbnQgUDEgbWFzcyBhbmQgc3RpZmZuZXNzIG1hdHJpY2VzIGFyZSBhc3NlbWJsZWQgb24gdGhlIHRhZHBvbGUKd2l0aCBgTWV0cmljR3JhcGhgLiBFdmVyeSBiYWNrd2FyZCBFdWxlciBzdGVwIGFkdmFuY2VzIHRoZSBGRU0gY29lZmZpY2llbnQKdmVjdG9yIGJ5IHNoaWZ0ZWQgc3BhcnNlIG1hdHJpeCBzb2x2ZXMsIHVzaW5nIHRoZSBzYW1lIG1hdHJpeCB1cGRhdGUgYXMKYGNvdl9pbl9oX21hdC5SbWRgLiBUaGUgcmF0aW9uYWwgaW52ZXJzZSB1c2VzIHRoZSBvcGVyYXRvci1iYXNlZCByb290L2ZhY3RvcgpyZXByZXNlbnRhdGlvbiB3aXRoIG9yZGVyICRtPTgkLiBDb2VmZmljaWVudHMgYXJlIHJlYWQgZGlyZWN0bHkgYXQKJFxiZXRhPVxhbHBoYS8yJCBmcm9tIGBtYXRsYWIvY29tcHV0ZWRfZnJhY3Rpb25hbF9yb290cy5jc3ZgOyBubwppbnRlcnBvbGF0aW9uIGluICRcYmV0YSQgaXMgdXNlZC4gVGhlc2UgbG9jYWxseSBnZW5lcmF0ZWQgQ2hlYuKAk1BhZMOpCmNvZWZmaWNpZW50cyBhcmUgZGlzdGluY3QgZnJvbSB0aGUgaW5zdGFsbGVkIGByU1BERWAgdGFibGVzLiBUaGUKZGVncmVlLSRtJCBudW1lcmF0b3IgYW5kIGRlZ3JlZS0kKG0rMSkkIGRlbm9taW5hdG9yIGdpdmUgJG0rMSQgc2hpZnRlZApzb2x2ZXMgYW5kIG5vIGNvbnN0YW50IHRlcm0gaW4gdGhlIHVwZGF0ZS4gRmFjdG9yaXphdGlvbnMgYXJlIHJldXNlZC4KClRoaXMgYnJhbmNoIHJldGFpbnMgdGhlIHNhbWUgbWVzaGVzLCBkaWZmdXNpb24sIGFuZCB0aW1lIHN0ZXBzIGFzIHRoZQpCUkFTSUwgYmFzZWxpbmUuIFRoZSBbY29lZmZpY2llbnQgY29tcGFyaXNvbl0ocm91Z2hfb3BlcmF0b3JfY29tcGFyaXNvbi5odG1sKQphbHNvIHJlcG9ydHMgb3JkZXIgJG09NCQgYW5kIHByZXNlcnZlcyB0aGUgb3JpZ2luYWwgQlJBU0lMIHJlc3VsdHMuCgpUaGUgZm9yY2luZyBpcyBzdXBwb3J0ZWQgb24gdGhlIGxvb3AgYW5kIGhhcyBleGFjdCByZWZsZWN0aW9uIHN5bW1ldHJpZXMuClRoZSBzaGlmdGVkIEZFTSBtYXRyaWNlcyBhcmUgcmVzdHJpY3RlZCB0byB0aGF0IGludmFyaWFudCBub2RhbCBzdWJzcGFjZSwKYW5kIHRoZSBmdWxsIGdyYXBoIHNvbHV0aW9uIGlzIHJlY292ZXJlZCBieSBzaWduZWQgcmVmbGVjdGlvbnMuIFRoaXMgaXMKdGhlIHNhbWUgRkVNIG1hdHJpeCBldm9sdXRpb247IG5vIGRpc2NyZXRlIGVpZ2VuZnVuY3Rpb24gcmVjdXJyZW5jZSBpcyB1c2VkLgoKVGhlIGxvYWQgaXMgYXNzZW1ibGVkIGJ5IGFuYWx5dGljIHNpbmXigJNoYXQgaW50ZWdyYWxzLiBPbiBhIG1lc2ggJGhfSj0yXnstSn0kLAp0aGUgbW9kZXMgJGpcZ2VxIEokIGhhdmUgemVybyAkTF8yJCBwcm9qZWN0aW9uIG9udG8gJFZfe2hfSn0kLiBUaGV5IHJlbWFpbgpwYXJ0IG9mIHRoZSBleGFjdCBzb2x1dGlvbiBhbmQgaXRzIGVycm9yLiBUaGVpciBzcXVhcmVkIGNvbnRyaWJ1dGlvbiBpcwokJApFX3tcbWF0aHJte3RhaWx9fV4yPQpcc3VtX3tqPUp9XntcaW5mdHl9XGZyYWMxe2peMmFfal4yfQpcbGVmdFtULVxmcmFjezIoMS1lXnstYV9qVH0pfXthX2p9CitcZnJhY3sxLWVeey0yYV9qVH19ezJhX2p9XHJpZ2h0XS4KJCQKVGhlIG9taXR0ZWQgcmVtYWluZGVyIG9mIHRoaXMgaW5maW5pdGUgc3VtIGlzIGJvdW5kZWQgYnkgYSBnZW9tZXRyaWMgc2VyaWVzCmFuZCBpcyBhdCBtb3N0ICQxMF57LTEzfSQgb2YgaXRzIGFjY3VtdWxhdGVkIHZhbHVlLiBGb3IgdGhlIHJlc29sdmVkIG1vZGVzLAp0aGUgRkVNIG1hc3Mgbm9ybSwgdGhlIHNwYXRpYWwgcHJvamVjdGlvbiByZXNpZHVhbCwgYW5kIGV4YWN0IHRpbWUgbW9tZW50cwpldmFsdWF0ZSB0aGUgZXJyb3Igb2YgdGhlIHJpZ2h0LWNvbnN0YW50IHJlY29uc3RydWN0aW9uIG9uIGVhY2ggc29sdmVyCmludGVydmFsLiBObyByZWZlcmVuY2UtbWVzaCBzYW1wbGluZyBvciBmaW5pdGUtbW9kZSByZXBsYWNlbWVudCBvZiAkZyQgaXMgdXNlZC4KCmBgYHtyIHBhcmFtZXRlcnN9CkpfdmVjdG9yIDwtIHAkSgpoX3ZlY3RvciA8LSAyXi1KX3ZlY3RvcgphbHBoYV92ZWN0b3IgPC0gc2VxKDAuNSwgMS45LCAwLjIpCnN0b3BpZm5vdChpc1RSVUUoYWxsLmVxdWFsKGFscGhhX3ZlY3RvciwgcCRhbHBoYSkpKQptX2ZpeGVkIDwtIHAkcmF0aW9uYWxfb3JkZXIKdGltZV9zdGVwcyA8LSBwJHRpbWVfc3RlcHMKVF9maW5hbCA8LSBwJFRfZmluYWwKZGlmZnVzaW9uIDwtIHAkZGlmZnVzaW9uCmthcHBhIDwtIHAka2FwcGEKYGBgCgpUaGUgdGltZSBzdGVwIGFuZCByYXRpb25hbCBvcmRlciBhcmUgZml4ZWQgYWxvbmcgZWFjaCBzcGF0aWFsIHJlZmluZW1lbnQKY3VydmUuIFRoZSBmaW5hbCBzZXR0aW5ncyBhcmU6CgpgYGB7ciBzZXR0aW5ncywgZWNobz1GQUxTRX0Ka25pdHI6OmthYmxlKGRhdGEuZnJhbWUoCiAgYWxwaGEgPSBwJGFscGhhLCB0YXUgPSBmb3JtYXQocCR0aW1lX3N0ZXBzLCBzY2llbnRpZmljID0gVFJVRSksCiAgbSA9IHAkcmF0aW9uYWxfb3JkZXIsIG1lc2hlcyA9ICIxLzMyLCAxLzY0LCAxLzEyOCwgMS8yNTYsIDEvNTEyIiksCiAgY29sLm5hbWVzID0gYygiJFxcYWxwaGEkIiwgIiRcXHRhdSQiLCAiJG0kIiwgIiRoJCIpLAogIGFsaWduID0gYygiciIsICJyIiwgInIiLCAibCIpKQpgYGAKCiMgUmVzdWx0cwoKVGhlIHNvbGlkIGN1cnZlcyBzaG93IHRoZSBjb21wdXRlZCBtYXRyaXgtc29sdmVyIGVycm9ycy4gRGFzaGVkIGN1cnZlcyBpbgp0aGUgZmlyc3QgZmlndXJlIGZvbGxvdyAkQ19cYWxwaGEgaF5cYWxwaGEvSiQ7IGRhc2hlZCBjdXJ2ZXMgaW4gdGhlIHNlY29uZApmb2xsb3cgJENfXGFscGhhIGheXGFscGhhJC4gVGhlaXIgY29uc3RhbnRzIGFyZSBmaXR0ZWQgb3ZlciB0aGUgdGhyZWUgZmluZXN0Cm1lc2hlcywgJGg9MS8xMjgsMS8yNTYsMS81MTIkLgoKYGBge3IgcmF3LWVycm9yLCBlY2hvPUZBTFNFLCBvdXQud2lkdGg9IjY1MHB4IiwgZmlnLmNhcD0iU3BhdGlhbCBlcnJvciBmb3IgdGhlIGZpeGVkIHJvdWdoIGZvcmNpbmcuIERhc2hlZCBjdXJ2ZXMgZm9sbG93IGheYWxwaGEvSjsgc29saWQgY3VydmVzIGFuZCBtYXJrZXJzIGFyZSB0aGUgbWF0cml4LXNvbHZlciByZXN1bHRzLiJ9CmtuaXRyOjppbmNsdWRlX2dyYXBoaWNzKCJkYXRhX2ZpbGVzL3JvdWdoL2NvbnZfaF9yb3VnaF9yYXcucG5nIikKYGBgCgpgYGB7ciBjb3JyZWN0ZWQtZXJyb3IsIGVjaG89RkFMU0UsIG91dC53aWR0aD0iNjUwcHgiLCBmaWcuY2FwPSJMb2dhcml0aG1pY2FsbHkgY29ycmVjdGVkIGVycm9yIEogRV9oLCB3aGVyZSBKPWxvZ18yKDEvaCkuIERhc2hlZCBsaW5lcyBoYXZlIHNsb3BlIGFscGhhLiJ9CmtuaXRyOjppbmNsdWRlX2dyYXBoaWNzKCJkYXRhX2ZpbGVzL3JvdWdoL2NvbnZfaF9yb3VnaF9jb3JyZWN0ZWQucG5nIikKYGBgCgpgYGB7ciByYXRlcywgZWNobz1GQUxTRX0KcmF0ZXMgPC0gcm91Z2hfcmVzdWx0JHJhdGVzCmtuaXRyOjprYWJsZShyYXRlcywgZGlnaXRzID0gYygxLCAxLCA0LCA0LCAyKSwKICBjb2wubmFtZXMgPSBjKCIkXFxhbHBoYSQiLCAiUmVmZXJlbmNlIiwgIlJhdyBzbG9wZSIsICJDb3JyZWN0ZWQgc2xvcGUiLAogICAgICAgICAgICAgICAgIkNvcnJlY3RlZCByZWxhdGl2ZSBlcnJvciAoJSkiKSwKICBjYXB0aW9uID0gIlJlZ3Jlc3Npb24gc2xvcGVzIG92ZXIgdGhlIHRocmVlIGZpbmVzdCBtZXNoZXMuIikKYGBgCgpUaGUgbG9nYXJpdGhtaWMgY29ycmVjdGlvbiBhY2NvdW50cyBmb3IgdGhlIGZhY3RvciAkMS9KJCBpbiB0aGUgaWRlYWwKc3BhdGlhbCBlcnJvciBtb2RlbC4gVGhlIG1lYXN1cmVkIGVycm9yIGFsc28gY29udGFpbnMgdGhlIGZpeGVkLW9yZGVyCnJhdGlvbmFsIGFwcHJveGltYXRpb24gZXJyb3IuIElmIHRoYXQgY29udHJpYnV0aW9uIGRvbWluYXRlcywgbXVsdGlwbHlpbmcKYnkgJEokIGNhbm5vdCByZXN0b3JlIHRoZSBpZGVhbCBzcGF0aWFsIHNsb3BlLiBUaGUgbWF0Y2hlZCBjb2VmZmljaWVudApjb21wYXJpc29uIHNlcGFyYXRlcyB0aGF0IGVmZmVjdCBmcm9tIHRoZSBmaW5pdGUgc3BhdGlhbCByZWZpbmVtZW50IHJhbmdlLgpGb3IgJFxhbHBoYSQgY2xvc2UgdG8gJDIkLCB0aGUgc2Vjb25kLW9yZGVyIGNvbnRyaWJ1dGlvbiBmcm9tIGxvdyBtb2RlcwpjYW4gcmVtYWluIHNpZ25pZmljYW50IG92ZXIgdGhpcyBtZXNoIHJhbmdlLCBzbyB0aGUgbGltaXRpbmcgY29ycmVjdGVkCnNsb3BlIGNhbiB0YWtlIGxvbmdlciB0byBhcHBlYXIuCgpgYGB7ciBlcnJvcnMsIGVjaG89RkFMU0UsIHJlc3VsdHM9J2FzaXMnfQplcnJvcnMgPC0gZGF0YS5mcmFtZShoID0gcGFzdGUwKCIxLyIsIDJecCRKKSwKICBhcHBseShyb3VnaF9yZXN1bHQkZXJyb3JzLCAyTCwgZnVuY3Rpb24oeCkgZm9ybWF0Qyh4LCBmb3JtYXQgPSAiZSIsIGRpZ2l0cyA9IDYpKSkKbmFtZXMoZXJyb3JzKSA8LSBjKCIkaCQiLCBwYXN0ZTAoIiRcXGFscGhhPSIsIHAkYWxwaGEsICIkIikpCmNhdCgnPGRpdiBzdHlsZT0ib3ZlcmZsb3cteDphdXRvIj5cbicsCiAga25pdHI6OmthYmxlKGVycm9ycywgZm9ybWF0ID0gImh0bWwiLCBjYXB0aW9uID0gIkNvbXB1dGVkIHNwYWNl4oCTdGltZSBlcnJvcnMuIiwKICAgIHRhYmxlLmF0dHIgPSAnY2xhc3M9InRhYmxlIHRhYmxlLWNvbmRlbnNlZCIgc3R5bGU9ImZvbnQtc2l6ZToxM3B4OyB3aGl0ZS1zcGFjZTpub3dyYXAiJyksCiAgJ1xuPC9kaXY+XG4nKQpgYGAK</div>
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeSourceEmbed("conv_in_h_rough.Rmd");
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -1,7 +1,7 @@
 rough_parameters <- function() {
   list(J = 5:9, alpha = seq(0.5, 1.9, 0.2),
        time_steps = c(5e-4, 1.25e-4, 1/30000, 1e-5, 1/320000, 1e-6, 4e-7, 2e-7),
-       rational_order = 14L, symmetry_reduction = TRUE,
+       rational_order = 8L, coefficient_source = "computed",symmetry_reduction = TRUE,
        T_final = 1, diffusion = 1, kappa = 4,
        projection_quadrature = 16L, tail_tolerance = 1e-13,
        fit_J = 7:9, forcing = "sum_{j>=1} sin(2^j*pi*x)/j on loop; zero on stem",
@@ -21,6 +21,8 @@ rough_run_experiment <- function(parameters = rough_parameters(),
   rough_compile_solver(root, cache_dir)
   cases <- expand.grid(J = parameters$J, alpha_index = seq_along(parameters$alpha))
   identity <- list(parameters = parameters,
+    coefficient_file = if(parameters$coefficient_source=="computed")
+      tools::md5sum(file.path(root,"matlab/computed_fractional_roots.csv")) else NULL,
     sources = tools::md5sum(list.files(file.path(root, "fun/rough"),
                                       pattern = "\\.(R|cpp)$", full.names = TRUE)))
   run_case <- function(i) {
@@ -40,7 +42,8 @@ rough_run_experiment <- function(parameters = rough_parameters(),
       order = parameters$rational_order, diffusion = parameters$diffusion,
       T_final = parameters$T_final, projection = projection,
       tail_tolerance = parameters$tail_tolerance,
-      symmetry_reduction = parameters$symmetry_reduction)
+      symmetry_reduction = parameters$symmetry_reduction,
+      coefficient_source = parameters$coefficient_source)
     value$final_state <- value$states <- NULL
     value$J <- J
     value$alpha <- alpha

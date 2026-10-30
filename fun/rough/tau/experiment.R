@@ -40,10 +40,10 @@ rough_tau_projection <- function(mesh, quadrature_order = 16L) {
 
 rough_tau_solve <- function(mesh,alpha,N,order,diffusion,T_final=1,
     projection=rough_tau_projection(mesh),tail_tolerance=1e-13,
-    return_states=FALSE) {
+    return_states=FALSE,coefficient_source="computed") {
   stopifnot(N>=1,N==as.integer(N),is.finite(T_final),T_final>0)
   tau <- T_final/N
-  operator <- rough_operator(mesh,alpha,tau,order,diffusion)
+  operator <- rough_operator(mesh,alpha,tau,order,diffusion,coefficient_source)
   tail <- rough_tail(mesh$J,alpha,diffusion,mesh$kappa,T_final,tail_tolerance)
   general <- function(A)as(as(A,"generalMatrix"),"CsparseMatrix")
   started <- proc.time()[["elapsed"]]
@@ -56,6 +56,8 @@ rough_tau_solve <- function(mesh,alpha,N,order,diffusion,T_final=1,
   result$tau <- tau
   result$N <- N
   result$order <- order
+  result$coefficient_source <- coefficient_source
+  result$coefficient_table <- operator$transfer$coefficients$table
   result$alpha <- alpha
   result$diffusion <- diffusion
   result$J <- mesh$J
@@ -70,7 +72,7 @@ rough_tau_parameters <- function() {
   kappa <- 4
   list(alpha=alpha,J=c(20L,16L,13L,11L,10L,9L,8L,8L),
     diffusion=(kappa^2+4*pi^2)^(-alpha/2),
-    rational_orders=c(20L,rep(14L,7L)),N=c(5L,10L,20L,40L,80L,160L),
+    rational_orders=rep(8L,8L),coefficient_source="computed",N=c(5L,10L,20L,40L,80L,160L),
     fit_indices=4:6,T_final=1,kappa=kappa,projection_quadrature=16L,
     tail_tolerance=1e-13,forcing="same fixed infinite L2 forcing as conv_in_h_rough",
     reconstruction="right-constant backward Euler",
@@ -89,7 +91,9 @@ rough_tau_run_experiment <- function(parameters=rough_tau_parameters(),
   rough_compile_solver(root,cache_dir)
   files <- c(list.files(file.path(root,"fun/rough"),pattern="\\.(R|cpp)$",full.names=TRUE),
     list.files(file.path(root,"fun/rough/tau"),pattern="\\.R$",full.names=TRUE))
-  provenance <- list(parameters=parameters,sources=tools::md5sum(files))
+  provenance <- list(parameters=parameters,sources=tools::md5sum(files),
+    coefficient_file=if(parameters$coefficient_source=="computed")
+      tools::md5sum(file.path(root,"matlab/computed_fractional_roots.csv")) else NULL)
   run_alpha <- function(a) {
     checkpoint <- file.path(checkpoint_dir,sprintf("alpha%03d.rds",round(100*parameters$alpha[a])))
     if(file.exists(checkpoint)) {
@@ -102,7 +106,8 @@ rough_tau_run_experiment <- function(parameters=rough_tau_parameters(),
     projection <- rough_tau_projection(mesh,parameters$projection_quadrature)
     values <- lapply(parameters$N,function(N) {
       value <- rough_tau_solve(mesh,parameters$alpha[a],N,parameters$rational_orders[a],
-        parameters$diffusion[a],parameters$T_final,projection,parameters$tail_tolerance)
+        parameters$diffusion[a],parameters$T_final,projection,parameters$tail_tolerance,
+        coefficient_source=parameters$coefficient_source)
       value$states <- value$final_state <- NULL
       message(sprintf("alpha=%.1f, N=%d, error=%.10g, %.2fs",
         parameters$alpha[a],N,value$error,value$elapsed))

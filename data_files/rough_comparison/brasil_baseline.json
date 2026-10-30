@@ -1,0 +1,145 @@
+{
+  "h": {
+    "parameters": {
+      "J": [5, 6, 7, 8, 9],
+      "alpha": [0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9],
+      "time_steps": [0.0005, 0.000125, 3.33333333333333e-05, 1e-05, 3.125e-06, 1e-06, 4e-07, 2e-07],
+      "rational_order": 14,
+      "symmetry_reduction": true,
+      "T_final": 1,
+      "diffusion": 1,
+      "kappa": 4,
+      "projection_quadrature": 16,
+      "tail_tolerance": 1e-13,
+      "fit_J": [7, 8, 9],
+      "forcing": "sum_{j>=1} sin(2^j*pi*x)/j on loop; zero on stem",
+      "reconstruction": "right-constant backward Euler",
+      "error_integration": "analytic time moments, spatial projection residual, bounded infinite tail"
+    },
+    "rates": [
+      {
+        "alpha": 0.5,
+        "theoretical": 0.5,
+        "raw": 0.65761548475013,
+        "corrected": 0.476330445057777,
+        "relative_error_percent": 4.73391098844463
+      },
+      {
+        "alpha": 0.7,
+        "theoretical": 0.7,
+        "raw": 0.8702501519509,
+        "corrected": 0.688965112258546,
+        "relative_error_percent": 1.57641253449338
+      },
+      {
+        "alpha": 0.9,
+        "theoretical": 0.9,
+        "raw": 1.0776252142598,
+        "corrected": 0.896340174567444,
+        "relative_error_percent": 0.406647270283969
+      },
+      {
+        "alpha": 1.1,
+        "theoretical": 1.1,
+        "raw": 1.28478329058837,
+        "corrected": 1.10349825089602,
+        "relative_error_percent": 0.318022808728825
+      },
+      {
+        "alpha": 1.3,
+        "theoretical": 1.3,
+        "raw": 1.49587023682533,
+        "corrected": 1.31458519713298,
+        "relative_error_percent": 1.12193824099819
+      },
+      {
+        "alpha": 1.5,
+        "theoretical": 1.5,
+        "raw": 1.70881338621669,
+        "corrected": 1.52752834652434,
+        "relative_error_percent": 1.83522310162253
+      },
+      {
+        "alpha": 1.7,
+        "theoretical": 1.7,
+        "raw": 1.88502168858991,
+        "corrected": 1.70373664889756,
+        "relative_error_percent": 0.219802876327286
+      },
+      {
+        "alpha": 1.9,
+        "theoretical": 1.9,
+        "raw": 1.97002656050792,
+        "corrected": 1.78874152081557,
+        "relative_error_percent": 5.85570943075945
+      }
+    ]
+  },
+  "tau": {
+    "parameters": {
+      "alpha": [0.5, 0.7, 0.9, 1.1, 1.3, 1.5, 1.7, 1.9],
+      "J": [20, 16, 13, 11, 10, 9, 8, 8],
+      "diffusion": [0.366411405440086, 0.245220389062172, 0.164113448214252, 0.109832726339667, 0.0735054190041477, 0.0491934125923994, 0.0329226317633736, 0.0220334314109805],
+      "rational_orders": [20, 14, 14, 14, 14, 14, 14, 14],
+      "N": [5, 10, 20, 40, 80, 160],
+      "fit_indices": [4, 5, 6],
+      "T_final": 1,
+      "kappa": 4,
+      "projection_quadrature": 16,
+      "tail_tolerance": 1e-13,
+      "forcing": "same fixed infinite L2 forcing as conv_in_h_rough",
+      "reconstruction": "right-constant backward Euler",
+      "error_integration": "exact time moments, stable projection residual, certified infinite tail"
+    },
+    "rates": [
+      {
+        "alpha": 0.5,
+        "theoretical": 1,
+        "observed": 0.993889877569301,
+        "relative_error_percent": 0.611012243069942
+      },
+      {
+        "alpha": 0.7,
+        "theoretical": 1,
+        "observed": 0.994251587744265,
+        "relative_error_percent": 0.574841225573453
+      },
+      {
+        "alpha": 0.9,
+        "theoretical": 1,
+        "observed": 0.994147767938168,
+        "relative_error_percent": 0.585223206183239
+      },
+      {
+        "alpha": 1.1,
+        "theoretical": 1,
+        "observed": 0.994030291725755,
+        "relative_error_percent": 0.59697082742447
+      },
+      {
+        "alpha": 1.3,
+        "theoretical": 1,
+        "observed": 0.994122720965459,
+        "relative_error_percent": 0.587727903454072
+      },
+      {
+        "alpha": 1.5,
+        "theoretical": 1,
+        "observed": 0.994031489322397,
+        "relative_error_percent": 0.596851067760307
+      },
+      {
+        "alpha": 1.7,
+        "theoretical": 1,
+        "observed": 0.993561141702702,
+        "relative_error_percent": 0.643885829729751
+      },
+      {
+        "alpha": 1.9,
+        "theoretical": 1,
+        "observed": 0.99394428040905,
+        "relative_error_percent": 0.605571959094986
+      }
+    ]
+  }
+}

@@ -75,10 +75,17 @@ to $\alpha$; plotting $J E_{h_J}$ removes the leading logarithmic factor.
 The consistent P1 mass and stiffness matrices are assembled on the tadpole
 with `MetricGraph`. Every backward Euler step advances the FEM coefficient
 vector by shifted sparse matrix solves, using the same matrix update as
-`cov_in_h_mat.Rmd`. The rational inverse is obtained from the positive
-BRASIL coefficients in `rSPDE`, with order $m=14$. The constant term of this
-approximant is included in the update. The factorizations are reused across
-all time steps.
+`cov_in_h_mat.Rmd`. The rational inverse uses the operator-based root/factor
+representation with order $m=8$. Coefficients are read directly at
+$\beta=\alpha/2$ from `matlab/computed_fractional_roots.csv`; no
+interpolation in $\beta$ is used. These locally generated Cheb–Padé
+coefficients are distinct from the installed `rSPDE` tables. The
+degree-$m$ numerator and degree-$(m+1)$ denominator give $m+1$ shifted
+solves and no constant term in the update. Factorizations are reused.
+
+This branch retains the same meshes, diffusion, and time steps as the
+BRASIL baseline. The [coefficient comparison](rough_operator_comparison.html)
+also reports order $m=4$ and preserves the original BRASIL results.
 
 The forcing is supported on the loop and has exact reflection symmetries.
 The shifted FEM matrices are restricted to that invariant nodal subspace,
@@ -146,9 +153,11 @@ knitr::kable(rates, digits = c(1, 1, 4, 4, 2),
   caption = "Regression slopes over the three finest meshes.")
 ```
 
-The logarithmic correction accounts for the factor $1/J$ in the error
-model. The remaining differences from $\alpha$ reflect the finite
-refinement range: $J E_h\sim C_\alpha h^\alpha$ is an asymptotic statement.
+The logarithmic correction accounts for the factor $1/J$ in the ideal
+spatial error model. The measured error also contains the fixed-order
+rational approximation error. If that contribution dominates, multiplying
+by $J$ cannot restore the ideal spatial slope. The matched coefficient
+comparison separates that effect from the finite spatial refinement range.
 For $\alpha$ close to $2$, the second-order contribution from low modes
 can remain significant over this mesh range, so the limiting corrected
 slope can take longer to appear.

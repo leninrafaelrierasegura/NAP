@@ -1,0 +1,23 @@
+{
+  "alpha": 0.5,
+  "order": 8,
+  "J": 20,
+  "diffusion": 0.366411405440086,
+  "continuous_time_floor": 0.002900523840632325,
+  "probes": [
+    {
+      "N": 320,
+      "error": 0.00309234619980771,
+      "oracle": 0.0030923371236556575,
+      "relative_difference": 2.9350461122587955e-06,
+      "pure_temporal_error": 0.0010726743297501406
+    },
+    {
+      "N": 640,
+      "error": 0.00294967382201654,
+      "oracle": 0.0029496713454598414,
+      "relative_difference": 8.396042841327394e-07,
+      "pure_temporal_error": 0.0005366756291085706
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 # Rough-forcing temporal experiment
 
+This branch uses the directly computed operator root/factor coefficients
+at order eight, without beta interpolation. `rough_operator_comparison.Rmd`
+also reports order four and the preserved BRASIL baseline. Some small-alpha
+curves have a visible rational approximation floor; their reported slopes
+are not claimed to match first-order temporal convergence on the full range.
+
 `conv_in_tau_rough.Rmd` displays completed matrix-solver results for
 `alpha = seq(0.5, 1.9, 0.2)`. Results are in
 `data_files/rough_tau_results.rds`; figures are in `data_files/rough_tau/`.
@@ -39,5 +45,7 @@ as the spatial experiment. A C++ compiler is required for recomputing, but
 not for displaying saved results. The alpha=0.5 curve needs a very fine mesh;
 recomputation uses about 2 GB of working memory for that curve.
 
-Independent validation, refinement checks and reproduction scripts are kept
-in `/home/rierasl/Desktop/DOCS/NAP/rough_tau_experiment/`.
+The original BRASIL validation is kept in
+`/home/rierasl/Desktop/DOCS/NAP/rough_tau_experiment/`. The branch comparison,
+including direct-product high-precision checks of every new error, is in
+`/home/rierasl/Desktop/DOCS/NAP/rough_operator_comparison/`.
