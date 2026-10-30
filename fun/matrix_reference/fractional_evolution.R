@@ -11,6 +11,10 @@ library(plotly)
 
 
 ## -----------------------------------------------------------------------------
+source(here::here("fun", "brasil_coefficients.R"), local = TRUE)
+
+
+## -----------------------------------------------------------------------------
 # Function to compute the roots and factor for the rational approximation
 my.get.roots <- function(m, # rational order, m = 1, 2, 3, or 4
                          beta # smoothness parameter, beta = alpha/2 with alpha between 0.5 and 2
@@ -143,114 +147,72 @@ compute.partial.fraction.param <- function(factor, # c_m/b_{m+1}
 
 ## -----------------------------------------------------------------------------
 # Function to compute the fractional operator
-my.fractional.operators.frac <- function(L, # Laplacian matrix
-                                         beta, # smoothness parameter beta
-                                         C, # mass matrix (not lumped)
-                                         scale.factor, # scaling parameter = kappa^2
-                                         m = 1, # original package orders 1--4
-                                         time_step, # physical time step = tau
-                                         diffusion = 1, # coefficient outside the fractional power
-                                         fractional_roots = NULL # optional externally validated root/factor list
-                                         ) {
+my.fractional.operators.frac <- function(L, beta, C, scale.factor, m = 1,
+                                         time_step, diffusion = 1,
+                                         fractional_roots = NULL) {
   stopifnot(length(diffusion) == 1L, is.finite(diffusion), diffusion > 0,
             length(time_step) == 1L, is.finite(time_step), time_step > 0,
             length(beta) == 1L, is.finite(beta), beta > 0, beta <= 1,
             length(scale.factor) == 1L, is.finite(scale.factor), scale.factor > 0)
   L <- L / scale.factor
-  if(beta == 1){
+  if (beta == 1) {
     L <- L * scale.factor^beta
-    return(list(C = C, # mass matrix
-                L = L, # Laplacian matrix scaled
-                m = m, # rational order
-                beta = beta, # smoothness parameter
-                diffusion = diffusion,
-                LHS = C + time_step * diffusion * L,
-                factorization = Matrix::Cholesky(
-                  Matrix::forceSymmetric(C + time_step * diffusion * L), LDL = FALSE)
-                ))
-  } else {
-    scaling <- diffusion * scale.factor^beta
-    roots <- if (is.null(fractional_roots)) my.get.roots(m, beta) else fractional_roots
-    if (!is.null(fractional_roots)) {
-      values <- c(roots$pr_roots, roots$pl_roots)
-      stopifnot(length(roots$factor) == 1L, is.finite(roots$factor), roots$factor > 0,
-                length(roots$pr_roots) == m, length(roots$pl_roots) == m + 1L,
-                is.numeric(values), !is.complex(values), all(is.finite(values)), all(values < 0))
-    }
-    poles_rs_k <- compute.partial.fraction.param(factor = roots$factor,
-                                                 pr_roots = roots$pr_roots,
-                                                 pl_roots = roots$pl_roots,
-                                                 time_step = time_step, 
-                                                 scaling = scaling,
-                                                 stable = !is.null(fractional_roots))
-
-    partial_fraction_terms <- list()
-    for (i in 1:(m+1)) {
-      # Here is where the terms in the sum in eq 12 are computed
-      partial_fraction_terms[[i]] <- (L - poles_rs_k$p[i] * C)#/poles_rs_k$r[i]
-      }
-    return(list(C = C, # mass matrix
-                L = L, # Laplacian matrix scaled
-                m = m, # rational order
-                beta = beta, # smoothness parameter
-                partial_fraction_terms = partial_fraction_terms, # partial fraction terms
-                residues = poles_rs_k$r, # residues \{a_k\}_{k=1}^{m+1}
-                poles = poles_rs_k$p,
-                diffusion = diffusion,
-                factorizations = lapply(partial_fraction_terms, function(A) {
-                  Matrix::Cholesky(Matrix::forceSymmetric(A), LDL = FALSE)
-                })
-                ))
+    lhs <- C + time_step * diffusion * L
+    return(list(C = C, L = L, m = m, beta = beta, diffusion = diffusion,
+                LHS = lhs, factorization = Matrix::Cholesky(
+                  Matrix::forceSymmetric(lhs), LDL = FALSE)))
   }
+  scaling <- diffusion * scale.factor^beta
+  if (is.null(fractional_roots)) {
+    coefficients <- brasil_coefficients(m, beta)
+    poles_rs_k <- brasil_partial_fractions(coefficients, time_step, scaling)
+  } else {
+    # Retain the optional legacy root-coefficient interface.
+    roots <- fractional_roots
+    values <- c(roots$pr_roots, roots$pl_roots)
+    stopifnot(length(roots$factor) == 1L, is.finite(roots$factor), roots$factor > 0,
+              length(roots$pr_roots) == m, length(roots$pl_roots) == m + 1L,
+              is.numeric(values), !is.complex(values), all(is.finite(values)), all(values < 0))
+    poles_rs_k <- compute.partial.fraction.param(roots$factor, roots$pr_roots,
+      roots$pl_roots, time_step, scaling, stable = TRUE)
+  }
+  partial_fraction_terms <- lapply(poles_rs_k$p, function(p) L - p * C)
+  remainder <- if (length(poles_rs_k$k)) poles_rs_k$k else 0
+  list(C = C, L = L, m = m, beta = beta, diffusion = diffusion,
+       partial_fraction_terms = partial_fraction_terms,
+       residues = poles_rs_k$r, poles = poles_rs_k$p, remainder = remainder,
+       mass_factor = if (remainder != 0) Matrix::Cholesky(
+         Matrix::forceSymmetric(C), LDL = FALSE) else NULL,
+       factorizations = lapply(partial_fraction_terms, function(A)
+         Matrix::Cholesky(Matrix::forceSymmetric(A), LDL = FALSE)))
 }
+
 
 
 ## -----------------------------------------------------------------------------
 # Function to solve the iteration
-my.solver.frac <- function(obj, # object returned by my.fractional.operators.frac()
-                           v # vector to be solved for
-                           ){
-  beta <- obj$beta
-  m <- obj$m
-  if (beta == 1){
+my.solver.frac <- function(obj, v) {
+  if (obj$beta == 1) {
     return(if (!is.null(obj$factorization))
-      solve(obj$factorization, v, system = "A") else solve(obj$LHS, v)
-           )
-  } else {
-    partial_fraction_terms <- obj$partial_fraction_terms
-    residues <- obj$residues
-    output <- v*0
-    for (i in seq_len(m + 1L)) {
-      solved <- if (!is.null(obj$factorizations)) {
-        solve(obj$factorizations[[i]], v, system = "A")
-      } else solve(partial_fraction_terms[[i]], v)
-      output <- output + residues[i] * solved
-    }
-    return(output # solve the linear system using the partial fraction decomposition
-           )
+      solve(obj$factorization, v, system = "A") else solve(obj$LHS, v))
   }
+  partial_fraction_terms <- obj$partial_fraction_terms
+  residues <- obj$residues
+  output <- v * 0
+  if (!is.null(obj$remainder) && obj$remainder != 0) {
+    mass_solved <- if (!is.null(obj$mass_factor))
+      solve(obj$mass_factor, v, system = "A") else solve(obj$C, v)
+    output <- obj$remainder * mass_solved
+  }
+  for (i in seq_along(residues)) {
+    solved <- if (!is.null(obj$factorizations)) {
+      solve(obj$factorizations[[i]], v, system = "A")
+    } else solve(partial_fraction_terms[[i]], v)
+    output <- output + residues[i] * solved
+  }
+  return(output)
 }
 
-# my.solver.frac <- function(obj, v) {
-#   beta <- obj$beta
-#   m <- obj$m
-#   
-#   if (beta == 1) {
-#     return(solve(obj$LHS, v))
-#   } 
-#   
-#   partial_fraction_terms <- obj$partial_fraction_terms
-#   residues <- obj$residues
-#   
-#   # --- PARALLEL PART ---
-#   results <- parallel::mclapply(
-#     1:(m+1),
-#     function(i) residues[i] * solve(partial_fraction_terms[[i]], v),
-#     mc.cores = parallel::detectCores()  
-#   )
-#   
-#   return(Reduce(`+`, results))
-# }
 
 
 ## -----------------------------------------------------------------------------

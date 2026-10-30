@@ -93,19 +93,20 @@ captioner <- function(caption) {
 
 
 ::: {.custom-box}
-To study convergence in $h$, we keep the time step $\tau$ and rational order $m$ fixed. Theorem `lastlasttheorem` in `paper/main.tex` gives
+To study convergence in $h$, we keep the time step $\tau$ and rational order $m$ fixed. Writing $E_m^{\mathrm{BRASIL}}$ for the uniform direct-power approximation error, the rational-error argument of Theorem `lastlasttheorem` in `paper/main.tex` gives
 $$
 E\lesssim\tau+h^{\alpha-\epsilon}
-+h^{\alpha-2}\exp\!\left(-2\pi\sqrt{(1-\alpha/2)m}\right),
++E_m^{\mathrm{BRASIL}},
 \qquad 0<\alpha<2.
 $$
 The spatial term gives a reference slope $\alpha-\epsilon$ in a regression of $\log_{10}E$ against $\log_{10}h$; the plotted reference slopes use $\alpha$, neglecting a sufficiently small $\epsilon$. This upper bound does not require the observed slope to equal $\alpha$: the smooth finite-mode data used here may show second-order convergence. Temporal, rational, and reference-quadrature errors should be checked independently so they do not mask spatial convergence. In particular, fixing $m$ does not guarantee that the rational error remains negligible as $h$ decreases.
 :::
 
 The physical equation is $u_t+\nu L^{\alpha/2}u=f$, with `diffusion` $=\nu>0$.
-Keep diffusion fixed along each refinement curve. The original meshes, package
-coefficients, interval-averaged forcing, and right-constant reference-time
-quadrature are retained. `error_method = "compressed"` evaluates the same
+Keep diffusion fixed along each refinement curve. The meshes, interval-averaged forcing, and right-constant reference-time
+quadrature are retained. Rational coefficients now come from rSPDE BRASIL
+at $\beta=\alpha/2$, including its constant term. The same shifted sparse
+matrix solver reuses Cholesky factors, with one additional mass-matrix solve. `error_method = "compressed"` evaluates the same
 reference-matrix norm using centered coefficient moments. It still advances
 every FEM/backward Euler step and needs no discrete eigenfunction identities.
 Use `error_method = "reference"` for the original accumulator. Execution
@@ -114,7 +115,8 @@ The spatial forcing load $(e_7,\psi_h^i)_{L_2(\Gamma)}$ is assembled
 analytically on the solver mesh. The reference mesh is used for the error norm.
 
 Set the global `eval` option above to `TRUE` to reload the saved errors and
-regenerate the plots. The heavy setup and convergence computation remain in an
+regenerate the plots. Saved outputs must be recomputed for BRASIL;
+coefficient metadata prevents loading an earlier root-table run as BRASIL. The heavy setup and convergence computation remain in an
 explicitly disabled chunk; run that chunk manually only when recomputing.
 With global `eval = FALSE`, the explicitly enabled chunks display the saved
 figure and send its Slack update. Results and figures use fixed names under
@@ -159,11 +161,11 @@ coeff_FF[7] <- 10
 AAA = 1
 OMEGA = pi
 
-h_vector <- 10^seq(log10(0.005), log10(0.5), length.out = 6)
+h_vector <- 2^seq(-7, -3)
 alpha_vector <- seq(0.5, 1.9, 0.2)
 
 # Keep the rational order and actual uniform time grid fixed across all runs.
-m_fixed <- 4
+m_fixed <- 8
 time_step_target <- 2e-5
 time_grid <- make_time_grid(T_final = T_final, target_step = time_step_target)
 time_step <- time_grid$time_step
@@ -263,13 +265,15 @@ for (i in seq_along(h_vector)) {
       channel = "#research")
   }
 }
+attr(errors_projected, "coefficient_source") <- "rSPDE BRASIL"
 save(errors_projected, file = here::here("data_files/errors_projected_h_mat.RData"))
 ```
 
 
 ```{r}
-# Load the errors_projected data
+# Load BRASIL errors; earlier root-table outputs require recomputation.
 load(here::here("data_files/errors_projected_h_mat.RData"))
+stopifnot(identical(attr(errors_projected, "coefficient_source"), "rSPDE BRASIL"))
 ```
 
 

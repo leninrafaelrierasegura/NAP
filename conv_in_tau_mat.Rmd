@@ -97,9 +97,10 @@ To study convergence in $\tau$, we keep the spatial mesh size $h$ and rational o
 :::
 
 The physical equation is $u_t+\nu L^{\alpha/2}u=f$, with `diffusion` $=\nu>0$.
-Keep diffusion fixed along each refinement curve. The original meshes, package
-coefficients, interval-averaged forcing, and right-constant reference-time
-quadrature are retained. `error_method = "compressed"` evaluates the same
+Keep diffusion fixed along each refinement curve. The meshes, interval-averaged forcing, and right-constant reference-time
+quadrature are retained. Rational coefficients now come from rSPDE BRASIL
+at $\beta=\alpha/2$, including its constant term. The same shifted sparse
+matrix solver reuses Cholesky factors, with one additional mass-matrix solve. `error_method = "compressed"` evaluates the same
 reference-matrix norm using centered coefficient moments. It still advances
 every FEM/backward Euler step and needs no discrete eigenfunction identities.
 Use `error_method = "reference"` for the original accumulator. Execution
@@ -108,7 +109,8 @@ The spatial forcing load $(e_7,\psi_h^i)_{L_2(\Gamma)}$ is assembled
 analytically on the solver mesh. The reference mesh is used for the error norm.
 
 Set the global `eval` option above to `TRUE` to reload the saved errors and
-regenerate the plots. The heavy setup and convergence computation remain in an
+regenerate the plots. Saved outputs must be recomputed for BRASIL;
+coefficient metadata prevents loading an earlier root-table run as BRASIL. The heavy setup and convergence computation remain in an
 explicitly disabled chunk; run that chunk manually only when recomputing.
 With global `eval = FALSE`, the explicitly enabled chunks display the saved
 figure and send its Slack update. Results and figures use fixed names under
@@ -155,9 +157,9 @@ AAA = 1
 OMEGA = pi
 
 # Requested time steps and fixed spatial mesh size.
-tau_targets <- 10^seq(log10(0.005), log10(0.5), length.out = 6)
+tau_targets <- T_final / c(200L, 80L, 32L, 13L, 6L, 2L)
 h_fixed <- 1e-3
-m_fixed <- 4
+m_fixed <- 8
 alpha_vector <- seq(0.5, 1.9, 0.2)
 
 # Use the actual uniform steps in both the solver and the convergence fit.
@@ -265,12 +267,14 @@ for (j in seq_along(alpha_vector)) {
       channel = "#research")
   }
 }
+attr(errors_projected, "coefficient_source") <- "rSPDE BRASIL"
 save(errors_projected, file = here::here("data_files/errors_projected_tau_mat.RData"))
 ```
 
 ```{r}
-# Load the errors_projected data
+# Load BRASIL errors; earlier root-table outputs require recomputation.
 load(here::here("data_files/errors_projected_tau_mat.RData"))
+stopifnot(identical(attr(errors_projected, "coefficient_source"), "rSPDE BRASIL"))
 ```
 
 

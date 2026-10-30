@@ -22,11 +22,10 @@ appear below. There are no run IDs, hashes, saved result files, or automatic
 refinement experiments. Knitting produces the usual HTML report.
 
 ```{r settings}
-h <- 0.01
-tau <- 1e-4
-m_max <- 4L
-coefficient_source <- "computed"  # "computed": m <= 8; "package": m <= 4
-computed_coefficient_file <- here::here("matlab", "computed_fractional_roots.csv")
+h <- 0.02
+tau <- 0.005
+m_max <- 14L
+coefficient_source <- "brasil"  # rSPDE m_brasil<m>t tables; keep their constant term
 
 alpha_vector <- seq(0.5, 1.9, 0.2)
 T_final <- 1
@@ -36,8 +35,9 @@ diffusion <- 1
 
 The data are $u_0=10e_5$ and $f(t)=10\sin(\pi t)e_7$ on the tadpole
 with edge lengths 1 and 2. `diffusion` multiplies the fractional power.
-Computed coefficients require an exact stored $\beta=\alpha/2$; the supplied
-CSV supports $\alpha=0.5,0.9,1.3$. Package roots use linear interpolation.
+BRASIL coefficients use the stored $\beta=\alpha/2$ row when available
+and linear interpolation otherwise. Available orders come from the installed
+rSPDE BRASIL tables.
 The integer case $\alpha=2$ bypasses rational approximation.
 
 ## Load and check
@@ -61,7 +61,7 @@ library(ggplot2)
 # source(helper_file, local = TRUE)
 # unlink(helper_file)
 
-coefficient_source <- match.arg(coefficient_source, c("computed", "package"))
+coefficient_source <- match.arg(coefficient_source, "brasil")
 stopifnot(length(h) == 1L, is.finite(h), h > 0,
           length(tau) == 1L, is.finite(tau), tau > 0,
           length(T_final) == 1L, is.finite(T_final), T_final > 0,
@@ -106,8 +106,9 @@ U_h^{k+1}=V\operatorname{diag}\!\left(
 V^\top(CU_h^k+\tau F^{k+1}).
 \]
 The rational solution uses shifted sparse solves, with their factorizations
-reused at every time step. Both solutions use the same analytically integrated
-loads and interval-averaged forcing. We measure
+reused at every time step. The BRASIL constant contributes an additional
+solve with the same consistent mass matrix. Both solutions use the same
+analytically integrated loads and interval-averaged forcing. We measure
 \[
 E_m=\left[\tau\sum_{k=1}^{N}
 (U_h^k-U_{h,m}^k)^\top C(U_h^k-U_{h,m}^k)\right]^{1/2}.
@@ -143,7 +144,7 @@ knitr::kable(errors, format.args = list(scientific = TRUE, digits = 5))
 
 ## Plot and slopes
 
-Dashed lines show the benchmark exponent $-2\pi\sqrt{1-\alpha/2}$,
+Dashed lines show the benchmark exponent $-2\pi\sqrt{\alpha/2}$,
 anchored at the first order; their heights are not proved bound constants.
 Open circles mark errors below an empirical numerical-resolution indicator.
 Those points should not be used to claim an asymptotic convergence rate.
@@ -155,7 +156,7 @@ guides <- plot_data
 for (alpha in alpha_vector) {
   index <- which(guides$alpha == alpha)
   guides$error[index] <- guides$error[index[1]] *
-    exp(-2 * pi * sqrt(1 - alpha / 2) * (sqrt(guides$m[index]) - 1))
+    exp(-2 * pi * sqrt(alpha / 2) * (sqrt(guides$m[index]) - 1))
 }
 p_m_isolated <- ggplot(plot_data, aes(sqrt(m), error, colour = alpha_label,
                                      group = alpha_label)) +
@@ -182,7 +183,7 @@ fit_slope <- function(d) {
 }
 slopes <- do.call(rbind, lapply(alpha_vector, function(a) {
   d <- results[results$alpha == a, ]
-  data.frame(alpha = a, benchmark = -2*pi*sqrt(1-a/2),
+  data.frame(alpha = a, benchmark = -2*pi*sqrt(a/2),
     all_orders_slope = fit_slope(d), resolved_orders = sum(d$resolved),
     resolved_only_slope = fit_slope(d[d$resolved, ]))
 }))
@@ -192,7 +193,8 @@ knitr::kable(slopes, digits = 5)
 ## Numerical checks
 
 `product_error` independently evolves the rational solution in the complete
-numerical eigenbasis, evaluating the root product directly. Its agreement
+numerical eigenbasis, evaluating the supplied BRASIL inverse approximation
+directly, including its constant term and without the time-step partial fractions. Its agreement
 with the sparse result checks the implementation. The resolution indicator
 uses the larger of that disagreement and the classical BE control error;
 it is a diagnostic, not a certified error bound.
@@ -216,27 +218,15 @@ contributions. Changing `h` or `tau` changes this finite-dimensional experiment.
 
 This section uses `coefficient_source` for every noninteger `alpha`
 in `alpha_vector`, with $m=1,\ldots,\mathtt{m\_max}$, using the same
-`m_vector` as the matrix-error plot. Write $\beta=\alpha/2$. The stored roots define
+`m_vector` as the matrix-error plot. Write $\beta=\alpha/2$. The BRASIL
+coefficients define
 \[
-\rho_{m,\beta}(t)=\mathrm{factor}\,
-\frac{\prod_{j=1}^{m}(t-r_{c,j})}
-     {\prod_{j=1}^{m+1}(t-r_{b,j})}
-\approx t^{\beta-1}.
+r_{m,\beta}(y)=d_m+\sum_{j=1}^{m}\rho_j(y-\eta_j)^{-1}
+\approx y^{-\beta}.
 \]
-The inverse-power approximation used by the solver is therefore
-\[
-r_{m,\beta}(x)=\frac{\rho_{m,\beta}(1/x)}{x}
-=\mathrm{factor}\,
-\frac{\prod_{j=1}^{m}(1-r_{c,j}x)}
-     {\prod_{j=1}^{m+1}(1-r_{b,j}x)}
-\approx x^{-\beta}.
-\]
-We plot $|r_{m,\beta}(x)-x^{-\beta}|$ on the common interval
-$[1,10^3]$. This is contained in every coefficient-generation interval
-$[1,10^{(5+m)/2}]$, so all orders are compared on the same domain.
-These are scalar function errors; they are independent of the mesh and time
-step. The integer case $\alpha=2$ is omitted because the solver evaluates it
-exactly without CSV coefficients.
+We plot $|r_{m,\beta}(y)-y^{-\beta}|$ on the common interval $[1,10^3]$.
+These scalar errors are independent of the mesh and time step. The integer
+case $\alpha=2$ is omitted because it is evaluated exactly.
 
 ```{r scalar-error-data}
 scalar_m_vector <- m_vector
@@ -251,12 +241,8 @@ for (scalar_alpha in scalar_alpha_vector) {
   for (scalar_m in scalar_m_vector) {
     scalar_roots <- my.get.roots(scalar_m, scalar_beta,
                                 coefficient_source = coefficient_source)
-    # Evaluate products in log form and avoid subtracting nearly equal values.
-    scalar_log_r <- log(scalar_roots$factor) +
-      rowSums(log1p(-outer(scalar_x, scalar_roots$pr_roots))) -
-      rowSums(log1p(-outer(scalar_x, scalar_roots$pl_roots)))
-    scalar_error <- abs(exp(-scalar_beta * log(scalar_x)) *
-                          expm1(scalar_log_r + scalar_beta * log(scalar_x)))
+    scalar_error <- abs(brasil_inverse(scalar_x, scalar_roots) -
+                          scalar_x^(-scalar_beta))
     stopifnot(all(is.finite(scalar_error)))
     scalar_rows[[length(scalar_rows) + 1L]] <- data.frame(
       alpha = scalar_alpha, m = scalar_m, x = scalar_x,
@@ -297,7 +283,7 @@ The maximum below is sampled on a logarithmic grid, including both endpoints;
 it is not a certified uniform error bound.
 For comparison with the matrix-error plot, the axes use the same
 $\sqrt{m}$ positions and natural-log error scale. Dashed lines use the same
-benchmark exponent $-2\pi\sqrt{1-\alpha/2}$, anchored at each scalar error
+benchmark exponent $-2\pi\sqrt{\alpha/2}$, anchored at each scalar error
 at $m=1$; they are reference slopes, not proved scalar-error bounds.
 
 ```{r scalar-error-convergence, fig.width=8, fig.height=5}
@@ -310,7 +296,7 @@ if (!is.null(scalar_errors)) {
     scalar_anchor <- scalar_index[scalar_guides$m[scalar_index] == 1L]
     scalar_guides$absolute_error[scalar_index] <-
       scalar_max_errors$absolute_error[scalar_anchor] *
-      exp(-2 * pi * sqrt(1 - scalar_alpha / 2) *
+      exp(-2 * pi * sqrt(scalar_alpha / 2) *
             (sqrt(scalar_guides$m[scalar_index]) - 1))
   }
   p_scalar_error_m <- ggplot(scalar_max_errors,
@@ -333,17 +319,14 @@ if (!is.null(scalar_errors)) {
 ## Scalar error on [0.001,1]
 
 On $[0.001,1]$ we compare the bounded function $x^\beta$, $\beta=\alpha/2$,
-with the transformed rational approximation
+with the direct BRASIL approximation
 \[
-q_{m,\beta}(x)=x\rho_{m,\beta}(x)
-=x\,\mathrm{factor}\,
-\frac{\prod_{j=1}^{m}(x-r_{c,j})}
-     {\prod_{j=1}^{m+1}(x-r_{b,j})}.
+B_{m,\beta}(x)=r_{m,\beta}(1/x)
+=d_m+\sum_{j=1}^{m}\frac{\rho_jx}{1-\eta_jx}.
 \]
-These plots use `coefficient_source`
-and all noninteger values in `alpha_vector`, with orders from `m_vector`.
-The grid is the exact reciprocal of the preceding scalar plot's grid on
-$[1,1000]$. Their sampled maximum errors therefore agree up to roundoff.
+These plots use the same coefficients and orders as the matrix solution.
+The grid is the exact reciprocal of the preceding scalar grid on $[1,1000]$;
+their sampled maximum errors therefore agree up to roundoff.
 
 ```{r unit-interval-error-data}
 unit_m_vector <- m_vector
@@ -355,12 +338,7 @@ for (unit_alpha in unit_alpha_vector) {
   for (unit_m in unit_m_vector) {
     unit_roots <- my.get.roots(unit_m, unit_beta,
                               coefficient_source = coefficient_source)
-    unit_log_rho <- log(unit_roots$factor) +
-      rowSums(log(outer(unit_x, -unit_roots$pr_roots, "+"))) -
-      rowSums(log(outer(unit_x, -unit_roots$pl_roots, "+")))
-    unit_log_x <- log(unit_x)
-    unit_error <- abs(exp(unit_beta * unit_log_x) *
-      expm1(unit_log_rho + (1 - unit_beta) * unit_log_x))
+    unit_error <- abs(brasil_power(unit_x, unit_roots) - unit_x^unit_beta)
     stopifnot(all(is.finite(unit_error)))
     unit_rows[[length(unit_rows) + 1L]] <- data.frame(
       alpha = unit_alpha, m = unit_m, x = unit_x, absolute_error = unit_error)
@@ -386,7 +364,7 @@ if (!is.null(unit_errors)) {
     facet_wrap(~ alpha_label, nrow = 1) +
     scale_x_continuous(limits = c(0.001, 1), breaks = c(0.001, 0.25, 0.5, 0.75, 1)) +
     scale_y_continuous(labels = scales::label_scientific()) +
-    labs(x = "x", y = "Absolute error |x rho_m(x) - x^(alpha/2)|",
+    labs(x = "x", y = "Absolute error |B_m(x) - x^(alpha/2)|",
       colour = "m",
       subtitle = sprintf("%s coefficients; interval [0.001, 1]", coefficient_source)) +
     theme_minimal() +
@@ -398,9 +376,9 @@ if (!is.null(unit_errors)) {
 
 For comparison with the matrix-error plot, the convergence plot uses
 $\sqrt{m}$ positions and a natural-log error scale, with the same reference
-exponent $-2\pi\sqrt{1-\alpha/2}$ anchored at $m=1$.
+exponent $-2\pi\sqrt{\alpha/2}$ anchored at $m=1$.
 These dashed lines are comparison slopes, not proved bounds for
-$|q_{m,\beta}(x)-x^\beta|$. The maxima are sampled, not certified uniform bounds.
+$|B_{m,\beta}(x)-x^\beta|$. The maxima are sampled, not certified uniform bounds.
 
 ```{r unit-interval-error-convergence, fig.width=8, fig.height=5}
 if (!is.null(unit_errors)) {
@@ -412,7 +390,7 @@ if (!is.null(unit_errors)) {
     unit_anchor <- unit_index[unit_guides$m[unit_index] == 1L]
     unit_guides$absolute_error[unit_index] <-
       unit_max_errors$absolute_error[unit_anchor] *
-      exp(-2 * pi * sqrt(1 - unit_alpha / 2) *
+      exp(-2 * pi * sqrt(unit_alpha / 2) *
             (sqrt(unit_guides$m[unit_index]) - 1))
   }
   p_unit_error_m <- ggplot(unit_max_errors,
@@ -441,15 +419,15 @@ allows order-dependent intervals, as in the thesis example.
 
 For $z=1/x$ the approximations satisfy the exact identity
 \[
-q_{m,\beta}(x)=x\rho_{m,\beta}(x)=r_{m,\beta}(1/x),
+B_{m,\beta}(x)=r_{m,\beta}(1/x),
 \qquad
-|q_{m,\beta}(x)-x^\beta|
+|B_{m,\beta}(x)-x^\beta|
 =|r_{m,\beta}(z)-z^{-\beta}|.
 \]
 Consequently,
 \[
 \sup_{z\in[1,1/\delta_m]}|r_{m,\beta}(z)-z^{-\beta}|
-=\sup_{x\in[\delta_m,1]}|q_{m,\beta}(x)-x^\beta|.
+=\sup_{x\in[\delta_m,1]}|B_{m,\beta}(x)-x^\beta|.
 \]
 The comparison below uses the thesis convention
 $\delta_m=10^{-(5+m)/2}$ by default. Set `reciprocal_domain` to `"common"`
@@ -459,10 +437,10 @@ their sampled maxima should agree up to roundoff. No Jacobian is needed
 for this supremum norm.
 
 The thesis example uses BRASIL partial-fraction coefficients with orders
-up to 14 and ten uniformly spaced samples in each interval. Here we retain
-the selected root tables, orders from `m_vector`, and dense logarithmic sampling.
-Reciprocity gives equality within either coefficient family; it does not
-require their convergence rates to coincide.
+up to 14 and ten uniformly spaced samples in each interval. Here we use the
+same BRASIL coefficient family, orders from `m_vector`, and dense logarithmic
+sampling. Reciprocity gives equality of the two errors for each order;
+it does not determine their convergence rate.
 
 ```{r reciprocal-error-comparison-data}
 reciprocal_domain <- "order-dependent"  # "common" uses [1,1000] and [0.001,1].
@@ -477,16 +455,10 @@ for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
     reciprocal_x <- 1 / reciprocal_z
     reciprocal_roots <- my.get.roots(reciprocal_m, reciprocal_beta,
                                      coefficient_source = coefficient_source)
-    reciprocal_log_r <- log(reciprocal_roots$factor) +
-      rowSums(log1p(-outer(reciprocal_z, reciprocal_roots$pr_roots))) -
-      rowSums(log1p(-outer(reciprocal_z, reciprocal_roots$pl_roots)))
-    reciprocal_log_rho <- log(reciprocal_roots$factor) +
-      rowSums(log(outer(reciprocal_x, -reciprocal_roots$pr_roots, "+"))) -
-      rowSums(log(outer(reciprocal_x, -reciprocal_roots$pl_roots, "+")))
-    reciprocal_large_error <- abs(reciprocal_z^(-reciprocal_beta) *
-      expm1(reciprocal_log_r + reciprocal_beta * log(reciprocal_z)))
-    reciprocal_unit_error <- abs(reciprocal_x^reciprocal_beta *
-      expm1(reciprocal_log_rho + (1 - reciprocal_beta) * log(reciprocal_x)))
+    reciprocal_large_error <- abs(brasil_inverse(reciprocal_z, reciprocal_roots) -
+                                   reciprocal_z^(-reciprocal_beta))
+    reciprocal_unit_error <- abs(brasil_power(reciprocal_x, reciprocal_roots) -
+                                  reciprocal_x^reciprocal_beta)
     reciprocal_gap <- max(abs(reciprocal_large_error - reciprocal_unit_error))
     stopifnot(all(is.finite(c(reciprocal_large_error, reciprocal_unit_error))),
               reciprocal_gap <= 1e-12)
@@ -519,7 +491,7 @@ if (!is.null(reciprocal_checks)) {
     reciprocal_anchor <- reciprocal_checks$large_interval_error[
       reciprocal_checks$alpha == reciprocal_alpha & reciprocal_checks$m == 1L]
     reciprocal_guides$error[reciprocal_index] <- reciprocal_anchor *
-      exp(-2 * pi * sqrt(1 - reciprocal_alpha / 2) *
+      exp(-2 * pi * sqrt(reciprocal_alpha / 2) *
             (sqrt(reciprocal_guides$m[reciprocal_index]) - 1))
   }
 }
