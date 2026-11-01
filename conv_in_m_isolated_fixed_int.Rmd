@@ -1,0 +1,369 @@
+---
+title: "Isolated rational convergence in m: fixed BRASIL interval"
+output:
+  html_document:
+    toc: true
+    theme: flatly
+    code_folding: show
+    self_contained: true
+    css: !expr here::here("style.css")
+---
+
+This experiment compares rational backward Euler with exact-discrete fractional
+backward Euler on the **same assembled P1 FEM operator**, using the same
+initial data, forcing and time steps as `conv_in_m_isolated.Rmd`.
+It computes fresh BRASIL coefficients on **one fixed interval for every order**.
+The complete numerical eigensystem determines the spectral interval and the
+reference solution; the rational solution uses shifted sparse solves.
+
+## Choose the experiment
+
+Edit these settings and run all chunks or Knit. Coefficients are generated at
+the requested exponents without table interpolation. Results and coefficients
+stay in memory; knitting creates the HTML report. A first full run takes a few
+minutes. Python setup is described in `fun/fixed_int/README.md`.
+
+```{r settings}
+h <- 0.02
+tau <- 0.005
+m_max <- 14L
+alpha_vector <- seq(0.5, 1.9, 0.2)
+T_final <- 1
+kappa <- 4
+diffusion <- 1
+
+fixed_x_min <- NULL       # Automatic: min(kappa^2/lambda_max, 1/diagnostic_y_max).
+diagnostic_y_max <- 1e3   # Also cover the original scalar interval [1,1000].
+coefficient_digits <- 70L
+coefficient_tolerance <- 1e-8
+coefficient_max_iterations <- 2000L
+coefficient_workers <- 2L
+python <- Sys.getenv("NAP_BRASIL_PYTHON", unset = "") # Default: .venv-fixed-int/bin/python.
+compare_package_tables <- TRUE
+scalar_grid_points <- 10001L
+```
+
+The physical data are $u_0=10e_5$ and $f(t)=10\sin(\pi t)e_7$ on the
+tadpole with edge lengths 1 and 2. The equation is
+$u_t+\nu L^{\alpha/2}u=f$, where `diffusion` is $\nu$.
+The integer case $\alpha=2$ uses ordinary backward Euler exactly and requires
+no fitted coefficients. The fixed-interval orders are independent of the
+orders available in the installed rSPDE tables.
+
+## Assemble the problem and choose the interval
+
+```{r setup, message=FALSE}
+knitr::opts_chunk$set(cache = FALSE, echo = TRUE, message = FALSE)
+library(Matrix)
+library(ggplot2)
+source(here::here("fun", "fixed_int", "experiment.R"), local = TRUE)
+
+stopifnot(length(h)==1L,is.finite(h),h>0,
+  length(tau)==1L,is.finite(tau),tau>0,
+  length(T_final)==1L,is.finite(T_final),T_final>0,
+  length(kappa)==1L,is.finite(kappa),kappa>0,
+  length(diffusion)==1L,is.finite(diffusion),diffusion>0,
+  length(m_max)==1L,is.finite(m_max),m_max>=2,m_max==floor(m_max),
+  length(alpha_vector)>0L,!anyDuplicated(alpha_vector),all(is.finite(alpha_vector)),
+  all(alpha_vector>=0.5 & alpha_vector<=2),
+  length(scalar_grid_points)==1L,is.finite(scalar_grid_points),
+  scalar_grid_points>=3,scalar_grid_points==floor(scalar_grid_points))
+N <- round(T_final/tau)
+if (!is.finite(N) || N<1 || N>1e6 ||
+    abs(T_final/tau-N)>64*.Machine$double.eps*max(1,N))
+  stop("Choose T_final/tau to be an integer between 1 and 1e6.")
+time_seq <- (0:N)*tau
+m_vector <- seq_len(m_max)
+fractional_alphas <- alpha_vector[alpha_vector!=2]
+data <- fixed_int_tadpole_data(h,kappa)
+spectrum <- fixed_int_discrete_spectrum(data$C,data$L)
+fitting_interval <- fixed_int_interval(spectrum,kappa,fixed_x_min,diagnostic_y_max)
+knitr::kable(data.frame(h_requested=h,h_min=data$h_min,h_max=data$h_max,
+  tau=tau,steps=N,dimension=nrow(data$C),
+  normalized_eigenvalue_max=fitting_interval$spectral_y_max,
+  fixed_x_min=fitting_interval$x_min,fixed_x_max=fitting_interval$x_max),digits=10)
+data$mesh_backend
+```
+
+For $\mathbf L=\kappa^2\mathbf C+\mathbf G$, compute
+$\mathbf LV=\mathbf CV\Lambda$ and $V^\top\mathbf CV=I$.
+The normalized eigenvalues are $y_j=\lambda_j/\kappa^2$.
+The fitting interval is
+\[
+J=[\delta,1],\qquad
+\delta=\min\!\left(\frac{\kappa^2}{\lambda_{\max,h}},
+                         \frac{1}{\mathtt{diagnostic\_y\_max}}\right).
+\]
+This one interval covers the full reciprocal FEM spectrum and the original
+scalar diagnostic. It stays fixed as $m$ varies. An explicit `fixed_x_min`
+can extend the interval toward zero; a value that misses the spectrum or
+scalar diagnostic is rejected. Changing `h` or `kappa` requires regenerating
+the coefficients, which this notebook does on every run.
+
+## Compute the BRASIL coefficients
+
+For each $\beta=\alpha/2$ and $m$, BRASIL computes a degree-$(m,m)$
+approximation $B_{m,\beta}(x)\approx x^\beta$ on $J$.
+Fitting and conversion to partial fractions use extended precision.
+Only the final coefficients passed to the sparse solver are rounded to doubles:
+\[
+S_{m,\beta}(y)=B_{m,\beta}(1/y)
+=d_m+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j}.
+\]
+The constant $d_m=B_{m,\beta}(0)$ is retained. Every fit must converge,
+satisfy signed equioscillation, reconstruct its barycentric representation,
+and have distinct negative poles, positive residues and $d_m\ge0$.
+
+```{r coefficients}
+coefficient_bank <- fixed_int_generate(
+  betas=fractional_alphas/2,orders=m_vector,interval=fitting_interval,
+  digits=coefficient_digits,tolerance=coefficient_tolerance,
+  max_iterations=coefficient_max_iterations,workers=coefficient_workers,python=python)
+coefficient_diagnostics <- coefficient_bank$diagnostics
+if (nrow(coefficient_diagnostics)) {
+  knitr::kable(aggregate(cbind(deviation,equioscillation_gap,double_conversion_gap)~beta,
+    coefficient_diagnostics,max),digits=10)
+  coefficient_bank$toolchain
+}
+```
+
+## The matrix update and isolated error
+
+The rational scheme is the same inverse-power scheme derived in
+[BRASIL functionality](brasilfunctionality.html#num_scheme), equation (9).
+Writing $a=\tau\nu\kappa^{2\beta}$, its time-step multiplier is
+\[
+H_m(y)=\frac{S_{m,\beta}(y)}{S_{m,\beta}(y)+a}
+=c+\sum_{j=1}^m\frac{w_j}{y-q_j},\qquad
+c=\frac{d_m}{d_m+a}.
+\]
+The source poles/residues $(\eta_j,\rho_j)$ differ from the time-step
+poles/residues $(q_j,w_j)$. Real scalar bracketing finds the latter without
+forming polynomial products. The checked source signs give $q_j<0$ and $w_j>0$.
+At each step, with interval-averaged forcing, the implementation computes
+\[
+\begin{aligned}
+\mathbf b^{k+1}&=\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1},\\
+\mathbf U_m^{k+1}
+&=c\mathbf C^{-1}\mathbf b^{k+1}
+  +\sum_{j=1}^m w_j(\mathbf L/\kappa^2-q_j\mathbf C)^{-1}\mathbf b^{k+1}.
+\end{aligned}
+\]
+Each sparse Cholesky factorization is reused throughout the time history.
+The reference uses the exact discrete multipliers
+$1/(1+\tau\nu\lambda_j^\beta)$ on the same mesh and time grid. The error is
+\[
+E_m=\left[\tau\sum_{k=1}^{N}
+  (\mathbf U_h^k-\mathbf U_m^k)^\top\mathbf C
+  (\mathbf U_h^k-\mathbf U_m^k)\right]^{1/2}.
+\]
+
+```{r compute}
+references <- lapply(alpha_vector,function(alpha)
+  fixed_int_reference(data$C,spectrum,data$initial,data$spatial_load,
+                      time_seq,alpha,diffusion))
+control_reference <- fixed_int_reference(data$C,spectrum,data$initial,
+  data$spatial_load,time_seq,alpha=2,diffusion=diffusion)
+control <- fixed_int_error(data,spectrum,control_reference,m=1L)
+rows <- list()
+for (reference in references) for (m in m_vector)
+  rows[[length(rows)+1L]] <- fixed_int_error(data,spectrum,reference,m,bank=coefficient_bank)
+results <- fixed_int_mark_resolution(do.call(rbind,rows),control$error)
+errors <- matrix(results$error,nrow=length(m_vector),
+  dimnames=list(m=m_vector,alpha=alpha_vector))
+knitr::kable(errors,format.args=list(scientific=TRUE,digits=5))
+```
+
+## Convergence and numerical resolution
+
+Open circles mark errors below the empirical resolution indicator:
+the larger of the sparse/eigenbasis error disagreement and the ordinary
+backward Euler control error, multiplied by 100. Slopes use resolved points
+only. Dashed lines show the original root-exponential benchmark
+$-2\pi\sqrt{\alpha/2}$, anchored at $m=1$; it is a comparison slope, not a
+predicted rate for approximation on a fixed interval away from zero.
+
+```{r convergence, fig.width=9, fig.height=5}
+plot_data <- results
+plot_data$alpha_label <- factor(plot_data$alpha,levels=alpha_vector)
+guides <- plot_data[plot_data$alpha!=2,]
+for (alpha in fractional_alphas) {
+  index <- which(guides$alpha==alpha)
+  guides$error[index] <- guides$error[index[1L]]*
+    exp(-2*pi*sqrt(alpha/2)*(sqrt(guides$m[index])-1))
+}
+p_m_fixed_int <- ggplot(plot_data,aes(sqrt(m),error,colour=alpha_label,group=alpha_label))+
+  geom_line()+geom_point(aes(shape=resolved),size=2)+
+  geom_line(data=guides,linetype="dashed")+
+  scale_shape_manual(values=c(`FALSE`=1,`TRUE`=16))+
+  scale_x_continuous(breaks=sqrt(m_vector),labels=m_vector)+
+  scale_y_continuous(trans=scales::log_trans(base=exp(1)),labels=scales::label_scientific())+
+  labs(x="m (square-root positions)",y="Isolated space-time error (natural-log scale)",
+    colour="alpha",shape="Resolved",
+    subtitle=sprintf("Fresh BRASIL on [%g, 1]; h=%g; tau=%g",fitting_interval$x_min,h,tau))+
+  theme_minimal()+theme(legend.position="bottom")
+p_m_fixed_int
+slopes <- fixed_int_slopes(results)
+knitr::kable(slopes,digits=6)
+```
+
+The table also fits $\log E_m$ against $m$, since fixed-interval convergence
+can look exponential in $m$. Both fits describe this finite-dimensional
+experiment; neither establishes a mesh-uniform asymptotic rate.
+
+## Compare with the installed tables
+
+This optional comparison changes only the coefficients, using the same
+assembled matrices, loads, steps, sparse solver and reference. Unsupported or
+invalid table entries are reported and omitted. They do not limit the orders
+available to the freshly computed coefficients.
+
+```{r table-comparison, fig.width=11, fig.height=7}
+table_rows <- rejected_rows <- list()
+if (compare_package_tables) {
+  for (reference in references) for (m in m_vector) {
+    cf <- tryCatch(if(reference$alpha==2) NULL else
+      fixed_int_table_coefficients(m,reference$alpha/2),error=function(e)e)
+    if (inherits(cf,"error")) {
+      rejected_rows[[length(rejected_rows)+1L]] <- data.frame(
+        alpha=reference$alpha,m=m,reason=conditionMessage(cf))
+      next
+    }
+    table_rows[[length(table_rows)+1L]] <- fixed_int_error(data,spectrum,reference,m,
+      coefficients=cf,source="Installed tables")
+  }
+}
+table_results <- if(length(table_rows))
+  fixed_int_mark_resolution(do.call(rbind,table_rows),control$error) else NULL
+table_rejections <- if(length(rejected_rows)) do.call(rbind,rejected_rows) else NULL
+if (!is.null(table_rejections)) knitr::kable(table_rejections)
+if (!is.null(table_results)) {
+  comparison <- rbind(results,table_results)
+  comparison$alpha_label <- factor(comparison$alpha,levels=alpha_vector,
+    labels=paste("alpha =",alpha_vector))
+  p_table_comparison <- ggplot(comparison,
+    aes(sqrt(m),error,colour=source,linetype=source,group=source))+
+    geom_line()+geom_point(aes(shape=resolved),size=1.5)+
+    facet_wrap(~alpha_label,ncol=4,scales="free_y")+
+    scale_shape_manual(values=c(`FALSE`=1,`TRUE`=16))+
+    scale_y_log10(labels=scales::label_scientific())+
+    labs(x="sqrt(m)",y="Isolated space-time error",colour="Coefficients",linetype="Coefficients",
+      shape="Resolved",subtitle="Matched FEM/backward Euler problem; only the coefficients differ")+
+    theme_minimal()+theme(legend.position="bottom")
+  print(p_table_comparison)
+  matched_slopes <- do.call(rbind,lapply(alpha_vector,function(alpha) {
+    old <- table_results[table_results$alpha==alpha,]
+    fresh <- results[results$alpha==alpha,]
+    orders <- intersect(old$m[old$resolved],fresh$m[fresh$resolved])
+    slope <- function(d) if(length(orders)>=2L)
+      unname(coef(lm(log(error)~sqrt(m),d[d$m%in%orders,]))[2L]) else NA_real_
+    data.frame(alpha=alpha,matched_orders=paste(orders,collapse=","),
+      table_slope=slope(old),fixed_interval_slope=slope(fresh))
+  }))
+  knitr::kable(matched_slopes,digits=6)
+}
+```
+
+## Scalar errors on exactly reciprocal fixed intervals
+
+These diagnostics use the **same freshly computed coefficients** as the matrix
+solution and the full common interval $[1,1/\delta]$:
+\[
+|S_{m,\beta}(y)-y^{-\beta}|
+=|B_{m,\beta}(x)-x^\beta|,\qquad x=1/y.
+\]
+The two errors are evaluated independently on exactly reciprocal grids. Their
+sampled maxima agree up to roundoff. These are sampled errors, not certified
+uniform bounds. Changing the interval with $m$ would change this experiment.
+
+```{r scalar-errors}
+scalar_y <- exp(seq(0,log(fitting_interval$y_max),length.out=scalar_grid_points))
+scalar_x <- 1/scalar_y
+scalar_rows <- scalar_summary_rows <- list()
+for (alpha in fractional_alphas) for (m in m_vector) {
+  beta <- alpha/2
+  cf <- fixed_int_coefficients(coefficient_bank,m,beta)
+  inverse_error <- abs(fixed_int_inverse(scalar_y,cf)-scalar_y^(-beta))
+  power_error <- abs(fixed_int_power(scalar_x,cf)-scalar_x^beta)
+  gap <- max(abs(inverse_error-power_error))
+  stopifnot(all(is.finite(c(inverse_error,power_error))),gap<1e-12)
+  scalar_rows[[length(scalar_rows)+1L]] <- data.frame(
+    alpha=alpha,m=m,y=scalar_y,x=scalar_x,absolute_error=inverse_error,power_error=power_error)
+  scalar_summary_rows[[length(scalar_summary_rows)+1L]] <- data.frame(
+    alpha=alpha,m=m,sampled_inverse_max=max(inverse_error),sampled_power_max=max(power_error),
+    reciprocal_gap=gap)
+}
+scalar_errors <- if(length(scalar_rows)) do.call(rbind,scalar_rows) else NULL
+scalar_max_errors <- if(length(scalar_summary_rows)) do.call(rbind,scalar_summary_rows) else NULL
+if (!is.null(scalar_errors)) {
+  scalar_errors$alpha_label <- factor(scalar_errors$alpha,levels=fractional_alphas,
+    labels=paste("alpha =",fractional_alphas))
+  scalar_errors$m_label <- factor(scalar_errors$m,levels=m_vector)
+  scalar_max_errors$alpha_label <- factor(scalar_max_errors$alpha,levels=fractional_alphas)
+  knitr::kable(scalar_max_errors,format.args=list(scientific=TRUE,digits=5))
+}
+```
+
+```{r scalar-error-curves, fig.width=11, fig.height=7}
+if (!is.null(scalar_errors)) {
+  # Exact zero samples at crossings are omitted on the logarithmic error axis.
+  positive_errors <- scalar_errors[scalar_errors$absolute_error>0,]
+  p_scalar_fixed_int <- ggplot(positive_errors,
+    aes(y,absolute_error,colour=m_label,group=m_label))+
+    geom_line(linewidth=.5)+facet_wrap(~alpha_label,ncol=4)+scale_x_log10()+
+    scale_y_log10(labels=scales::label_scientific())+
+    labs(x="Normalized spectral variable y",y="Absolute inverse-power error",colour="m",
+      subtitle=sprintf("Fresh BRASIL; common y interval [1, %g]",fitting_interval$y_max))+
+    theme_minimal()+theme(legend.position="bottom")
+  print(p_scalar_fixed_int)
+}
+```
+
+```{r unit-interval-error-curves, fig.width=11, fig.height=7}
+if (!is.null(scalar_errors)) {
+  positive_errors <- scalar_errors[scalar_errors$power_error>0,]
+  p_power_fixed_int <- ggplot(positive_errors,aes(x,power_error,colour=m_label,group=m_label))+
+    geom_line(linewidth=.5)+facet_wrap(~alpha_label,ncol=4)+scale_x_log10()+
+    scale_y_log10(labels=scales::label_scientific())+
+    labs(x="Reciprocal variable x",y="Absolute power error",colour="m",
+      subtitle=sprintf("Same coefficients; common x interval [%g, 1]",fitting_interval$x_min))+
+    theme_minimal()+theme(legend.position="bottom")
+  print(p_power_fixed_int)
+}
+```
+
+```{r scalar-error-convergence, fig.width=9, fig.height=5}
+if (!is.null(scalar_max_errors)) {
+  p_scalar_m_fixed_int <- ggplot(scalar_max_errors,
+    aes(sqrt(m),sampled_inverse_max,colour=alpha_label,group=alpha_label))+
+    geom_line()+geom_point(size=2)+
+    scale_x_continuous(breaks=sqrt(m_vector),labels=m_vector)+
+    scale_y_continuous(trans=scales::log_trans(base=exp(1)),labels=scales::label_scientific())+
+    labs(x="m (square-root positions)",y="Sampled maximum scalar error (natural-log scale)",
+      colour="alpha",subtitle="Same fixed interval and coefficients for every order")+
+    theme_minimal()+theme(legend.position="bottom")
+  print(p_scalar_m_fixed_int)
+}
+```
+
+## Numerical checks
+
+`product_error` evaluates the same $S_{m,\beta}$ directly in the complete
+numerical eigenbasis and evolves every mode. It uses no time-step partial
+fractions. Its agreement with the sparse result checks the implementation
+of the rational scheme. The exact-integer control checks ordinary backward
+Euler against the same discrete reference.
+
+```{r checks}
+knitr::kable(spectrum$diagnostics,digits=10)
+knitr::kable(control[,c("error","product_error","final_state_gap_C")],
+  format.args=list(scientific=TRUE,digits=5))
+knitr::kable(results[,c("alpha","m","error","product_error",
+  "absolute_error_disagreement","reconstruction_error","resolved")],
+  format.args=list(scientific=TRUE,digits=5))
+```
+
+This study measures rational error at fixed `h` and `tau`. Faster observed
+decay on this finite spectral interval does not imply a faster mesh-uniform
+rate for approximation down to zero. Values near the numerical floor are
+shown for completeness and excluded from the reported resolved slopes.

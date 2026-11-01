@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Functionality: BRASIL rational approximation</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<link href="site_libs/highlightjs-9.12.0/textmate.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+<link href="site_libs/font-awesome-6.5.2/css/all.min.css" rel="stylesheet" />
+<link href="site_libs/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet" />
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+<link rel="stylesheet" href="visual.css" type="text/css" />
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">NAP</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Home</a>
+</li>
+<li class="dropdown">
+  <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+    Contents
+     
+    <span class="caret"></span>
+  </a>
+  <ul class="dropdown-menu" role="menu">
+    <li>
+      <a href="functionality.html">Functionality</a>
+    </li>
+    <li>
+      <a href="exp1.html">Example</a>
+    </li>
+    <li>
+      <a href="conv_in_h.html">Convergence in 𝘩</a>
+    </li>
+    <li>
+      <a href="conv_in_tau.html">Convergence in τ</a>
+    </li>
+    <li>
+      <a href="conv_in_m.html">Convergence in 𝑚</a>
+    </li>
+  </ul>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        <li>
+  <a href="https://arxiv.org/abs/0000.00000">
+    <span class="fa fa-file-pdf"></span>
+     
+  </a>
+</li>
+<li>
+  <a href="https://github.com/leninrafaelrierasegura/NAP">
+    <span class="fa fa-github"></span>
+     
+  </a>
+</li>
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+
+
+<h1 class="title toc-ignore">Functionality: BRASIL rational
+approximation</h1>
+
+</div>
+
+
+<div id="fractional-diffusion-equations-on-metric-graphs"
+class="section level2" number="0.1">
+<h2><span class="header-section-number">0.1</span> Fractional diffusion
+equations on metric graphs</h2>
+<p>We analyze and numerically approximate solutions to fractional
+diffusion equations on metric graphs of the form <span
+class="math display">\[\begin{equation}
+\label{eq:maineq}
+\tag{1}
+\left\{
+\begin{aligned}
+    \partial_t u(s,t)+(\kappa^2-\Delta_\Gamma)^{\alpha/2}u(s,t)
+        &amp;=f(s,t), &amp;&amp; (s,t)\in\Gamma\times(0,T),\\
+    u(s,0)&amp;=u_0(s), &amp;&amp; s\in\Gamma.
+\end{aligned}
+\right.
+\end{equation}\]</span> Here <span
+class="math inline">\(\Gamma=(\mathcal V,\mathcal E)\)</span> is a
+compact connected metric graph, <span
+class="math inline">\(\kappa&gt;0\)</span>, <span
+class="math inline">\(\alpha\in(0,2]\)</span> is the fractional
+diffusion exponent, and <span class="math inline">\(f\)</span> and <span
+class="math inline">\(u_0\)</span> are the right-hand side and initial
+condition, respectively. The Kirchhoff–Laplacian <span
+class="math inline">\(\Delta_\Gamma\)</span> acts edgewise and has
+domain <span class="math display">\[\begin{equation}
+\label{eq:Kcond}
+\tag{2}
+\mathcal D(\Delta_\Gamma)=
+\left\{\phi\in C(\Gamma):\ \phi|_e\in H^2(e)\ \text{for every
+}e\in\mathcal E,
+\quad\sum_{e\in\mathcal E_v}\partial_e\phi(v)=0
+\ \text{for every }v\in\mathcal V\right\}.
+\end{equation}\]</span> The derivatives in the vertex condition are
+directed from the vertex into the incident edges, with each edge
+endpoint counted separately. We write <span
+class="math inline">\(L=\kappa^2-\Delta_\Gamma\)</span> and <span
+class="math inline">\(\beta=\alpha/2\)</span>. Fractional powers of
+<span class="math inline">\(L\)</span> are defined spectrally; the
+vertex conditions are incorporated through <span
+class="math inline">\(L\)</span>.</p>
+</div>
+<div id="num_scheme" class="section level2" number="0.2">
+<h2><span class="header-section-number">0.2</span> Numerical Scheme</h2>
+<p>Let <span class="math inline">\(V_h\)</span> be the space of
+continuous piecewise linear finite element functions on a graph mesh
+indexed by <span class="math inline">\(h\)</span>, and let <span
+class="math inline">\(P_h\)</span> denote the <span
+class="math inline">\(L_2(\Gamma)\)</span>-orthogonal projection onto
+<span class="math inline">\(V_h\)</span>. Define the discrete operator
+<span class="math inline">\(L_h:V_h\to V_h\)</span> by <span
+class="math display">\[
+    (L_hv_h,w_h)_{L_2(\Gamma)}
+    =\kappa^2(v_h,w_h)_{L_2(\Gamma)}
+      +(v_h&#39;,w_h&#39;)_{L_2(\Gamma)},\qquad v_h,w_h\in V_h.
+\]</span> Its fractional power induces the discrete bilinear form <span
+class="math display">\[
+    \mathfrak a_{h,\alpha}(v_h,w_h)
+    =(L_h^{\alpha/4}v_h,L_h^{\alpha/4}w_h)_{L_2(\Gamma)}.
+\]</span> Thus, the spatial operator is discretized first and its
+fractional power is then taken on <span
+class="math inline">\(V_h\)</span>.</p>
+<p>Let <span class="math inline">\(t_k=k\tau\)</span>, <span
+class="math inline">\(k=0,\ldots,N\)</span>, with <span
+class="math inline">\(\tau=T/N\)</span>. The scheme computes <span
+class="math inline">\(U_h^\tau=\{U_h^k\}_{k=0}^{N}\)</span>, where <span
+class="math inline">\(U_h^k\in V_h\)</span> and <span
+class="math display">\[
+\left\{
+\begin{aligned}
+    \left(\delta U_h^{k+1},\phi\right)_{L_2(\Gamma)}
+      +\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
+      &amp;=(f^{k+1},\phi)_{L_2(\Gamma)},\qquad \phi\in V_h,\\
+    U_h^0&amp;=P_hu_0,
+\end{aligned}
+\right.
+\]</span> for <span class="math inline">\(k=0,\ldots,N-1\)</span>, with
+<span class="math display">\[
+    \delta U_h^{k+1}=\frac{U_h^{k+1}-U_h^k}{\tau},
+    \qquad f^{k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}f(t)\,dt.
+\]</span> Equivalently, <span class="math display">\[\begin{equation}
+\label{system:fully_discrete_scheme}
+\tag{3}
+\left\{
+\begin{aligned}
+    (U_h^{k+1},\phi)_{L_2(\Gamma)}
+      +\tau\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
+      &amp;=(U_h^k,\phi)_{L_2(\Gamma)}
+        +\tau(f^{k+1},\phi)_{L_2(\Gamma)},\qquad\phi\in V_h,\\
+    U_h^0&amp;=P_hu_0.
+\end{aligned}
+\right.
+\end{equation}\]</span></p>
+<p>At each time step, the finite element solution can be expressed in
+the basis <span class="math inline">\(\{\psi_h^i\}_{i=1}^{N_h}\)</span>
+as <span class="math display">\[\begin{equation}
+\label{num_sol}
+\tag{4}
+    U_h^k(s)=\sum_{i=1}^{N_h}u_i^k\psi_h^i(s),\qquad s\in\Gamma.
+\end{equation}\]</span> Replacing <span
+class="math inline">\(\eqref{num_sol}\)</span> into <span
+class="math inline">\(\eqref{system:fully_discrete_scheme}\)</span>
+yields <span class="math display">\[
+    \sum_{j=1}^{N_h}u_j^{k+1}
+    \left[(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
+          +\tau\mathfrak a_{h,\alpha}(\psi_h^j,\psi_h^i)\right]
+    =\sum_{j=1}^{N_h}u_j^k(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
+      +\tau(f^{k+1},\psi_h^i)_{L_2(\Gamma)},
+\]</span> for <span class="math inline">\(i=1,\ldots,N_h\)</span>.</p>
+<p>Introduce the mass and stiffness matrices <span
+class="math display">\[
+    \mathbf C_{i,j}=(\psi_h^i,\psi_h^j)_{L_2(\Gamma)},\qquad
+    \mathbf
+G_{i,j}=({\psi_h^i}&#39;,{\psi_h^j}&#39;)_{L_2(\Gamma)},\qquad
+    \mathbf L=\kappa^2\mathbf C+\mathbf G.
+\]</span> The coefficient matrix representing <span
+class="math inline">\(L_h\)</span> is <span
+class="math inline">\(\mathbf B=\mathbf C^{-1}\mathbf L\)</span>.
+Consequently, the matrix of the fractional bilinear form is <span
+class="math inline">\(\mathbf C\mathbf B^\beta\)</span>, and the scheme
+is <span class="math display">\[\begin{equation}
+\label{diff_eq_discrete}
+\tag{5}
+    (\mathbf C+\tau\mathbf C\mathbf B^\beta)\mathbf U^{k+1}
+    =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1},
+\end{equation}\]</span> where <span class="math inline">\(\mathbf
+U^k\)</span> has components <span class="math inline">\(u_i^k\)</span>
+and <span class="math inline">\(\mathbf F^k\)</span> has components
+<span class="math inline">\((f^k,\psi_h^i)_{L_2(\Gamma)}\)</span>. In
+particular, <span class="math inline">\(\mathbf C(\mathbf C^{-1}\mathbf
+L)^\beta\)</span> generally differs from the ordinary matrix power <span
+class="math inline">\(\mathbf L^\beta\)</span>.</p>
+<p>Introduce the normalized matrix <span class="math inline">\(\mathbf
+A=\mathbf C^{-1}\mathbf L/\kappa^2\)</span>. Multiplying <span
+class="math inline">\(\eqref{diff_eq_discrete}\)</span> first by <span
+class="math inline">\(\mathbf C^{-1}\)</span> and then by <span
+class="math inline">\(\mathbf A^{-\beta}\)</span> gives <span
+class="math display">\[\begin{equation}
+\label{eq:inverse_scheme}
+\tag{6}
+    (\mathbf A^{-\beta}+\tau\kappa^{2\beta}\mathbf I)\mathbf U^{k+1}
+    =\mathbf A^{-\beta}
+      (\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}).
+\end{equation}\]</span></p>
+<div id="brasil-rational-approximation" class="section level3"
+number="0.2.1">
+<h3><span class="header-section-number">0.2.1</span> BRASIL rational
+approximation</h3>
+<p>Let <span class="math inline">\(0&lt;\beta&lt;1\)</span>, and let
+<span class="math inline">\(\lambda_{1,h}\)</span> and <span
+class="math inline">\(\lambda_{N_h,h}\)</span> be the smallest and
+largest eigenvalues of <span class="math inline">\(L_h\)</span>. These
+are the generalized eigenvalues of <span class="math inline">\((\mathbf
+L,\mathbf C)\)</span>, with <span
+class="math inline">\(\lambda_{1,h}=\kappa^2\)</span>. The interval
+<span class="math display">\[
+    J_h=[\kappa^2\lambda_{N_h,h}^{-1},
+         \kappa^2\lambda_{1,h}^{-1}]=[\delta_h,1]
+\]</span> contains the spectrum of <span class="math inline">\(\mathbf
+A^{-1}\)</span>.</p>
+<p>Using the BRASIL coefficients supplied by rSPDE at exponent <span
+class="math inline">\(\beta\)</span>, let <span class="math display">\[
+    q_1(x)=\sum_{i=0}^{m}c_ix^i,\qquad
+    q_2(x)=\sum_{j=0}^{m}b_jx^j,\qquad
+    B_m(x)=\frac{q_1(x)}{q_2(x)}\approx x^\beta.
+\]</span> Here the target is <span
+class="math inline">\(x^\beta\)</span> directly, and both polynomial
+degrees are at most <span class="math inline">\(m\)</span>. A fixed
+approximation on <span class="math inline">\([0,1]\)</span> covers every
+<span class="math inline">\(J_h\)</span> and allows the same
+coefficients to be used on different meshes. The numerical tabulation or
+interpolation of coefficients need not give an exact minimax
+approximation at every requested exponent.</p>
+<p>In the normalized operator variable <span
+class="math inline">\(y=1/x\)</span>, define <span
+class="math display">\[\begin{equation}
+\label{eq:inverse_rational}
+\tag{7}
+    S_m(y)=B_m(y^{-1})
+          =p_\ell(y)^{-1}p_r(y)\approx y^{-\beta},
+    \qquad
+    p_r(y)=y^m q_1(y^{-1}),\quad
+    p_\ell(y)=y^m q_2(y^{-1}).
+\end{equation}\]</span> The supplied partial fraction coefficients
+represent this same function as <span class="math display">\[
+    S_m(y)=d_m+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j},
+    \qquad
+    B_m(x)=d_m+\sum_{j=1}^{m}\frac{\rho_jx}{1-\eta_jx}.
+\]</span> The source poles <span class="math inline">\(\eta_j\)</span>,
+source residues <span class="math inline">\(\rho_j\)</span>, and
+constant <span class="math inline">\(d_m\)</span> belong to the
+inverse-power approximation <span class="math inline">\(S_m\)</span>.
+They are distinct from the poles and residues of the time-step function
+derived below. Assuming <span class="math inline">\(q_2(0)\ne0\)</span>,
+the constant is <span class="math display">\[
+    d_m=B_m(0)=\lim_{y\to\infty}S_m(y)=\frac{c_0}{b_0}.
+\]</span></p>
+<p>For comparison with the root-product notation, if <span
+class="math inline">\(q_1\)</span> and <span
+class="math inline">\(q_2\)</span> both have degree <span
+class="math inline">\(m\)</span>, with roots <span
+class="math inline">\(\{r_{1i}\}_{i=1}^{m}\)</span> and <span
+class="math inline">\(\{r_{2j}\}_{j=1}^{m}\)</span> counted with
+multiplicity, then <span class="math display">\[
+    p_r(y)=c_m\prod_{i=1}^{m}(1-r_{1i}y),\qquad
+    p_\ell(y)=b_m\prod_{j=1}^{m}(1-r_{2j}y).
+\]</span> Thus both products have <span class="math inline">\(m\)</span>
+factors, and the corresponding normalization is <span
+class="math inline">\(\mathrm{factor}=c_m/b_m\)</span>. Define <span
+class="math display">\[\begin{equation}
+\label{eq:PLPR}
+\tag{8}
+    \mathbf P_r=\prod_{i=1}^{m}(\mathbf I-r_{1i}\mathbf A),
+    \qquad
+    \mathbf P_\ell=\frac{\kappa^{2\beta}}{\mathrm{factor}}\,
+      \mathbf C\prod_{j=1}^{m}(\mathbf I-r_{2j}\mathbf A).
+\end{equation}\]</span> This product representation is algebraic; the
+partial fraction coefficients allow the same derivation without forming
+polynomial products.</p>
+<p>Replacing <span class="math inline">\(\mathbf A^{-\beta}\)</span> in
+<span class="math inline">\(\eqref{eq:inverse_scheme}\)</span> by <span
+class="math inline">\(S_m(\mathbf A)\)</span> gives the rational scheme
+<span class="math display">\[
+    (S_m(\mathbf A)+\tau\kappa^{2\beta}\mathbf I)\mathbf U_m^{k+1}
+    =S_m(\mathbf A)
+      (\mathbf U_m^k+\tau\mathbf C^{-1}\mathbf F^{k+1}),
+\]</span> where <span class="math inline">\(\mathbf U_m^0\)</span> is
+the coefficient vector of <span class="math inline">\(P_hu_0\)</span>.
+The subscript <span class="math inline">\(m\)</span> distinguishes the
+rational approximation from the exact discrete fractional scheme. In the
+root-product notation, this is equivalently <span
+class="math display">\[\begin{equation}
+\label{eq:scheme}
+\tag{9}
+    (\mathbf P_r^\top\mathbf C+\tau\mathbf P_\ell^\top)
+       \mathbf U_m^{k+1}
+    =\mathbf P_r^\top(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\end{equation}\]</span> Indeed, setting <span
+class="math inline">\(\mathbf D=\mathbf L\mathbf
+C^{-1}/\kappa^2\)</span>, we have <span class="math inline">\(\mathbf
+A^\top=\mathbf D\)</span> and <span class="math inline">\(p(\mathbf
+D)\mathbf C=\mathbf C p(\mathbf A)\)</span> for any polynomial <span
+class="math inline">\(p\)</span>. The factors that are polynomials in
+the same matrix commute; no commutation of <span
+class="math inline">\(\mathbf L\)</span> with <span
+class="math inline">\(\mathbf C^{-1}\)</span> is assumed.</p>
+<p>It follows that <span
+class="math inline">\(\eqref{eq:scheme}\)</span> can be written as <span
+class="math display">\[
+    (p_r(\mathbf D)+\tau\kappa^{2\beta}p_\ell(\mathbf D))
+       \mathbf C\mathbf U_m^{k+1}
+    =p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}),
+\]</span> and hence <span class="math display">\[\begin{equation}
+\label{eq:final_scheme}
+\tag{10}
+    \mathbf U_m^{k+1}=\mathbf C^{-1}
+       (p_r(\mathbf D)+\tau\kappa^{2\beta}p_\ell(\mathbf D))^{-1}
+       p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\end{equation}\]</span> These inverses are well-defined if <span
+class="math inline">\(S_m\)</span> is finite and positive on the
+spectrum of <span class="math inline">\(\mathbf A\)</span> and its
+reduced denominator has no zeros there.</p>
+</div>
+<div id="partial-fraction-decomposition" class="section level3"
+number="0.2.2">
+<h3><span class="header-section-number">0.2.2</span> Partial fraction
+decomposition</h3>
+<p>Consider the scalar time-step function <span
+class="math display">\[\begin{equation}
+\label{eq:partial_fraction}
+\tag{11}
+    H_m(y)=\frac{S_m(y)}{S_m(y)+\tau\kappa^{2\beta}}
+          =\frac{p_r(y)}{p_r(y)+\tau\kappa^{2\beta}p_\ell(y)}
+          =\sum_{n=1}^{m}\frac{a_n}{y-z_n}+r_\tau.
+\end{equation}\]</span> The last equality assumes a reduced denominator
+of degree <span class="math inline">\(m\)</span> with simple roots <span
+class="math inline">\(z_n\)</span> and <span
+class="math inline">\(d_m+\tau\kappa^{2\beta}\ne0\)</span>. Lower
+degrees reduce the number of terms; repeated poles require additional
+powers <span class="math inline">\((y-z_n)^{-\ell}\)</span> up to their
+multiplicity.</p>
+<p>Unlike a strictly proper rational function, <span
+class="math inline">\(H_m\)</span> generally has a nonzero constant
+term. Taking its limit at infinity yields <span
+class="math display">\[\begin{equation}
+\label{eq:remainder}
+\tag{12}
+    r_\tau=\frac{d_m}{d_m+\tau\kappa^{2\beta}}.
+\end{equation}\]</span> This time-step remainder is not the source
+constant <span class="math inline">\(d_m\)</span> itself.</p>
+<p>Substituting <span
+class="math inline">\(\eqref{eq:partial_fraction}\)</span> into <span
+class="math inline">\(\eqref{eq:final_scheme}\)</span> gives <span
+class="math display">\[\begin{equation}
+\label{eq:final_scheme2}
+\tag{13}
+    \mathbf U_m^{k+1}=\mathbf C^{-1}
+      \left(\sum_{n=1}^{m}a_n
+      (\mathbf L\mathbf C^{-1}/\kappa^2-z_n\mathbf I)^{-1}
+      +r_\tau\mathbf I\right)
+      (\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\end{equation}\]</span> Since <span class="math display">\[
+    (\mathbf L\mathbf C^{-1}/\kappa^2-z_n\mathbf I)^{-1}
+    =\mathbf C(\mathbf L/\kappa^2-z_n\mathbf C)^{-1},
+\]</span> we can rewrite <span
+class="math inline">\(\eqref{eq:final_scheme2}\)</span> as <span
+class="math display">\[\begin{equation}
+\label{eq:final_scheme3}
+\tag{14}
+    \mathbf U_m^{k+1}
+    =\mathbf R_{m,\tau}(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}),
+    \qquad
+    \mathbf R_{m,\tau}=r_\tau\mathbf C^{-1}
+       +\sum_{n=1}^{m}a_n(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}.
+\end{equation}\]</span> Only sparse solves are required: one mass-matrix
+solve for the constant term when <span
+class="math inline">\(r_\tau\ne0\)</span>, and one shifted solve for
+each pole. For fixed <span class="math inline">\(h\)</span>, <span
+class="math inline">\(\tau\)</span>, <span
+class="math inline">\(\kappa\)</span>, <span
+class="math inline">\(\beta\)</span>, and <span
+class="math inline">\(m\)</span>, the matrices are unchanged between
+time steps, so their factorizations can be reused.</p>
+</div>
+<div id="poles-and-residues-of-the-time-step-function"
+class="section level3" number="0.2.3">
+<h3><span class="header-section-number">0.2.3</span> Poles and residues
+of the time-step function</h3>
+<p>To derive the poles directly from the source partial fractions, set
+<span class="math inline">\(s=\tau\kappa^{2\beta}&gt;0\)</span> and
+define <span class="math display">\[
+    F_m(y)=S_m(y)+s
+          =d_m+s+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j}.
+\]</span> The time-step poles <span class="math inline">\(z_n\)</span>
+solve <span class="math inline">\(F_m(z_n)=0\)</span>. They are
+precisely the zeros of the reduced combined denominator <span
+class="math inline">\(p_r+s p_\ell\)</span>; the source poles <span
+class="math inline">\(\eta_j\)</span> are removable singularities of
+<span class="math inline">\(H_m\)</span>.</p>
+<p>Suppose the source poles are distinct and ordered, and satisfy <span
+class="math display">\[
+    \eta_1&lt;\cdots&lt;\eta_m&lt;0,\qquad
+    \rho_j&gt;0,\qquad d_m\ge0.
+\]</span> These are assumptions on the selected coefficients, not a
+guarantee for every numerically tabulated or interpolated BRASIL
+approximation. On each real interval between the source poles, <span
+class="math display">\[
+    F_m&#39;(y)=-\sum_{j=1}^{m}\frac{\rho_j}{(y-\eta_j)^2}&lt;0.
+\]</span> Moreover, <span class="math inline">\(F_m(y)\to
+d_m+s&gt;0\)</span> as <span class="math inline">\(y\to-\infty\)</span>,
+<span class="math inline">\(F_m(y)\to-\infty\)</span> as <span
+class="math inline">\(y\uparrow\eta_j\)</span>, and <span
+class="math inline">\(F_m(y)\to+\infty\)</span> as <span
+class="math inline">\(y\downarrow\eta_j\)</span>. Thus there is exactly
+one simple zero in each of <span class="math display">\[
+    (-\infty,\eta_1),\quad(\eta_1,\eta_2),\quad\ldots,
+    \quad(\eta_{m-1},\eta_m),
+\]</span> and no zero to the right of <span
+class="math inline">\(\eta_m\)</span>. In particular, <span
+class="math display">\[
+    z_1&lt;\eta_1&lt;z_2&lt;\eta_2&lt;\cdots&lt;z_m&lt;\eta_m&lt;0.
+\]</span> These roots can therefore be characterized by real scalar
+bracketing without expanding the combined denominator into polynomial
+coefficients.</p>
+<p>At a simple pole, <span class="math inline">\(S_m(z_n)=-s\)</span>,
+so the residue is <span class="math display">\[\begin{equation}
+\label{eq:residues}
+\tag{15}
+    a_n=\lim_{y\to z_n}(y-z_n)H_m(y)
+        =\frac{S_m(z_n)}{S_m&#39;(z_n)}
+        =\frac{s}{\displaystyle\sum_{j=1}^{m}
+                     \rho_j/(z_n-\eta_j)^2}&gt;0.
+\end{equation}\]</span> Consequently, <span class="math inline">\(0\le
+r_\tau&lt;1\)</span>, and every shifted matrix <span
+class="math inline">\(\mathbf L/\kappa^2-z_n\mathbf C\)</span> is real
+symmetric positive definite. The mass matrix is also positive definite,
+so all the solves in <span
+class="math inline">\(\eqref{eq:final_scheme3}\)</span> admit sparse
+Cholesky factorizations. In addition, <span
+class="math inline">\(S_m(y)&gt;0\)</span> for <span
+class="math inline">\(y\ge1\)</span>, and hence <span
+class="math inline">\(0&lt;H_m(y)&lt;1\)</span> on the discrete
+spectrum.</p>
+<p>If these sign assumptions fail, real negative time-step poles are not
+guaranteed. This alone does not establish that the rational
+approximation is inaccurate or unstable. If the reduced combined
+denominator has genuine nonreal roots, the real coefficients imply
+conjugate pole–residue pairs. For a real load vector <span
+class="math inline">\(\mathbf b\)</span>, their matrix contributions
+combine as <span class="math display">\[
+    a(\mathbf L/\kappa^2-z\mathbf C)^{-1}\mathbf b
+    +\overline a(\mathbf L/\kappa^2-\overline z\mathbf C)^{-1}\mathbf b
+    =2\operatorname{Re}\!\left[
+      a(\mathbf L/\kappa^2-z\mathbf C)^{-1}\mathbf b\right].
+\]</span> The matrix iteration remains real, but evaluating such pairs
+requires complex sparse solves or equivalent real block systems; the
+real positive-definite Cholesky conclusion above does not apply.</p>
+</div>
+<div id="integer-power-and-a-fixed-diffusion-coefficient"
+class="section level3" number="0.2.4">
+<h3><span class="header-section-number">0.2.4</span> Integer power and a
+fixed diffusion coefficient</h3>
+<p>For <span class="math inline">\(\alpha=2\)</span>, we have <span
+class="math inline">\(\beta=1\)</span> and use the exact inverse <span
+class="math inline">\(S(y)=y^{-1}\)</span>. Then <span
+class="math display">\[
+    H(y)=\frac{1}{1+\tau\kappa^2y}
+        =\frac{1}{\tau\kappa^2}
+          \left(y+\frac{1}{\tau\kappa^2}\right)^{-1},
+\]</span> so the remainder is zero and the scheme reduces to ordinary
+backward Euler, <span class="math display">\[
+    (\mathbf C+\tau\mathbf L)\mathbf U^{k+1}
+    =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1}.
+\]</span> If the physical equation instead contains a fixed diffusion
+coefficient <span class="math inline">\(\nu&gt;0\)</span>, namely <span
+class="math inline">\(u_t+\nu L^\beta u=f\)</span>, the same derivation
+replaces <span class="math inline">\(\tau\kappa^{2\beta}\)</span> by
+<span class="math inline">\(\tau\nu\kappa^{2\beta}\)</span> in the
+time-step function, its poles, residues, and remainder. The right-hand
+side remains <span class="math inline">\(\mathbf C\mathbf
+U_m^k+\tau\mathbf F^{k+1}\)</span>, and the integer-power matrix is
+<span class="math inline">\(\mathbf C+\tau\nu\mathbf L\)</span>.</p>
+</div>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
