@@ -20,7 +20,8 @@ figures. Knit again to display them. Parameter and recompute chunks are skipped
 when knitting; the displayed settings always describe the saved results.
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,cache=FALSE)
+# Set the R engine explicitly so purl() also works in interactive sessions.
+knitr::opts_chunk$set(engine="R",message=FALSE,warning=FALSE,error=FALSE,cache=FALSE)
 helper <- tempfile(fileext = ".R")
 knitr::purl("brasilfunc.Rmd", output = helper, quiet = TRUE)
 sys.source(helper, envir = environment())
@@ -57,7 +58,7 @@ provides a control without rational approximation.
 ```{r parameters, eval=FALSE}
 h <- 0.02
 tau <- 0.005
-m_max <- 14L
+m_max <- 8L
 alpha_vector <- seq(0.5,1.9,0.2)
 T_final <- 1
 kappa <- 4

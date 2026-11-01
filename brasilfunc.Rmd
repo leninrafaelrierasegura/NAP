@@ -1489,6 +1489,69 @@ rough_tau_solve <- function(mesh, alpha, N, order, diffusion, T_final = 1, proje
 
 ```
 
+## Isolated rational study with rough forcing
+
+The quarter-loop matrices include the full-graph factor of four. The
+infinite forcing has exactly zero FEM load for modes j >= J; both matched
+evolutions share this projection. Their difference therefore has no
+continuum-tail contribution. The complete fractional backward Euler
+reference uses every eigenmode of the reduced FEM matrix pair.
+
+```{r brasil-functions-isolated-rough, eval=TRUE}
+isolated_rough_tadpole_data <- function(J = 8L, kappa = 4) {
+    # Exact invariant-subspace representation of the full tadpole FEM problem.
+    if (length(J) != 1L || !is.finite(J) || J != as.integer(J) ||
+        J < 3L || J > 11L)
+        stop("Choose 3 <= J <= 11 for the complete-eigensystem rough study.")
+    mesh <- rough_tau_mesh(J, kappa)
+    list(C = mesh$C, L = mesh$K, initial = numeric(nrow(mesh$C)),
+         spatial_load = mesh$load, kappa = kappa, J = as.integer(J),
+         h_requested = mesh$h, h_min = mesh$h, h_max = mesh$h,
+         projected_forcing_modes = length(mesh$j))
+}
+
+isolated_rough_be_reference <- function(data, spectrum, time_seq, alpha,
+                                      diffusion = 1, max_history_mib = 256) {
+    n <- nrow(data$C)
+    stopifnot(length(time_seq) >= 2L, all(is.finite(time_seq)),
+              time_seq[1L] == 0, all(diff(time_seq) > 0),
+              length(alpha) == 1L, is.finite(alpha), alpha > 0, alpha <= 2,
+              length(diffusion) == 1L, is.finite(diffusion), diffusion > 0,
+              identical(dim(spectrum$vectors), c(n, n)),
+              length(spectrum$values) == n,
+              length(data$initial) == n, all(is.finite(data$initial)),
+              length(data$spatial_load) == n, all(is.finite(data$spatial_load)),
+              length(max_history_mib) == 1L, is.finite(max_history_mib),
+              max_history_mib > 0)
+    dt <- diff(time_seq)[1L]
+    stopifnot(max(abs(diff(time_seq) - dt)) <=
+              128 * .Machine$double.eps * max(1, tail(time_seq, 1L)))
+    history_mib <- 2 * 8 * as.double(n) * length(time_seq)/1024^2
+    if (history_mib > max_history_mib)
+        stop("Exact rough reference exceeds max_history_mib; use a moderate grid.")
+    V <- spectrum$vectors
+    x <- as.numeric(Matrix::crossprod(V, data$C %*% data$initial))
+    f <- as.numeric(Matrix::crossprod(V, data$spatial_load))
+    rates <- diffusion * spectrum$values^(alpha/2)
+    mu <- 1/(1 + dt * rates)
+    states <- coefficients <- matrix(0, n, length(time_seq))
+    states[, 1L] <- data$initial
+    coefficients[, 1L] <- x
+    y <- x
+    for (k in seq_len(length(time_seq) - 1L)) {
+        y <- mu * (y + dt * f)
+        coefficients[, k + 1L] <- y
+        states[, k + 1L] <- as.numeric(V %*% y)
+    }
+    list(states = states, coefficients = coefficients, initial_coefficients = x,
+         forcing_coefficients = f, exact_rates = rates,
+         g_average = c(0, rep(1, length(time_seq) - 1L)), dt = dt,
+         time_seq = time_seq, alpha = alpha, diffusion = diffusion,
+         history_mib = history_mib)
+}
+
+```
+
 ## Sparse time stepping for rough data
 
 ```{r brasil-functions-5, eval=TRUE}

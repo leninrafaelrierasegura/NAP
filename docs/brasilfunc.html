@@ -1432,17 +1432,17 @@ pre {
 font-size: 14px
 }
 .custom-box {
-background-color: #f5f7fa;
-border-color: #e1e8ed;
-color: #2c3e50;
-padding: 15px;
-border-radius: 5px;
-margin-bottom: 20px;
+background-color: #f5f7fa; 
+border-color: #e1e8ed; 
+color: #2c3e50; 
+padding: 15px; 
+border-radius: 5px; 
+margin-bottom: 20px; 
 }
 .caption {
 margin: auto;
 text-align: center;
-margin-bottom: 20px;
+margin-bottom: 20px; 
 }</style>
 
 
@@ -1477,80 +1477,6 @@ padding: 0;
 </style>
 
 
-<style type="text/css">
-.dropdown-submenu {
-position: relative;
-}
-.dropdown-submenu>.dropdown-menu {
-top: 0;
-left: 100%;
-margin-top: -6px;
-margin-left: -1px;
-border-radius: 0 6px 6px 6px;
-}
-.dropdown-submenu:hover>.dropdown-menu {
-display: block;
-}
-.dropdown-submenu>a:after {
-display: block;
-content: " ";
-float: right;
-width: 0;
-height: 0;
-border-color: transparent;
-border-style: solid;
-border-width: 5px 0 5px 5px;
-border-left-color: #cccccc;
-margin-top: 5px;
-margin-right: -10px;
-}
-.dropdown-submenu:hover>a:after {
-border-left-color: #adb5bd;
-}
-.dropdown-submenu.pull-left {
-float: none;
-}
-.dropdown-submenu.pull-left>.dropdown-menu {
-left: -100%;
-margin-left: 10px;
-border-radius: 6px 0 6px 6px;
-}
-</style>
-
-<script type="text/javascript">
-// manage active state of menu based on current page
-$(document).ready(function () {
-  // active menu anchor
-  href = window.location.pathname
-  href = href.substr(href.lastIndexOf('/') + 1)
-  if (href === "")
-    href = "index.html";
-  var menuAnchor = $('a[href="' + href + '"]');
-
-  // mark the anchor link active (and if it's in a dropdown, also mark that active)
-  var dropdown = menuAnchor.closest('li.dropdown');
-  if (window.bootstrap) { // Bootstrap 4+
-    menuAnchor.addClass('active');
-    dropdown.find('> .dropdown-toggle').addClass('active');
-  } else { // Bootstrap 3
-    menuAnchor.parent().addClass('active');
-    dropdown.addClass('active');
-  }
-
-  // Navbar adjustments
-  var navHeight = $(".navbar").first().height() + 15;
-  var style = document.createElement('style');
-  var pt = "padding-top: " + navHeight + "px; ";
-  var mt = "margin-top: -" + navHeight + "px; ";
-  var css = "";
-  // offset scroll position for anchor links (for fixed navbar)
-  for (var i = 1; i <= 6; i++) {
-    css += ".section h" + i + "{ " + pt + mt + "}\n";
-  }
-  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
-  document.head.appendChild(style);
-});
-</script>
 
 <!-- tabsets -->
 
@@ -1673,32 +1599,6 @@ border-radius: 0px;
 
 
 
-
-<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
-  <div class="container">
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </button>
-      <a class="navbar-brand" href="index.html">BRASIL</a>
-    </div>
-    <div id="navbar" class="navbar-collapse collapse">
-      <ul class="nav navbar-nav">
-        <li>
-  <a href="index.html">Experiments</a>
-</li>
-<li>
-  <a href="brasilfunc.html">Theory and functions</a>
-</li>
-      </ul>
-      <ul class="nav navbar-nav navbar-right">
-
-      </ul>
-    </div><!--/.nav-collapse -->
-  </div><!--/.container -->
-</div><!--/.navbar -->
 
 <div id="header">
 
@@ -3126,6 +3026,65 @@ rough_tau_solve &lt;- function(mesh, alpha, N, order, diffusion, T_final = 1, pr
     result$tail &lt;- tail
     result$transfer_reconstruction_error &lt;- operator$transfer$reconstruction_error
     result
+}</code></pre>
+</div>
+<div id="isolated-rational-study-with-rough-forcing" class="section level2">
+<h2>Isolated rational study with rough forcing</h2>
+<p>The quarter-loop matrices include the full-graph factor of four. The
+infinite forcing has exactly zero FEM load for modes j &gt;= J; both
+matched evolutions share this projection. Their difference therefore has
+no continuum-tail contribution. The complete fractional backward Euler
+reference uses every eigenmode of the reduced FEM matrix pair.</p>
+<pre class="r"><code>isolated_rough_tadpole_data &lt;- function(J = 8L, kappa = 4) {
+    # Exact invariant-subspace representation of the full tadpole FEM problem.
+    if (length(J) != 1L || !is.finite(J) || J != as.integer(J) ||
+        J &lt; 3L || J &gt; 11L)
+        stop(&quot;Choose 3 &lt;= J &lt;= 11 for the complete-eigensystem rough study.&quot;)
+    mesh &lt;- rough_tau_mesh(J, kappa)
+    list(C = mesh$C, L = mesh$K, initial = numeric(nrow(mesh$C)),
+         spatial_load = mesh$load, kappa = kappa, J = as.integer(J),
+         h_requested = mesh$h, h_min = mesh$h, h_max = mesh$h,
+         projected_forcing_modes = length(mesh$j))
+}
+
+isolated_rough_be_reference &lt;- function(data, spectrum, time_seq, alpha,
+                                      diffusion = 1, max_history_mib = 256) {
+    n &lt;- nrow(data$C)
+    stopifnot(length(time_seq) &gt;= 2L, all(is.finite(time_seq)),
+              time_seq[1L] == 0, all(diff(time_seq) &gt; 0),
+              length(alpha) == 1L, is.finite(alpha), alpha &gt; 0, alpha &lt;= 2,
+              length(diffusion) == 1L, is.finite(diffusion), diffusion &gt; 0,
+              identical(dim(spectrum$vectors), c(n, n)),
+              length(spectrum$values) == n,
+              length(data$initial) == n, all(is.finite(data$initial)),
+              length(data$spatial_load) == n, all(is.finite(data$spatial_load)),
+              length(max_history_mib) == 1L, is.finite(max_history_mib),
+              max_history_mib &gt; 0)
+    dt &lt;- diff(time_seq)[1L]
+    stopifnot(max(abs(diff(time_seq) - dt)) &lt;=
+              128 * .Machine$double.eps * max(1, tail(time_seq, 1L)))
+    history_mib &lt;- 2 * 8 * as.double(n) * length(time_seq)/1024^2
+    if (history_mib &gt; max_history_mib)
+        stop(&quot;Exact rough reference exceeds max_history_mib; use a moderate grid.&quot;)
+    V &lt;- spectrum$vectors
+    x &lt;- as.numeric(Matrix::crossprod(V, data$C %*% data$initial))
+    f &lt;- as.numeric(Matrix::crossprod(V, data$spatial_load))
+    rates &lt;- diffusion * spectrum$values^(alpha/2)
+    mu &lt;- 1/(1 + dt * rates)
+    states &lt;- coefficients &lt;- matrix(0, n, length(time_seq))
+    states[, 1L] &lt;- data$initial
+    coefficients[, 1L] &lt;- x
+    y &lt;- x
+    for (k in seq_len(length(time_seq) - 1L)) {
+        y &lt;- mu * (y + dt * f)
+        coefficients[, k + 1L] &lt;- y
+        states[, k + 1L] &lt;- as.numeric(V %*% y)
+    }
+    list(states = states, coefficients = coefficients, initial_coefficients = x,
+         forcing_coefficients = f, exact_rates = rates,
+         g_average = c(0, rep(1, length(time_seq) - 1L)), dt = dt,
+         time_seq = time_seq, alpha = alpha, diffusion = diffusion,
+         history_mib = history_mib)
 }</code></pre>
 </div>
 <div id="sparse-time-stepping-for-rough-data" class="section level2">

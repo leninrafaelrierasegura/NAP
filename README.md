@@ -1,6 +1,6 @@
 # BRASIL matrix experiments
 
-Five standalone R Markdown experiments use only installed `rSPDE` BRASIL
+Six standalone R Markdown experiments use only installed `rSPDE` BRASIL
 coefficient tables. Reusable coefficient, assembly, matrix-solver and error-diagnostic functions
 are in `brasilfunc.Rmd`, including the sparse matrix time-stepping kernel.
 Each notebook contains its own computation loops, regressions, plots and saves.
@@ -17,6 +17,7 @@ changes saved results, or contacts a messaging service. No credentials are neede
 | Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:14; h=0.02; tau=0.005; diffusion=1 |
 | Rough, space | `conv_in_h_rough.Rmd` | m=14; J=5:9; alpha-specific time steps; diffusion=1 |
 | Rough, time | `conv_in_tau_rough.Rmd` | m=20 for alpha=0.5, otherwise 14; N=5,10,20,40,80,160 |
+| Rough, rational order | `conv_in_m_isolated_rough.Rmd` | m=1:9; h=1/256; tau=0.02; diffusion=0.25 |
 
 All studies use alpha=0.5,0.7,...,1.9, kappa=4 and T=1. The rough temporal
 study keeps its alpha-specific mesh and diffusion. Each notebook lists them.
@@ -28,7 +29,7 @@ saved results. From the project root:
 
 ```r
 rmarkdown::render("conv_in_m_isolated.Rmd", output_dir="docs")
-# Or render all seven pages:
+# Or render all eight pages:
 rmarkdown::render_site()
 ```
 
@@ -52,8 +53,11 @@ Invalid signed coefficient rows are rejected, not altered. The shared graph
 helper supports both current and older MetricGraph APIs.
 
 The rational evolution always uses shifted sparse matrix solves and retains
-the BRASIL constant term. The isolated study uses a complete numerical
-FEM eigensystem only for its reference and independent diagnostic.
+the BRASIL constant term. Both isolated studies use a complete numerical
+FEM eigensystem only for their reference and independent diagnostic. The rough
+order study uses the invariant quarter-loop matrices with full-graph mass
+normalization. Its parameter diagnostics remain in DOCS/NAP; the project
+contains only the selected run and installed BRASIL coefficient rows.
 
 Run the focused integration checks from the project root:
 
