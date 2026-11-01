@@ -12,8 +12,11 @@ output:
 
 [Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
-Knit displays the saved results with the parameters below. The recomputation
-chunk is disabled; run it manually only to replace the saved experiment.
+Knit displays the saved results. To run a new experiment, edit the **Parameters
+for the next run** chunk, then run the setup, parameters, and recompute chunks
+manually in that order. The recompute chunk overwrites the saved results and
+figures. Knit again to display them. Parameter and recompute chunks are skipped
+when knitting; the displayed settings always describe the saved results.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,cache=FALSE)
@@ -33,10 +36,12 @@ stopifnot(identical(attr(errors_projected,"coefficient_source"),"rSPDE BRASIL"),
 
 On the tadpole with stem length 1 and loop length 2, solve
 $$
-u_t+\nu L^{\alpha/2}u=10\sin(\pi t)e_7,
-\qquad u(0)=10e_5,\qquad L=\kappa^2-\Delta_\Gamma.
+u_t+\nu L^{\alpha/2}u=a_f A\sin(\omega t)e_7,
+\qquad u(0)=a_0e_5,\qquad L=\kappa^2-\Delta_\Gamma.
 $$
-The data contain finitely many smooth eigenfunctions. Consistent P1 mass
+The data contain finitely many smooth eigenfunctions; the editable amplitudes
+are `initial_amplitude` and `forcing_amplitude`, with sine factor `AAA` and
+frequency `OMEGA`. Consistent P1 mass
 and stiffness matrices are assembled on the tadpole. Every backward Euler
 step applies shifted sparse matrix solves using the installed `rSPDE`
 BRASIL poles, residues, and constant. Cholesky factors are reused, including
@@ -48,23 +53,60 @@ continuum solution, evaluated on the saved reference mesh and time grid.
 Centered coefficient moments accumulate this norm without changing the FEM
 time evolution. The reference modes evaluate the continuum solution only.
 
-## Current parameters
+## Parameters for the next run
 
-```{r parameters}
+```{r parameters, eval=FALSE}
 T_final <- 1
 kappa <- 4
 diffusion <- 1e-3
 alpha_vector <- seq(0.5,1.9,0.2)
 m_fixed <- 8L
-overkill_h <- 1e-5
-overkill_time_step <- 1e-5
 tau_vector <- T_final/c(200L,80L,32L,13L,6L,2L)
 h_fixed <- 1e-3
-stopifnot(isTRUE(all.equal(p$axis,tau_vector)),
-          isTRUE(all.equal(p$alpha,alpha_vector)),p$m==m_fixed,
-          p$diffusion==diffusion,p$kappa==kappa,p$T==T_final,
-          p$reference_h==overkill_h,p$reference_tau==overkill_time_step,
-          isTRUE(all.equal(p$fixed$h,h_fixed)))
+overkill_h <- 1e-5
+overkill_time_step <- 1e-5
+N_finite <- 4L
+initial_amplitude <- 10
+forcing_amplitude <- 10
+AAA <- 1
+OMEGA <- pi
+workers <- 1L
+error_method <- "compressed"
+error_n_blocks <- 1L
+error_verbose <- FALSE
+```
+
+```{r recompute, eval=FALSE}
+errors_projected <- run_smooth_tau(
+  T_final=T_final,kappa=kappa,diffusion=diffusion,alpha_vector=alpha_vector,
+  m_fixed=m_fixed,tau_vector=tau_vector,h_fixed=h_fixed,
+  overkill_h=overkill_h,overkill_time_step=overkill_time_step,N_finite=N_finite,
+  initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
+  AAA=AAA,OMEGA=OMEGA,workers=workers,error_method=error_method,
+  error_n_blocks=error_n_blocks,error_verbose=error_verbose,
+  output_file="data_files/errors_projected_tau_mat.RData",
+  figure_file="data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png")
+```
+
+## Saved parameters
+
+```{r load-results, include=FALSE}
+load("data_files/errors_projected_tau_mat.RData", envir=saved)
+errors_projected <- saved$errors_projected
+p <- attr(errors_projected,"parameters")
+```
+
+```{r saved-parameters, echo=FALSE}
+knitr::kable(data.frame(T=p$T,kappa=p$kappa,diffusion=p$diffusion,m=p$m,
+  reference_h=p$reference_h,reference_tau=p$reference_tau,
+  fixed_h=p$fixed$h))
+# Original saved runs used these amplitudes and sine settings.
+# New runs record the values explicitly in their metadata.
+a0 <- if(is.null(p$initial_amplitude)) 10 else p$initial_amplitude
+af <- if(is.null(p$forcing_amplitude)) 10 else p$forcing_amplitude
+A <- if(is.null(p$AAA)) 1 else p$AAA
+omega <- if(is.null(p$OMEGA)) pi else p$OMEGA
+knitr::kable(data.frame(initial_amplitude=a0,forcing_amplitude=af,AAA=A,OMEGA=omega))
 ```
 
 The reference temporal rate is one; the spatial mesh and rational order
@@ -78,21 +120,12 @@ knitr::include_graphics("data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpaz
 
 ```{r saved-rates, echo=FALSE}
 observed <- apply(errors_projected,2,function(e)
-  unname(coef(lm(log10(e)~log10(tau_vector)))[2]))
-knitr::kable(data.frame(alpha=alpha_vector,reference=1,observed=observed),digits=5)
+  unname(coef(lm(log10(e)~log10(p$axis)))[2]))
+knitr::kable(data.frame(alpha=p$alpha,reference=1,observed=observed),digits=5)
 ```
 
 ```{r saved-errors, echo=FALSE}
-knitr::kable(data.frame(tau=tau_vector,errors_projected,check.names=FALSE),
-  col.names=c("tau",paste("alpha =",alpha_vector)),
+knitr::kable(data.frame(tau=p$axis,errors_projected,check.names=FALSE),
+  col.names=c("tau",paste("alpha =",p$alpha)),
   format.args=list(scientific=TRUE,digits=5))
-```
-
-## Recompute explicitly
-
-All implementation functions are in [brasilfunc.Rmd](brasilfunc.html).
-The current saved results are preserved until this chunk is run manually.
-
-```{r recompute, eval=FALSE}
-errors_projected <- run_smooth_tau(workers=1L)
 ```

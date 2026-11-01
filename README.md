@@ -33,8 +33,16 @@ rmarkdown::render_site()
 
 ## Explicit recomputation
 
-The final `eval=FALSE` chunk in each experiment calls its runner from
-`brasilfunc.Rmd`. Run that chunk manually to replace the saved results.
+In each notebook, edit **Parameters for the next run**, then manually run the
+`setup`, `parameters`, and `recompute` chunks in order. The computation uses
+those exact notebook variables and overwrites its saved data and figures.
+Knit afterward to refresh the report.
+
+The parameter and recompute chunks have `eval=FALSE`: Knit skips both and
+shows the existing saved results, even after you edit settings for a future
+run. Displayed parameter tables are read from the saved result metadata.
+No experiment parameter changes are needed in `brasilfunc.Rmd`.
+
 Recomputation needs Matrix, MetricGraph, rSPDE, ggplot2, statmod and sp;
 the rough matrix kernel additionally needs Rcpp, RcppEigen and a C++ compiler.
 The installed rSPDE must provide the requested `m_brasil<m>t` tables.

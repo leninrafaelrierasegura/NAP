@@ -1723,7 +1723,8 @@ functions</h1>
 experiments. Every rational coefficient is read from the installed
 <code>rSPDE</code> BRASIL tables, including their constant term.
 Knitting this file defines functions only. The experiment notebooks load
-saved results; recomputation is explicit.</p>
+saved results. Their editable parameter chunks provide every experiment
+setting when the computation chunks are run manually.</p>
 <div id="fractional-diffusion-equations-on-metric-graphs" class="section level2">
 <h2>Fractional diffusion equations on metric graphs</h2>
 <p>We analyze and numerically approximate solutions to fractional
@@ -2685,7 +2686,7 @@ run_reference_cases &lt;- function(cases, FUN, workers = 1L) {
 </div>
 <div id="smooth-experiments" class="section level2">
 <h2>Smooth experiments</h2>
-<pre class="r"><code>save_smooth_figure &lt;- function(errors,axis,alpha,study) {
+<pre class="r"><code>save_smooth_figure &lt;- function(errors,axis,alpha,study,output_file) {
   frame &lt;- expand.grid(row=seq_along(axis),column=seq_along(alpha))
   frame$x &lt;- axis[frame$row]
   frame$error &lt;- as.vector(errors)
@@ -2702,37 +2703,26 @@ run_reference_cases &lt;- function(cases, FUN, workers = 1L) {
     ggplot2::geom_point()+ggplot2::scale_x_log10()+ggplot2::scale_y_log10()+
     ggplot2::labs(x=study,y=&quot;Space-time L2 error&quot;,color=&quot;alpha&quot;)+
     ggplot2::theme_bw()+ggplot2::theme(legend.position=&quot;bottom&quot;)
-  ggplot2::ggsave(file.path(&quot;data_files&quot;,&quot;tikzpic&quot;,
-    paste0(&quot;p_&quot;,study,&quot;_nicer_tadpole_mat_with_mathpazo.png&quot;)),plot,
+  dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
+  ggplot2::ggsave(output_file,plot,
     width=4,height=5,dpi=300,bg=&quot;white&quot;)
   invisible(plot)
 }
 
-run_smooth_h &lt;- function(workers=1L,output_file=&quot;data_files/errors_projected_h_mat.RData&quot;) {
-# Parameters
-T_final &lt;- 1
-diffusion &lt;- 1e-3 # nu &gt; 0 in u_t + nu * L^(alpha/2) u = f
-workers &lt;- workers
-error_method &lt;- &quot;compressed&quot; # &quot;reference&quot; retains the original error accumulator
-kappa &lt;- 4
-N_finite &lt;- 4 # choose even
-adjusted_N_finite &lt;- N_finite + N_finite/2 + 1
-# Coefficients for u_0 and f
-coeff_U_0 &lt;- 50*(1:adjusted_N_finite)^-1
-coeff_U_0[-5] &lt;- 0
-coeff_FF &lt;- rep(0, adjusted_N_finite)
-coeff_FF[7] &lt;- 10
-
-AAA = 1
-OMEGA = pi
-
-h_vector &lt;- 2^seq(-7, -3)
-alpha_vector &lt;- seq(0.5, 1.9, 0.2)
-
-# Keep the rational order and actual uniform time grid fixed across all runs.
-m_fixed &lt;- 8
-time_step_target &lt;- 2e-5
-time_grid &lt;- make_time_grid(T_final = T_final, target_step = time_step_target)
+run_smooth_h &lt;- function(T_final, kappa, diffusion, alpha_vector, m_fixed,
+    h_vector, time_step, overkill_h, overkill_time_step, N_finite,
+    initial_amplitude, forcing_amplitude, AAA, OMEGA,
+    workers, error_method, error_n_blocks, error_verbose, output_file, figure_file) {
+  stopifnot(N_finite&gt;=4, N_finite%%2==0, length(alpha_vector)&gt;0,
+    all(is.finite(alpha_vector)), all(alpha_vector&gt;0 &amp; alpha_vector&lt;=2),
+    length(m_fixed)==1, m_fixed==floor(m_fixed))
+  for(alpha in alpha_vector[alpha_vector!=2]) brasil_coefficients(m_fixed,alpha/2)
+  adjusted_N_finite &lt;- N_finite+N_finite/2+1
+  coeff_U_0 &lt;- numeric(adjusted_N_finite)
+  coeff_U_0[5] &lt;- initial_amplitude
+  coeff_FF &lt;- numeric(adjusted_N_finite)
+  coeff_FF[7] &lt;- forcing_amplitude
+time_grid &lt;- make_time_grid(T_final = T_final, target_step = time_step)
 time_step &lt;- time_grid$time_step
 time_seq &lt;- time_grid$time_seq
 g_average &lt;- average_sine_forcing(time_seq, A = AAA, omega = OMEGA)
@@ -2743,10 +2733,6 @@ stopifnot(all(coeff_U_0[-5] == 0))
 stopifnot(length(coeff_FF) &gt;= 7L, all(coeff_FF[-7] == 0))
 
 # Reference quadrature and error accumulation.
-overkill_time_step &lt;- 1e-5
-overkill_h &lt;- 1e-5
-error_verbose &lt;- FALSE # Report completed blocks, percentage, elapsed time, and ETA.
-error_n_blocks &lt;- 1L # More blocks use less memory; blocks may span solver intervals.
 # Heavy setup and convergence computation: run manually to replace saved results.
 overkill_graph &lt;- gets.graph.tadpole(h = overkill_h)
 overkill_graph$compute_fem()
@@ -2820,38 +2806,29 @@ for (i in seq_along(h_vector)) {
 attr(errors_projected,&quot;coefficient_source&quot;) &lt;- &quot;rSPDE BRASIL&quot;
   attr(errors_projected,&quot;parameters&quot;) &lt;- list(study=&quot;h&quot;,axis=h_vector,alpha=alpha_vector,
     m=m_fixed,diffusion=diffusion,kappa=kappa,T=T_final,reference_h=overkill_h,
-    reference_tau=overkill_time_step,fixed=list(tau=time_step))
+    reference_tau=overkill_time_step,N_finite=N_finite,
+    initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
+    AAA=AAA,OMEGA=OMEGA,fixed=list(tau=time_step))
+  dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
   save(errors_projected,file=output_file)
-  save_smooth_figure(errors_projected,h_vector,alpha_vector,&quot;h&quot;)
+  save_smooth_figure(errors_projected,h_vector,alpha_vector,&quot;h&quot;,figure_file)
   invisible(errors_projected)
 }
 
-run_smooth_tau &lt;- function(workers=1L,output_file=&quot;data_files/errors_projected_tau_mat.RData&quot;) {
-# Parameters
-T_final &lt;- 1
-diffusion &lt;- 1e-3 # nu &gt; 0 in u_t + nu * L^(alpha/2) u = f
-workers &lt;- workers
-error_method &lt;- &quot;compressed&quot; # &quot;reference&quot; retains the original error accumulator
-kappa &lt;- 4
-N_finite &lt;- 4 # choose even
-adjusted_N_finite &lt;- N_finite + N_finite/2 + 1
-# Coefficients for u_0 and f
-coeff_U_0 &lt;- 50*(1:adjusted_N_finite)^-1
-coeff_U_0[-5] &lt;- 0
-coeff_FF &lt;- rep(0, adjusted_N_finite)
-coeff_FF[7] &lt;- 10
-# The analytic forcing load currently supports only the seventh eigenfunction.
-stopifnot(length(coeff_FF) &gt;= 7L, all(coeff_FF[-7] == 0))
-
-AAA = 1
-OMEGA = pi
-
-# Requested time steps and fixed spatial mesh size.
-tau_targets &lt;- T_final / c(200L, 80L, 32L, 13L, 6L, 2L)
-h_fixed &lt;- 1e-3
-m_fixed &lt;- 8
-alpha_vector &lt;- seq(0.5, 1.9, 0.2)
-
+run_smooth_tau &lt;- function(T_final, kappa, diffusion, alpha_vector, m_fixed,
+    tau_vector, h_fixed, overkill_h, overkill_time_step, N_finite,
+    initial_amplitude, forcing_amplitude, AAA, OMEGA,
+    workers, error_method, error_n_blocks, error_verbose, output_file, figure_file) {
+  stopifnot(N_finite&gt;=4, N_finite%%2==0, length(alpha_vector)&gt;0,
+    all(is.finite(alpha_vector)), all(alpha_vector&gt;0 &amp; alpha_vector&lt;=2),
+    length(m_fixed)==1, m_fixed==floor(m_fixed))
+  for(alpha in alpha_vector[alpha_vector!=2]) brasil_coefficients(m_fixed,alpha/2)
+  adjusted_N_finite &lt;- N_finite+N_finite/2+1
+  coeff_U_0 &lt;- numeric(adjusted_N_finite)
+  coeff_U_0[5] &lt;- initial_amplitude
+  coeff_FF &lt;- numeric(adjusted_N_finite)
+  coeff_FF[7] &lt;- forcing_amplitude
+tau_targets &lt;- tau_vector
 # Use the actual uniform steps in both the solver and the convergence fit.
 time_grids &lt;- lapply(tau_targets, function(target) {
   make_time_grid(T_final = T_final, target_step = target)
@@ -2865,10 +2842,6 @@ g_averages &lt;- lapply(time_grids, function(grid) {
 })
 
 # Reference quadrature and error accumulation.
-overkill_time_step &lt;- 1e-5
-overkill_h &lt;- 1e-5
-error_verbose &lt;- FALSE
-error_n_blocks &lt;- 1L
 # Heavy setup and convergence computation: run manually to replace saved results.
 overkill_graph &lt;- gets.graph.tadpole(h = overkill_h)
 overkill_graph$compute_fem()
@@ -2949,9 +2922,12 @@ for (j in seq_along(alpha_vector)) {
 attr(errors_projected,&quot;coefficient_source&quot;) &lt;- &quot;rSPDE BRASIL&quot;
   attr(errors_projected,&quot;parameters&quot;) &lt;- list(study=&quot;tau&quot;,axis=tau_vector,alpha=alpha_vector,
     m=m_fixed,diffusion=diffusion,kappa=kappa,T=T_final,reference_h=overkill_h,
-    reference_tau=overkill_time_step,fixed=list(h=h_fixed))
+    reference_tau=overkill_time_step,N_finite=N_finite,
+    initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
+    AAA=AAA,OMEGA=OMEGA,fixed=list(h=h_fixed))
+  dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
   save(errors_projected,file=output_file)
-  save_smooth_figure(errors_projected,tau_vector,alpha_vector,&quot;tau&quot;)
+  save_smooth_figure(errors_projected,tau_vector,alpha_vector,&quot;tau&quot;,figure_file)
   invisible(errors_projected)
 }
 
@@ -3113,20 +3089,10 @@ isolated_rational_error &lt;- function(data,spectrum,reference,m,excitation_tole
             started)
 }
 
-isolated_parameters &lt;- function() list(h=0.02,tau=0.005,m_max=14L,
-  alpha_vector=seq(0.5,1.9,0.2),T_final=1,kappa=4,diffusion=1)
-
-run_isolated_brasil &lt;- function(output_file=&quot;data_files/isolated_m_results.rds&quot;) {
+run_isolated_brasil &lt;- function(h, tau, m_max, alpha_vector, T_final, kappa, diffusion,
+    initial_amplitude, forcing_amplitude, AAA, OMEGA, output_file, figure_dir) {
   library(ggplot2)
-h &lt;- 0.02
-tau &lt;- 0.005
-m_max &lt;- 14L
-coefficient_source &lt;- &quot;brasil&quot;  # rSPDE m_brasil&lt;m&gt;t tables; keep their constant term
-
-alpha_vector &lt;- seq(0.5, 1.9, 0.2)
-T_final &lt;- 1
-kappa &lt;- 4
-diffusion &lt;- 1
+  coefficient_source &lt;- &quot;brasil&quot;
 stopifnot(length(h) == 1L, is.finite(h), h &gt; 0,
           length(tau) == 1L, is.finite(tau), tau &gt; 0,
           length(T_final) == 1L, is.finite(T_final), T_final &gt; 0,
@@ -3150,14 +3116,14 @@ time_seq &lt;- (0:N) * tau
 # A complete eigensystem is dense: reject very fine meshes before assembly.
 if (3 / h &gt; 1200)
   stop(&quot;Choose h &gt;= 0.0025 for this complete-eigensystem notebook.&quot;)
-data &lt;- isolated_tadpole_data(h, kappa)
+data &lt;- isolated_tadpole_data(h,kappa,initial_amplitude,forcing_amplitude)
 spectrum &lt;- isolated_discrete_spectrum(data$C, data$L)
 knitr::kable(data.frame(h_requested = h, h_min = data$h_min, h_max = data$h_max,
   tau = tau, steps = N, dimension = nrow(data$C), source = coefficient_source))
 rows &lt;- list()
 for (alpha in alpha_vector) {
   reference &lt;- isolated_exact_be_reference(data$C, spectrum, data$initial,
-    data$spatial_load, time_seq, alpha, diffusion)
+    data$spatial_load, time_seq,alpha,diffusion,A=AAA,omega=OMEGA)
   for (m in m_vector) {
     rows[[length(rows) + 1L]] &lt;- isolated_rational_error(
       data, spectrum, reference, m)
@@ -3167,7 +3133,7 @@ results &lt;- do.call(rbind, rows)
 
 # Classical BE control: exact and sparse implementations should agree.
 control_reference &lt;- isolated_exact_be_reference(data$C, spectrum, data$initial,
-  data$spatial_load, time_seq, alpha = 2, diffusion = diffusion)
+  data$spatial_load, time_seq,alpha=2,diffusion=diffusion,A=AAA,omega=OMEGA)
 control &lt;- isolated_rational_error(data, spectrum, control_reference, m = 1L)
 results$noise_indicator &lt;- pmax(results$absolute_error_disagreement,
   control$error, .Machine$double.xmin)
@@ -3424,12 +3390,15 @@ if (!is.null(reciprocal_checks)) {
   print(p_reciprocal_error_m)
 }
   plots &lt;- list(`plot`=p_m_isolated,`scalar-error-curves`=p_scalar_error,`scalar-error-convergence`=p_scalar_error_m,`unit-interval-error-curves`=p_unit_error,`unit-interval-error-convergence`=p_unit_error_m,`reciprocal-error-comparison-plot`=p_reciprocal_error_m)
-  dir.create(&quot;data_files/isolated_m&quot;,recursive=TRUE,showWarnings=FALSE)
-  for(name in names(plots)) ggplot2::ggsave(file.path(&quot;data_files/isolated_m&quot;,paste0(name,&quot;.png&quot;)),
+  dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
+  for(name in names(plots)) ggplot2::ggsave(file.path(figure_dir,paste0(name,&quot;.png&quot;)),
     plots[[name]],width=if(name==&quot;reciprocal-error-comparison-plot&quot;)11 else 8,height=5,dpi=144)
-  result &lt;- list(parameters=isolated_parameters(),results=results,errors=errors,slopes=slopes,
+  result &lt;- list(parameters=list(h=h,tau=tau,m_max=m_max,alpha_vector=alpha_vector,
+      T_final=T_final,kappa=kappa,diffusion=diffusion,initial_amplitude=initial_amplitude,
+      forcing_amplitude=forcing_amplitude,AAA=AAA,OMEGA=OMEGA),results=results,errors=errors,slopes=slopes,
     diagnostics=spectrum$diagnostics,control=control,scalar_max_errors=scalar_max_errors,
     unit_max_errors=unit_max_errors,reciprocal_checks=reciprocal_checks)
+  dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
   saveRDS(result,output_file)
   invisible(result)
 }</code></pre>
@@ -3654,14 +3623,7 @@ rough_solve &lt;- function(mesh, alpha, time_step, order = 16L, diffusion = 1, T
     result
 }
 
-rough_parameters &lt;- function() {
-    list(J = 5:9, alpha = seq(0.5, 1.9, 0.2), time_steps = c(5e-04, 0.000125, 1/30000, 1e-05, 1/320000, 1e-06,
-        4e-07, 2e-07), rational_order = 14L, symmetry_reduction = TRUE, T_final = 1, diffusion = 1, kappa = 4,
-        projection_quadrature = 16L, tail_tolerance = 1e-13, fit_J = 7:9, forcing = &quot;sum_{j&gt;=1} sin(2^j*pi*x)/j on loop; zero on stem&quot;,
-        reconstruction = &quot;right-constant backward Euler&quot;, error_integration = &quot;analytic time moments, spatial projection residual, bounded infinite tail&quot;)
-}
-
-rough_run_experiment &lt;- function(parameters = rough_parameters(), output_file = file.path(&quot;data_files&quot;, &quot;rough_h_results.rds&quot;),
+rough_run_experiment &lt;- function(parameters, output_file = file.path(&quot;data_files&quot;, &quot;rough_h_results.rds&quot;),
     checkpoint_dir = tempfile(&quot;rough-checkpoints-&quot;), workers = 1L, root = getwd(), cache_dir = tempdir()) {
     stopifnot(length(parameters$alpha) == length(parameters$time_steps), all(parameters$fit_J %in% parameters$J),
         workers &gt;= 1L, workers == as.integer(workers))
@@ -3825,16 +3787,7 @@ rough_tau_solve &lt;- function(mesh, alpha, N, order, diffusion, T_final = 1, pr
     result
 }
 
-rough_tau_parameters &lt;- function() {
-    alpha &lt;- seq(0.5, 1.9, 0.2)
-    kappa &lt;- 4
-    list(alpha = alpha, J = c(20L, 16L, 13L, 11L, 10L, 9L, 8L, 8L), diffusion = (kappa^2 + 4 * pi^2)^(-alpha/2),
-        rational_orders = c(20L, rep(14L, 7L)), N = c(5L, 10L, 20L, 40L, 80L, 160L), fit_indices = 4:6, T_final = 1,
-        kappa = kappa, projection_quadrature = 16L, tail_tolerance = 1e-13, forcing = &quot;same fixed infinite L2 forcing as conv_in_h_rough&quot;,
-        reconstruction = &quot;right-constant backward Euler&quot;, error_integration = &quot;exact time moments, stable projection residual, certified infinite tail&quot;)
-}
-
-rough_tau_run_experiment &lt;- function(parameters = rough_tau_parameters(), output_file = &quot;data_files/rough_tau_results.rds&quot;,
+rough_tau_run_experiment &lt;- function(parameters, output_file = &quot;data_files/rough_tau_results.rds&quot;,
     checkpoint_dir = tempfile(&quot;rough-tau-&quot;), workers = 3L, root = getwd(), cache_dir = tempdir()) {
     stopifnot(length(parameters$alpha) == length(parameters$J), length(parameters$alpha) == length(parameters$diffusion),
         length(parameters$alpha) == length(parameters$rational_orders), all(parameters$fit_indices %in% seq_along(parameters$N)),

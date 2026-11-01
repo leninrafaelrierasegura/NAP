@@ -12,8 +12,11 @@ output:
 
 [Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
-Knit displays the saved results with the parameters below. The recomputation
-chunk is disabled; run it manually only to replace the saved experiment.
+Knit displays the saved results. To run a new experiment, edit the **Parameters
+for the next run** chunk, then run the setup, parameters, and recompute chunks
+manually in that order. The recompute chunk overwrites the saved results and
+figures. Knit again to display them. Parameter and recompute chunks are skipped
+when knitting; the displayed settings always describe the saved results.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,cache=FALSE)
@@ -22,12 +25,12 @@ knitr::purl("brasilfunc.Rmd", output = helper, quiet = TRUE)
 sys.source(helper, envir = environment())
 unlink(helper)
 r <- readRDS("data_files/isolated_m_results.rds")
-stopifnot(isTRUE(all.equal(r$parameters,isolated_parameters())))
+
 ```
 
-## Current parameters
+## Parameters for the next run
 
-```{r parameters}
+```{r parameters, eval=FALSE}
 h <- 0.02
 tau <- 0.005
 m_max <- 14L
@@ -35,13 +38,43 @@ alpha_vector <- seq(0.5,1.9,0.2)
 T_final <- 1
 kappa <- 4
 diffusion <- 1
-stopifnot(isTRUE(all.equal(r$parameters,list(h=h,tau=tau,m_max=m_max,
-  alpha_vector=alpha_vector,T_final=T_final,kappa=kappa,diffusion=diffusion))))
+initial_amplitude <- 10
+forcing_amplitude <- 10
+AAA <- 1
+OMEGA <- pi
+```
+
+```{r recompute, eval=FALSE}
+r <- run_isolated_brasil(h=h,tau=tau,m_max=m_max,alpha_vector=alpha_vector,
+  T_final=T_final,kappa=kappa,diffusion=diffusion,
+  initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
+  AAA=AAA,OMEGA=OMEGA,output_file="data_files/isolated_m_results.rds",
+  figure_dir="data_files/isolated_m")
+```
+
+## Saved parameters
+
+```{r load-results, include=FALSE}
+r <- readRDS("data_files/isolated_m_results.rds")
+```
+
+```{r saved-parameters, echo=FALSE}
+p <- r$parameters
+knitr::kable(data.frame(h=p$h,tau=p$tau,m_max=p$m_max,T=p$T_final,
+  kappa=p$kappa,diffusion=p$diffusion))
+knitr::kable(data.frame(alpha=p$alpha_vector))
+# Original saved runs used these amplitudes and sine settings.
+# New runs record the values explicitly in their metadata.
+a0 <- if(is.null(p$initial_amplitude)) 10 else p$initial_amplitude
+af <- if(is.null(p$forcing_amplitude)) 10 else p$forcing_amplitude
+A <- if(is.null(p$AAA)) 1 else p$AAA
+omega <- if(is.null(p$OMEGA)) pi else p$OMEGA
+knitr::kable(data.frame(initial_amplitude=a0,forcing_amplitude=af,AAA=A,OMEGA=omega))
 ```
 
 ## Matrix experiment
 
-The smooth data are $u_0=10e_5$ and $f(t)=10\sin(\pi t)e_7$ on the
+The smooth data are $u_0=a_0e_5$ and $f(t)=a_f A\sin(\omega t)e_7$ on the
 length-(1,2) tadpole. Both evolutions use the **same assembled consistent P1
 FEM matrices**, analytic loads, and interval-averaged forcing.
 For $LV=CV\Lambda$ with $V^\top CV=I$, the reference is
@@ -133,10 +166,4 @@ read from `rSPDE` throughout.
 
 ```{r reciprocal-figure, echo=FALSE, out.width="850px"}
 knitr::include_graphics("data_files/isolated_m/reciprocal-error-comparison-plot.png")
-```
-
-## Recompute explicitly
-
-```{r recompute, eval=FALSE}
-r <- run_isolated_brasil()
 ```

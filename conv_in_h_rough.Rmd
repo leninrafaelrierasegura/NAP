@@ -21,6 +21,12 @@ always_allow_html: true
 
 [Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
+Knit displays the saved results. To run a new experiment, edit the **Parameters
+for the next run** chunk, then run the setup, parameters, and recompute chunks
+manually in that order. The recompute chunk overwrites the saved results and
+figures. Knit again to display them. Parameter and recompute chunks are skipped
+when knitting; the displayed settings always describe the saved results.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE,
   echo = TRUE, cache = FALSE, fig.align = "center", dpi = 150)
@@ -29,7 +35,6 @@ knitr::purl("brasilfunc.Rmd", output = helper, quiet = TRUE)
 sys.source(helper, envir = environment())
 unlink(helper)
 rough_result <- readRDS("data_files/rough_h_results.rds")
-stopifnot(identical(rough_result$parameters, rough_parameters()))
 p <- rough_result$parameters
 ```
 
@@ -39,7 +44,7 @@ On the tadpole graph with stem length $1$ and loop length $2$, let
 $L=\kappa^2-\Delta_\Gamma$ and consider
 $$
 \partial_tu+\nu L^{\alpha/2}u=g,\qquad u(0)=0,
-\qquad T=1,\quad\nu=1,\quad\kappa=4.
+\qquad T=`r p$T_final`,\quad\nu=`r p$diffusion`,\quad\kappa=`r p$kappa`.
 $$
 Use the same forcing for every $\alpha$:
 $$
@@ -79,7 +84,7 @@ The consistent P1 mass and stiffness matrices are assembled on the tadpole
 with `MetricGraph`. Every backward Euler step advances the FEM coefficient
 vector by shifted sparse matrix solves, using the same matrix update as
 `cov_in_h_mat.Rmd`. The rational inverse is obtained from the positive
-BRASIL coefficients in `rSPDE`, with order $m=14$. The constant term of this
+BRASIL coefficients in `rSPDE`, at the saved rational order listed below. The constant term of this
 approximant is included in the update. The factorizations are reused across
 all time steps.
 
@@ -98,22 +103,52 @@ E_{\mathrm{tail}}^2=
 +\frac{1-e^{-2a_jT}}{2a_j}\right].
 $$
 The omitted remainder of this infinite sum is bounded by a geometric series
-and is at most $10^{-13}$ of its accumulated value. For the resolved modes,
+and is at most `r format(p$tail_tolerance,scientific=TRUE)` of its accumulated value. For the resolved modes,
 the FEM mass norm, the spatial projection residual, and exact time moments
 evaluate the error of the right-constant reconstruction on each solver
 interval. No reference-mesh sampling or finite-mode replacement of $g$ is used.
 
-```{r parameters}
-J_vector <- p$J
-h_vector <- 2^-J_vector
-alpha_vector <- seq(0.5, 1.9, 0.2)
-stopifnot(isTRUE(all.equal(alpha_vector, p$alpha)))
-m_fixed <- p$rational_order
-time_steps <- p$time_steps
-T_final <- p$T_final
-diffusion <- p$diffusion
-kappa <- p$kappa
+# Parameters for the next run
+
+```{r parameters, eval=FALSE}
+alpha_vector <- seq(0.5,1.9,0.2)
+T_final <- 1
+kappa <- 4
+J_vector <- 5:9
+time_steps <- c(5e-4,1.25e-4,1/30000,1e-5,1/320000,1e-6,4e-7,2e-7)
+m_fixed <- 14L
+diffusion <- 1
+fit_J <- 7:9
+symmetry_reduction <- TRUE
+projection_quadrature <- 16L
+tail_tolerance <- 1e-13
+workers <- 1L
 ```
+
+```{r recompute, eval=FALSE}
+parameters <- list(alpha=alpha_vector,J=J_vector,T_final=T_final,
+  kappa=kappa,diffusion=diffusion,projection_quadrature=projection_quadrature,
+  tail_tolerance=tail_tolerance,time_steps=time_steps,rational_order=m_fixed,
+  fit_J=fit_J,symmetry_reduction=symmetry_reduction,
+  forcing="sum_{j>=1} sin(2^j*pi*x)/j on loop; zero on stem",
+  reconstruction="right-constant backward Euler",
+  error_integration="analytic time moments, spatial projection residual, bounded infinite tail")
+rough_result <- rough_run_experiment(parameters=parameters,workers=workers,
+  output_file="data_files/rough_h_results.rds")
+rough_save_figures(rough_result)
+```
+
+# Saved parameters
+
+```{r load-results, include=FALSE}
+rough_result <- readRDS("data_files/rough_h_results.rds")
+p <- rough_result$parameters
+```
+
+```{r saved-common-parameters, echo=FALSE}
+knitr::kable(data.frame(T=p$T_final,kappa=p$kappa,diffusion=p$diffusion))
+```
+
 
 The time step and rational order are fixed along each spatial refinement
 curve. The final settings are:
@@ -121,7 +156,7 @@ curve. The final settings are:
 ```{r settings, echo=FALSE}
 knitr::kable(data.frame(
   alpha = p$alpha, tau = format(p$time_steps, scientific = TRUE),
-  m = p$rational_order, meshes = "1/32, 1/64, 1/128, 1/256, 1/512"),
+  m = p$rational_order, meshes = paste0("1/",2^p$J,collapse=", ")),
   col.names = c("$\\alpha$", "$\\tau$", "$m$", "$h$"),
   align = c("r", "r", "r", "l"))
 ```
@@ -130,8 +165,7 @@ knitr::kable(data.frame(
 
 The solid curves show the computed matrix-solver errors. Dashed curves in
 the first figure follow $C_\alpha h^\alpha/J$; dashed curves in the second
-follow $C_\alpha h^\alpha$. Their constants are fitted over the three finest
-meshes, $h=1/128,1/256,1/512$.
+follow $C_\alpha h^\alpha$. Their constants are fitted over the saved fit meshes, $J \in$ `r paste(p$fit_J,collapse=", ")`.
 
 ```{r raw-error, echo=FALSE, out.width="650px", fig.cap="Spatial error for the fixed rough forcing. Dashed curves follow h^alpha/J; solid curves and markers are the matrix-solver results."}
 knitr::include_graphics("data_files/rough/conv_h_rough_raw.png")
@@ -146,7 +180,7 @@ rates <- rough_result$rates
 knitr::kable(rates, digits = c(1, 1, 4, 4, 2),
   col.names = c("$\\alpha$", "Reference", "Raw slope", "Corrected slope",
                 "Corrected relative error (%)"),
-  caption = "Regression slopes over the three finest meshes.")
+  caption = "Regression slopes over the saved fit meshes.")
 ```
 
 The logarithmic correction accounts for the factor $1/J$ in the error
@@ -164,13 +198,4 @@ cat('<div style="overflow-x:auto">\n',
   knitr::kable(errors, format = "html", caption = "Computed space–time errors.",
     table.attr = 'class="table table-condensed" style="font-size:13px; white-space:nowrap"'),
   '\n</div>\n')
-```
-
-# Recompute explicitly
-
-Knit displays the saved results. Run this chunk manually to replace them.
-
-```{r recompute, eval=FALSE}
-rough_result <- rough_run_experiment()
-rough_save_figures(rough_result)
 ```
