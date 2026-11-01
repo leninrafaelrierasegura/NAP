@@ -1,0 +1,15 @@
+BRASIL real-pole/residue audit
+rSPDE 2.5.2.9000 ; m = 8 
+999 table rows have distinct ordered negative poles, positive residues, k>=0.
+Linear interpolation preserves those conditions throughout [ 0.001 , 0.999 ].
+Therefore ALL finite a>0 have real negative q_j and real positive w_j mathematically.
+Numerical case counts:
+                       
+                        pass
+  interpolated midpoint  998
+  notebook                48
+  table row             4995
+Complex q cases: 0 
+Complex w cases: 0 
+Maximum reconstruction discrepancy: 1.4881e-14 
+No guarantee is made for invalid input coefficients, nonpositive a, or floating-point extremes.

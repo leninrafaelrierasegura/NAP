@@ -1,0 +1,1912 @@
+---
+title: "The rough-forcing spatial experiment: mathematics and code"
+subtitle: "A derivation of conv_in_h_rough.Rmd and the functions in fun/rough"
+date: "30 October 2026"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    number_sections: true
+    theme: flatly
+    highlight: pygments
+    code_folding: hide
+    code_download: true
+    mathjax: "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+    self_contained: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                     error = FALSE, cache = FALSE, fig.align = "center")
+project_root <- if (file.exists("fun/rough/load.R")) normalizePath(".") else normalizePath("..")
+stopifnot(file.exists(file.path(project_root, "fun/rough/load.R")))
+knitr::opts_knit$set(root.dir = project_root)
+baseline_root <- file.path(project_root, "data_files/rough_comparison/brasil_sources/rough")
+for (name in c("problem.R", "matrix_solver.R", "experiment.R", "plotting.R"))
+  source(file.path(baseline_root, name), local = TRUE)
+saved_path <- file.path(project_root, "data_files/rough_comparison/brasil_h_results.rds")
+saved <- readRDS(saved_path)
+parameters <- saved$parameters
+source_files <- c("problem.R", "matrix_solver.R", "matrix_evolution.cpp",
+                  "experiment.R", "plotting.R", "load.R")
+source_listing <- function(name, language = "r") {
+  fence <- paste(rep(intToUtf8(96), 3), collapse = "")
+  lines <- readLines(file.path(baseline_root, name), warn = FALSE)
+  cat("\n", fence, language, "\n", paste(lines, collapse = "\n"),
+      "\n", fence, "\n\n", sep = "")
+}
+```
+
+# What this note explains
+
+> **Branch comparison:** this detailed note describes the preserved BRASIL
+> baseline. On `rough/operator-based-coefficients`, the live experiments use
+> directly computed root/factor coefficients without beta interpolation.
+> See the [matched comparison](../docs/rough_operator_comparison.html).
+> The result tables and source listings below read the archived baseline,
+> so they remain consistent with the mathematical and code explanation.
+
+This note explains the **spatial rough-forcing experiment** in
+[original conv_in_h_rough.Rmd](../data_files/rough_comparison/brasil_h_notebook.Rmd). Its implementation is in
+[fun/rough](../fun/rough/README.md). It is not an explanation of the separate
+temporal rough-forcing experiment.
+
+The differential equation, the data, the finite element method, the rational
+update, and the norm used to measure error are all derived here. The code
+appendix includes the preserved baseline source, not a rewritten substitute.
+Rendering this note reads the saved results and source files. It does not
+rerun the forty convergence cases or compile the C++ solver.
+
+There are four objects to keep separate:
+
+| Object | Meaning |
+|---|---|
+| \(u(t)\) | The solution of the continuous equation with an infinite-series forcing |
+| \(u_h(t)\) | The ideal spatial FEM solution, with exact fractional powers and continuous time |
+| \(U_{h,m}^k\), and its reconstruction \(U_{h,m}^{\tau}(t)\) | The rational backward Euler FEM approximation actually advanced by the code |
+| \(E_{\mathrm{reported}}\) | Its space–time error, evaluated using stable numerical formulas and a bounded remainder of an infinite sum |
+
+The statement \(E_h\asymp h^\alpha/|\log h|\) is first a statement about the
+ideal spatial error \(\|u-u_h\|_{L_2(0,T;L_2(\Gamma))}\).
+It describes the fully discrete experiment over a range where the other
+errors are small. Fixed \(\tau\) and fixed rational order do not give this
+asymptotic behavior down to arbitrarily small \(h\).
+
+## Notation
+
+| Symbol | Definition |
+|---|---|
+| \(\Gamma\) | The tadpole metric graph |
+| \(y\in[0,1]\) | Coordinate on the stem; \(y=1\) is the junction |
+| \(x\in[0,2]\) | Coordinate on the loop; \(x=0\) and \(x=2\) are the same junction |
+| \(L=\kappa^2-\Delta_\Gamma\) | Shifted Kirchhoff–Laplacian |
+| \(\beta=\alpha/2\) | Fractional exponent of \(L\) |
+| \(\phi_j\), \(j\geq1\) | A selected dyadic family of continuous eigenfunctions |
+| \(\mu_j\) | Eigenvalue of \(L\) on \(\phi_j\) |
+| \(a_j=\nu\mu_j^\beta\) | Physical decay rate |
+| \(J\) | Mesh refinement index; \(h=2^{-J}\) |
+| \(n=2^J\) | Number of stem elements |
+| \(N\) | Number of time intervals; \(\tau=T/N\) |
+| \(C,G,K=\kappa^2C+G\) | FEM mass, stiffness, and shifted stiffness matrices |
+| \(B\) | Columns of exact loads of the resolved \(\phi_j\) |
+| \(P=C^{-1}B\) | Matrix of their FEM projection coefficients |
+| \(\mathsf R_h\) | Gram matrix of their spatial projection residuals |
+| \(\mathcal R_m\) | Scalar rational approximation to \(x^{-\beta}\) |
+| \(S\) | Signed nodal embedding from a quarter-loop to the full graph |
+| \(\Psi v\) | FEM function with coefficient vector \(v\) |
+
+The index \(j\) is **not** the index of the entire ordered graph spectrum.
+The functions used here are a sparse, orthonormal subset of that spectrum.
+
+# The graph and the operator
+
+## The metric and the drawing are different things
+
+The graph consists of a stem of length 1 attached to a loop of length 2.
+Integration means integration with respect to edge length:
+\[
+(f,v)_{L_2(\Gamma)}
+=\int_0^1 f_{\mathrm{stem}}(y)v_{\mathrm{stem}}(y)\,dy
++\int_0^2 f_{\mathrm{loop}}(x)v_{\mathrm{loop}}(x)\,dx.
+\]
+The total graph length is 3.
+
+The drawing in `rough_mesh()` uses a straight segment and a polygonal
+approximation to a circle of radius \(1/\pi\). A perfect circle of this
+radius has circumference 2, but its polygonal approximation has a slightly
+different Euclidean length. The code therefore explicitly sets the
+**metric** edge lengths to `c(1, 2)`. The differential equation uses those
+lengths, not an approximate polygon circumference.
+
+## Domain of the Kirchhoff–Laplacian
+
+The operator acts as a second derivative separately on each edge.
+Its domain consists of edgewise \(H^2\) functions satisfying:
+
+1. Continuity at the junction:
+   \[
+   v_{\mathrm{stem}}(1)=v_{\mathrm{loop}}(0)=v_{\mathrm{loop}}(2).
+   \]
+2. Neumann condition at the free endpoint:
+   \[
+   v_{\mathrm{stem}}'(0)=0.
+   \]
+3. Kirchhoff flux balance at the junction:
+   \[
+   -v_{\mathrm{stem}}'(1)
+   +v_{\mathrm{loop}}'(0)-v_{\mathrm{loop}}'(2)=0.
+   \]
+
+The signs come from derivatives directed **outward from the vertex**.
+At the right endpoint of an oriented interval the outward derivative is
+the negative coordinate derivative. The loop contributes twice at its
+junction: once from each endpoint of its interval representation.
+
+Integration by parts with these conditions gives
+\[
+(-\Delta_\Gamma v,v)=\int_\Gamma |v'|^2.
+\]
+Thus the shifted operator is positive:
+\[
+(Lv,v)=\kappa^2\|v\|^2+\|v'\|^2
+\geq\kappa^2\|v\|^2.
+\]
+The positive shift \(\kappa>0\) removes the zero eigenvalue of the unshifted
+Kirchhoff–Laplacian and makes inverse fractional powers well-defined.
+
+# Why the selected functions are eigenfunctions
+
+For \(j=1,2,\ldots\), write \(k_j=2^j\), and define
+\[
+\phi_j=
+\begin{cases}
+0,&\text{on the stem},\\
+\sin(k_j\pi x),&\text{on the loop}.
+\end{cases}
+\]
+
+## Edgewise differential equation
+
+On the loop,
+\[
+-\frac{d^2}{dx^2}\sin(k_j\pi x)
+=(k_j\pi)^2\sin(k_j\pi x).
+\]
+On the stem both sides are zero. Therefore, edgewise,
+\[
+L\phi_j=\left[\kappa^2+(k_j\pi)^2\right]\phi_j.
+\]
+An edgewise identity alone is not enough: the vertex conditions must also hold.
+
+## Vertex conditions
+
+At the junction,
+\[
+\phi_{\mathrm{stem}}(1)=0,\qquad
+\phi_{\mathrm{loop}}(0)=0,\qquad
+\phi_{\mathrm{loop}}(2)=\sin(2k_j\pi)=0.
+\]
+The free-end Neumann condition holds because the stem function is zero.
+
+At the junction the two loop derivatives are
+\[
+\phi_{\mathrm{loop}}'(0)=k_j\pi,\qquad
+\phi_{\mathrm{loop}}'(2)=k_j\pi\cos(2k_j\pi)=k_j\pi.
+\]
+Hence the outward derivatives add to
+\[
+0+k_j\pi-k_j\pi=0.
+\]
+Each function is smooth on both edges, satisfies all domain conditions,
+and is therefore a genuine graph eigenfunction:
+\[
+\boxed{\mu_j=\kappa^2+\pi^2 2^{2j},\qquad L\phi_j=\mu_j\phi_j.}
+\]
+
+The construction would also give loop-supported eigenfunctions
+\(\sin(k\pi x)\) for other positive integer \(k\). The dyadic selection
+\(k=2^j\) is deliberate: it makes regularity, unresolved loads, tail bounds,
+and mesh refinement particularly transparent.
+
+## Normalization and orthogonality
+
+For an integer \(k\geq1\),
+\[
+\int_0^2\sin^2(k\pi x)\,dx
+=\left[\frac{x}{2}-\frac{\sin(2k\pi x)}{4k\pi}\right]_0^2=1.
+\]
+Thus these functions are already normalized; no extra square-root factor
+is required.
+
+For distinct integers \(k,\ell\), the product-to-sum identity gives
+\[
+\int_0^2\sin(k\pi x)\sin(\ell\pi x)\,dx=0.
+\]
+The stem contributes zero. Consequently
+\[
+(\phi_i,\phi_j)_{L_2(\Gamma)}=\delta_{ij}.
+\]
+
+This family is not a complete basis of \(L_2(\Gamma)\). However, it can be
+included in a full orthonormal eigenbasis, choosing an orthonormal basis
+inside each eigenspace if an eigenvalue is repeated. All coefficients of
+our data outside this selected family are zero.
+
+# Why the forcing is in \(L_2\), but in no positive spectral Sobolev space
+
+Define the partial sums
+\[
+g_M=\sum_{j=1}^M\frac1j\phi_j.
+\]
+Orthogonality gives, for \(M'>M\),
+\[
+\|g_{M'}-g_M\|_{L_2(\Gamma)}^2
+=\sum_{j=M+1}^{M'}\frac1{j^2}\longrightarrow0.
+\]
+Completeness of \(L_2(\Gamma)\) therefore defines
+\[
+\boxed{g=\sum_{j=1}^{\infty}\frac1j\phi_j\quad\text{in }L_2(\Gamma).}
+\]
+Furthermore,
+\[
+\|g\|_{L_2(\Gamma)}^2
+=\sum_{j=1}^{\infty}\frac1{j^2}=\frac{\pi^2}{6}.
+\]
+
+## The meaning of \(\dot H^s\)
+
+Here the dot denotes a spectral space of the **shifted** operator:
+\[
+\dot H^s(\Gamma)=D(L^{s/2}),\qquad
+\|v\|_{\dot H^s}^2=\sum_\ell \lambda_\ell^s|(v,e_\ell)|^2.
+\]
+It does not mean a mean-zero subspace. The strictly positive shift makes
+this norm nondegenerate, including on constant functions.
+
+The exponent is \(s\), rather than \(2s\), in the weighted sum because the
+norm squares \(L^{s/2}\). With the selected eigenfunctions,
+\[
+\|g\|_{\dot H^s}^2=\sum_{j=1}^{\infty}\frac{\mu_j^s}{j^2}.
+\]
+For every \(s>0\),
+\[
+\frac{\mu_j^s}{j^2}
+\geq \pi^{2s}\frac{2^{2sj}}{j^2}\longrightarrow\infty.
+\]
+The summands do not even tend to zero. Hence
+\[
+\boxed{g\in L_2(\Gamma),\qquad
+g\notin\dot H^s(\Gamma)\ \text{for every }s>0.}
+\]
+
+This is why using dyadic frequencies matters. Coefficients \(1/j\) on an
+ordinary sequence of frequencies growing only like \(j\) would have some
+positive regularity; coefficients \(1/j\) on frequencies growing like
+\(2^j\) do not.
+
+## Why choose the coefficient \(1/j\)?
+
+More generally, coefficients \(j^{-p}\) on this dyadic family give an
+\(L_2\) forcing when \(p>1/2\), but still give no positive spectral
+Sobolev regularity. The corresponding spatial tail has norm of order
+\(h^\alpha/J^p\). The choice \(p=1\) is simple, has the familiar norm
+\(\sum j^{-2}=\pi^2/6\), and produces the correction factor \(J\).
+
+Setting all coefficients equal to 1 to try to obtain a pure \(h^\alpha\)
+tail would make \(\sum_j\|\phi_j\|^2\) diverge. That would no longer be
+an \(L_2\) forcing under the assumptions of this experiment. The logarithmic
+factor is a feature of these fixed, square-summable data, not an error in
+the numerical solver.
+
+## Why the earlier smooth experiment behaved differently
+
+The original matrix experiment uses finite-mode data, namely
+\(u_0=10e_5\) and \(f(t)=10\sin(\pi t)e_7\). A finite eigenfunction sum
+belongs to every nonnegative-order spectral Sobolev space. The manuscript's
+spatial exponent therefore reaches the P1 limit \(2-\epsilon\), regardless
+of the tested \(\alpha<2\).
+
+Here the initial condition is zero, so initial regularity imposes no
+restriction. The forcing has precisely the \(s_f=0\) regularity needed to
+make the forcing term in the estimate select \(\alpha-\epsilon\).
+The spatial roughness persists because the forcing is present throughout
+the time interval.
+
+## What the series does and does not say pointwise
+
+The definition above is an \(L_2\) definition. It does not require absolute
+pointwise convergence, continuity, or existence of vertex values for \(g\).
+In particular, one must not differentiate the forcing series term by term
+and assume that the differentiated series is an \(L_2\) function.
+
+At a dyadic point \(x=i2^{-J}\), all terms with \(j\geq J\) have zero sine
+value. This makes nodal sampling misleading: very high modes can disappear
+at every mesh node while still carrying nonzero \(L_2\) energy.
+The forcing is assembled through integrals against FEM hats, not through
+interpolation of sampled values.
+
+The mean of each selected sine over the loop is zero, so
+\(\int_\Gamma g=0\). The solution also has zero graph mean. This is a
+property of the chosen data, not the definition of the dotted spaces.
+
+# Deriving and checking the true solution
+
+The physical equation is
+\[
+u_t+\nu L^\beta u=g,\qquad u(0)=0,\qquad \beta=\alpha/2,\quad\nu>0.
+\]
+Since the data use only the selected eigenfunctions, seek
+\[
+u(t)=\sum_{j\geq1}c_j(t)\phi_j.
+\]
+Taking its inner product with \(\phi_j\) gives
+\[
+c_j'(t)+a_jc_j(t)=\frac1j,\qquad
+c_j(0)=0,\qquad a_j=\nu\mu_j^\beta.
+\]
+Multiplication by \(e^{a_jt}\) and integration yield
+\[
+e^{a_jt}c_j(t)=\frac1j\int_0^t e^{a_jr}\,dr,
+\]
+and therefore
+\[
+\boxed{
+c_j(t)=\frac{1-e^{-a_jt}}{j\,a_j},\qquad
+u(t)=\sum_{j=1}^{\infty}\frac{1-e^{-a_jt}}{j\,a_j}\phi_j.}
+\]
+
+## Why the infinite formula really solves the equation
+
+The bound \(0\leq1-e^{-z}\leq\min(z,1)\) gives
+\[
+|c_j(t)|\leq\min\left(\frac{t}{j},\frac1{j\,a_j}\right).
+\]
+Thus the solution series converges in \(L_2\), uniformly on bounded time
+intervals. Its derivative has coefficients
+\[
+c_j'(t)=\frac{e^{-a_jt}}j.
+\]
+These are bounded by the square-summable sequence \(1/j\).
+The derivative series is continuous in \(L_2\), including at \(t=0\), by
+dominated convergence of the squared coefficients.
+
+Likewise
+\[
+\nu L^\beta u(t)=\sum_{j\geq1}\frac{1-e^{-a_jt}}j\phi_j
+\]
+converges in \(L_2\). Adding this series to the derivative series gives
+\(g\) coefficient by coefficient. The initial value is zero.
+This establishes a strong \(L_2\) solution, rather than only a formal series.
+
+Equivalently, the same function is the semigroup integral
+\[
+u(t)=\int_0^t e^{-\nu L^\beta(t-r)}g\,dr.
+\]
+The eigenfunction derivation is the scalar evaluation of this formula.
+
+Uniqueness follows from the energy identity for the difference \(w\) of
+two solutions:
+\[
+\frac12\frac{d}{dt}\|w\|_{L_2}^2
++\nu\|L^{\beta/2}w\|_{L_2}^2=0,\qquad w(0)=0.
+\]
+
+## Exact spatial regularity of \(u(t)\)
+
+For every \(t>0\),
+\[
+\|u(t)\|_{\dot H^\alpha}^2
+=\frac1{\nu^2}\sum_{j\geq1}\frac{(1-e^{-a_jt})^2}{j^2}
+\leq\frac{\pi^2}{6\nu^2}.
+\]
+For any \(\delta>0\),
+\[
+\|u(t)\|_{\dot H^{\alpha+\delta}}^2
+=\frac1{\nu^2}\sum_{j\geq1}
+\frac{\mu_j^\delta(1-e^{-a_jt})^2}{j^2}=\infty.
+\]
+Indeed \(a_j\to\infty\), so the parentheses tend to 1, while
+\(\mu_j^\delta/j^2\) grows exponentially.
+
+Persistent forcing therefore produces exactly \(\alpha\) orders of spectral
+smoothing. It prevents the solution from becoming arbitrarily smooth at
+positive times. This differs from a homogeneous equation with rough initial
+data, whose high modes decay away.
+
+## Which vertex conditions can be interpreted classically for the solution?
+
+Each \(\phi_j\) belongs to the domain of \(L\), but an infinite sum of such
+functions need not belong to that domain. For every \(t>0\) and
+\(\alpha<2\), the regularity calculation above gives
+\(u(t)\notin\dot H^2=D(L)\). The equation uses \(L^{\alpha/2}u\), defined
+spectrally, rather than requiring \(Lu\) to exist in \(L_2\).
+
+For these particular data, the solution is nevertheless continuous on the
+graph for every \(\alpha>0\):
+\[
+\sum_{j\geq1}|c_j(t)|\|\phi_j\|_\infty
+\leq C\sum_{j\geq1}\frac{2^{-\alpha j}}j<\infty.
+\]
+The uniform convergence preserves the zero junction values and zero stem.
+
+When \(\alpha>1\), the derivative series also converges uniformly because
+\[
+\sum_{j\geq1}2^j\pi|c_j(t)|
+\leq C\sum_{j\geq1}\frac{2^{(1-\alpha)j}}j<\infty.
+\]
+In this range the two loop endpoint derivatives are equal and the
+Kirchhoff derivative balance can be read classically, even though the
+second derivatives are not square-integrable.
+
+For \(0<\alpha\leq1\), one should not impose a classical finite derivative
+at the junction on this solution. This is not merely a failure to justify
+termwise differentiation. Along \(x_n=2^{-n}\), all modes \(j\geq n\)
+vanish, while the remaining sine arguments lie in \([0,\pi/2]\).
+Using \(\sin z\geq2z/\pi\) on that interval and
+\(1-e^{-a_jt}\geq1/2\) for all sufficiently large \(j\), one obtains
+\[
+\frac{u(x_n,t)}{x_n}
+\geq C\sum_{j=j_0}^{n-1}\frac{2^{(1-\alpha)j}}j\longrightarrow\infty.
+\]
+Thus the finite one-sided loop derivative fails at the junction in that
+range. The spectral fractional equation is still well-defined and the
+solution still satisfies it strongly in \(L_2\). The Kirchhoff conditions
+define the underlying operator and its eigenfunctions; they do not imply
+that every element of every fractional domain has classical derivative traces.
+
+# Uniform dyadic meshes and FEM matrices
+
+## Why \(h=2^{-J}\)
+
+Set \(n=2^J\), so \(h=1/n\). Then the stem has \(n\) elements and the loop
+has \(2n\) elements of exactly the same physical length.
+
+This choice provides four useful facts:
+
+1. Both edge lengths are integer multiples of \(h\).
+2. The mesh nodes align with the dyadic sine frequencies.
+3. All unresolved sine loads vanish exactly, with a precisely known cutoff.
+4. The four signed quarter-loop copies align node by node.
+
+The experiment uses \(J=5,6,7,8,9\), namely
+\(h=1/32,1/64,1/128,1/256,1/512\).
+A general unaligned mesh is possible, but its unresolved loads would not
+have the exact vanishing property used by this implementation.
+
+## Node counts and data structures
+
+The stem has \(n+1\) distinct nodes. The loop adds \(2n-1\) interior nodes,
+because its two endpoint coordinates are one existing junction node.
+Thus the full FEM dimension is
+\[
+N_h=(n+1)+(2n-1)=3n.
+\]
+
+In the graph representation used by `rough_mesh()`:
+
+- Node 1 is the free endpoint and node 2 is the junction.
+- A row of `graph$mesh$PtE` gives an edge number and a relative edge coordinate.
+- Interior row \(r\) corresponds to global node \(2+r\).
+- Relative loop coordinates are multiplied by 2 to get physical \(x\).
+- `loop_nodes` starts and ends with global node 2. This repeats a reference
+  to the same node; it does not create a second junction.
+
+The code checks both the dimension \(3n\) and the actual element lengths.
+
+## Local and global matrices
+
+Let \(\{\psi_i\}\) be the continuous piecewise linear nodal basis and write
+\(v_h=\Psi v=\sum_i v_i\psi_i\). The local matrices on an element of length \(h\) are
+\[
+C_e=\frac h6
+\begin{pmatrix}2&1\\1&2\end{pmatrix},\qquad
+G_e=\frac1h
+\begin{pmatrix}1&-1\\-1&1\end{pmatrix}.
+\]
+Assembly adds contributions at shared nodes, including both sides of the
+loop junction. Globally,
+\[
+C_{ij}=(\psi_j,\psi_i),\qquad
+G_{ij}=(\psi_j',\psi_i'),\qquad K=\kappa^2C+G.
+\]
+The code uses the **consistent** mass matrix \(C\); it does not lump it.
+
+The coefficient matrix of the discrete operator \(L_h\) is
+\[
+A_h=C^{-1}K.
+\]
+It is self-adjoint in the mass inner product
+\((v,w)_C=v^\mathsf TCw\), although generally not symmetric in the ordinary
+Euclidean inner product. The symmetric matrix \(K\) alone is not the
+coefficient representation of \(L_h\).
+
+For example,
+\[
+\|\Psi v\|_{L_2(\Gamma)}^2=v^\mathsf TCv.
+\]
+Using an ordinary vector norm here would measure a different quantity.
+
+# Exact sine–hat loads and the disappearance of unresolved modes
+
+## Derivation of the sine–hat integral
+
+For a periodic loop hat centered at \(x_i\), let
+\[
+\psi_i(x_i+r)=1-|r|/h,\qquad |r|\leq h.
+\]
+For a sine of frequency \(w\), oddness eliminates one term:
+\[
+\begin{aligned}
+\int \sin(wx)\psi_i(x)\,dx
+&=\sin(wx_i)\,2\int_0^h(1-r/h)\cos(wr)\,dr\\
+&=\sin(wx_i)\,\frac{2(1-\cos(wh))}{h w^2}\\
+&=h\,\operatorname{sinc}^2(wh/2)\sin(wx_i),
+\end{aligned}
+\]
+where \(\operatorname{sinc}(z)=\sin(z)/z\), with value 1 at zero.
+
+For mode \(j\), set
+\[
+\theta_j=\pi 2^j h.
+\]
+Then the load column \(B_j\) is exactly
+\[
+(B_j)_i=h\,\operatorname{sinc}^2(\theta_j/2)\sin(2^j\pi x_i)
+\]
+at interior loop nodes, and zero on stem nodes.
+
+At the junction the loop hat has one piece near \(x=0\) and another near
+\(x=2\). The sine changes sign under wrapping across the junction.
+The two integrals cancel. The junction load is therefore also zero.
+
+## Why modes \(j\geq J\) have zero loads
+
+At a loop node \(x_i=ih=i2^{-J}\),
+\[
+\sin(2^j\pi x_i)=\sin(\pi i2^{j-J})=0\qquad(j\geq J).
+\]
+The integral formula, together with the junction cancellation, proves
+\[
+(\phi_j,\psi_i)=0\quad\text{for every hat }\psi_i,\qquad j\geq J.
+\]
+Therefore
+\[
+\boxed{P_h\phi_j=0\quad(j\geq J).}
+\]
+
+The proof uses the hat integral. Zero nodal samples by themselves would
+not imply zero loads for an arbitrary function.
+
+For \(j<J\), \(\theta_j\leq\pi/2\), so the highest retained sine has four
+elements per wavelength. The code assembles precisely
+\(j=1,\ldots,J-1\), using `sinpi(x*k)` to evaluate \(\sin(\pi xk)\) with
+better argument reduction near integer arguments.
+
+## Why the finite load still represents the infinite forcing
+
+The functional \(v\mapsto(v,\psi_i)\) is continuous on \(L_2\), so the
+definition of \(g\) permits
+\[
+(g,\psi_i)=\lim_{M\to\infty}\sum_{j=1}^M\frac1j(\phi_j,\psi_i)
+=\sum_{j=1}^{J-1}\frac1j(B_j)_i.
+\]
+Consequently the exact full forcing load is
+\[
+\boxed{b=B(1,1/2,\ldots,1/(J-1))^\mathsf T.}
+\]
+
+The code line `load <- as.numeric(B %*% (1/j))` is thus an exact finite
+representation of the load of the **fixed infinite** \(g\).
+It is not the choice of a different finite forcing for each mesh.
+
+# Orthogonal projection and its stable residual Gram matrix
+
+For a function \(\phi\), its \(L_2\)-orthogonal FEM projection satisfies
+\[
+(P_h\phi,\psi_i)=(\phi,\psi_i).
+\]
+If its coefficient vector is \(p\), then \(Cp=b(\phi)\). For all resolved
+modes together,
+\[
+\boxed{CP=B,\qquad P=C^{-1}B.}
+\]
+The matrix \(P\) has \(N_h\) rows and \(J-1\) columns.
+
+Let \(r_j=\phi_j-P_h\phi_j\) and define
+\[
+(\mathsf R_h)_{ij}=(r_i,r_j).
+\]
+Orthogonality of the projection gives the exact identity
+\[
+\boxed{\mathsf R_h=I-P^\mathsf TCP=I-B^\mathsf TC^{-1}B.}
+\]
+This matrix is positive semidefinite.
+
+## Why the code does not subtract these matrices
+
+For a well-resolved smooth sine, \(\|r_j\|^2\) is very small.
+Computing it as \(1-\|P_h\phi_j\|^2\) subtracts numbers close to 1 and can
+lose most relative accuracy or produce a tiny negative result.
+
+`rough_projection()` instead evaluates the residual function itself on
+each element:
+\[
+r_j(x_{\ell}+hz)
+=\sin(2^j\pi(x_\ell+hz))
+-\big[(1-z)P_{\ell j}+zP_{\ell+1,j}\big].
+\]
+It integrates products \(r_i r_j\) with a 16-point Gauss–Legendre rule,
+summing over loop elements and also over stem elements. The latter terms
+include any floating-point leakage of the computed projection onto the stem.
+
+The reference interval transformation is
+\[
+z=(\xi+1)/2,\qquad dx=h\,dz,
+\]
+so the weights are the standard Gauss weights divided by 2, then multiplied
+by \(h\).
+
+This is stable spatial quadrature, not a symbolic exact integration of
+sine products. The residual is not a polynomial. The order is sufficient
+for the retained frequencies and was checked by doubling it to 32.
+The resulting Gram matrix is assembled as a sum of weighted cross-products,
+which preserves positivity much better than subtraction.
+
+# The matrix backward Euler method
+
+With \(u_0=0\) and a constant forcing, the ideal spatial FEM equation is
+\[
+u_h'(t)+\nu L_h^\beta u_h(t)=P_hg,\qquad u_h(0)=0.
+\]
+Write the coefficient vector at step \(k\) as \(U^k\).
+Backward Euler gives
+\[
+\big[I+\tau\nu(C^{-1}K)^\beta\big]U^{k+1}
+=U^k+\tau C^{-1}b.
+\]
+There is no sine-in-time forcing average in this experiment: the forcing
+is constant, so its interval average is exactly itself.
+
+## Normalize the operator
+
+Put
+\[
+X=C^{-1}K/\kappa^2,\qquad
+s=\tau\nu\kappa^{2\beta}.
+\]
+The eigenvalues of \(X\) are at least 1. The exact one-step function is
+\[
+H_{\mathrm{exact}}(x)=\frac1{1+s x^\beta}
+=\frac{x^{-\beta}}{x^{-\beta}+s}.
+\]
+Thus the normalized inverse power is the object approximated rationally.
+
+The code obtains
+\[
+\mathcal R_m(x)=k_0+\sum_{\ell=1}^m\frac{r_\ell}{x-p_\ell}
+\approx x^{-\beta},
+\qquad p_\ell<0,\quad r_\ell>0,\quad k_0\geq0.
+\]
+It uses BRASIL coefficient tables in `rSPDE`.
+The table column called `alpha` is evaluated at **\(\beta=\alpha/2\)**,
+not at the PDE order \(\alpha\).
+
+The published experiment explicitly uses order 14, with a table row at
+each requested \(\beta\). The helper defaults still say `order = 16L`;
+the experiment overrides them. Calling a low-level helper without this
+override is not a reproduction of the published settings. In particular,
+some higher-order table rows have a negative constant and are rejected by
+the positivity checks.
+
+## The rational evolution function
+
+Replace \(x^{-\beta}\) by \(\mathcal R_m(x)\):
+\[
+\boxed{H_m(x)=\frac{\mathcal R_m(x)}{\mathcal R_m(x)+s}.}
+\]
+For \(x\geq1\), positivity gives \(0<H_m(x)<1\).
+This explains stability in the mass norm: every scalar spectral multiplier
+of the discrete self-adjoint operator lies between 0 and 1.
+
+The exact scalar transfer error is
+\[
+H_m(x)-H_{\mathrm{exact}}(x)
+=\frac{s(\mathcal R_m(x)-x^{-\beta})}
+{(\mathcal R_m(x)+s)(x^{-\beta}+s)}.
+\]
+It is the inverse-approximation error propagated through the backward Euler
+resolvent. A fixed degree does not control this error uniformly over
+arbitrarily fine meshes merely because it worked on the current range.
+
+# Why the partial fractions have the form used in the code
+
+## Location and uniqueness of the new poles
+
+Sort the original poles:
+\[
+p_1<\cdots<p_m<0.
+\]
+The new poles \(z_\ell\) solve
+\[
+\mathcal R_m(z_\ell)+s=0.
+\]
+Between original poles,
+\[
+\mathcal R_m'(x)=-\sum_{\ell=1}^m\frac{r_\ell}{(x-p_\ell)^2}<0.
+\]
+On each interval \((p_i,p_{i+1})\), the function decreases from \(+\infty\)
+to \(-\infty\), so there is exactly one root.
+There is also exactly one root in \((-\infty,p_1)\): the limit of
+\(\mathcal R_m+s\) at \(-\infty\) is \(k_0+s>0\), while its left-hand limit
+at \(p_1\) is \(-\infty\).
+There are no roots to the right of \(p_m\), where the function is positive.
+
+Hence there are exactly \(m\) new poles, all negative.
+
+`rough_transfer()` brackets the first root by repeatedly doubling a
+negative left endpoint until the sign is correct. Each interval is mapped
+to \(z\in[0,1]\) before calling `uniroot()`. The normalized coordinate
+avoids using one absolute tolerance for poles on very different scales.
+At an original pole the code supplies the appropriate very large signed
+endpoint value instead of evaluating a division by zero.
+
+## Residues and the constant term
+
+At a new pole \(z_\ell\), \(\mathcal R_m(z_\ell)=-s\), so
+\[
+w_\ell
+=\frac{\mathcal R_m(z_\ell)}{\mathcal R_m'(z_\ell)}
+=\frac{s}{\sum_i r_i/(z_\ell-p_i)^2}>0.
+\]
+Also
+\[
+d=\lim_{x\to\infty}H_m(x)=\frac{k_0}{k_0+s}.
+\]
+Therefore
+\[
+\boxed{H_m(x)=d+\sum_{\ell=1}^m\frac{w_\ell}{x-z_\ell}.}
+\]
+
+The code's `residues` after this transformation are the \(w_\ell\), not the
+original \(r_\ell\). Its `remainder` is \(d\).
+Dropping \(d\) would implement a different one-step function.
+
+The reconstruction check evaluates both formulas at 257 logarithmically
+spaced points from 1 to \(10^{10}\), requiring maximum absolute discrepancy
+at most \(2\times10^{-12}\). This checks the partial-fraction conversion.
+It is not a proof of rational approximation accuracy over the whole real axis.
+
+## Conversion to sparse FEM systems
+
+Let \(q=C U^k+\tau b\). Since
+\[
+X-zI=C^{-1}(K/\kappa^2-zC),
+\]
+we have
+\[
+(X-zI)^{-1}C^{-1}=(K/\kappa^2-zC)^{-1}.
+\]
+The coefficient update becomes
+\[
+\boxed{
+U^{k+1}
+=d\,C^{-1}q+
+\sum_{\ell=1}^m w_\ell
+(K/\kappa^2-z_\ell C)^{-1}q.}
+\]
+Every shifted matrix is symmetric positive definite because
+\(K/\kappa^2\) and \(C\) are positive definite and \(z_\ell<0\).
+
+The matrices are fixed for a complete case \((h,\alpha,\tau,m,\nu)\).
+They are factored once and solved against a new right-hand side at every
+time step. No discrete eigenvectors are required.
+
+The R object stores `m = length(A)-1L` for compatibility with the original
+`my.solver.frac()` loop, which executes `m+1` solves. This internal field
+is therefore 13 for the order-14 representation. The published rational
+order remains 14. The C++ variable `m` is instead the actual residue count, 14.
+
+# Exact quarter-loop symmetry reduction
+
+## The four signed copies
+
+For every selected frequency \(k=2^j\), \(k\) is even, and
+\[
+\sin(k\pi(1-x))=-\sin(k\pi x),\quad
+\sin(k\pi(1+x))=\sin(k\pi x),\quad
+\sin(k\pi(2-x))=-\sin(k\pi x).
+\]
+The values at \(0,1/2,1,3/2,2\) are zero.
+Thus values on \(0<x<1/2\) determine the full loop through four signed copies.
+The stem remains zero.
+
+The quarter-loop has \(n/2-1\) interior unknowns. For a quarter-loop grid
+index \(r=1,\ldots,n/2-1\), the corresponding full loop grid indices are
+\[
+r,\quad n-r,\quad n+r,\quad 2n-r
+\]
+with signs \(+,-,+,-\).
+`rough_symmetry_embedding()` places exactly these four entries in each
+column of the sparse matrix \(S\).
+
+In exact arithmetic,
+\[
+S^\mathsf TS=4I.
+\]
+At \(J=9\), the full graph has 1536 unknowns; the reduced system has 255.
+
+## Why this is the same FEM evolution
+
+This reduction uses a nodal symmetry, not a truncated eigenfunction basis.
+Uniform mass and stiffness stencils preserve the signed pattern, including
+cancellation at its zero boundary nodes. Both \(C\) and \(K\) leave the
+coefficient subspace \(\operatorname{range}(S)\) invariant. The exact load
+also lies in that subspace.
+
+Restrict the matrices and load by
+\[
+C_r=S^\mathsf TCS,\qquad
+K_r=S^\mathsf TKS,\qquad b_r=S^\mathsf Tb.
+\]
+The projected continuum basis is obtained from
+\[
+C_rP_r=S^\mathsf TB,\qquad SP_r=P.
+\]
+The code checks the last equality numerically.
+
+For any right-hand side generated by this evolution, the full shifted
+solution lies in \(\operatorname{range}(S)\). Multiplying the full equation
+by \(S^\mathsf T\) gives the restricted equation, and lifting its unique
+solution by \(S\) recovers the full solution. This holds for the mass solve
+and every rational shifted solve, hence inductively at every time step.
+
+Furthermore,
+\[
+\|\Psi S v\|_{L_2(\Gamma)}^2=v^\mathsf TC_rv.
+\]
+No factor of 4 is missing: the four copies have already been included by
+the products \(S^\mathsf TCS\) and \(S^\mathsf TKS\).
+The residual Gram matrix remains the full-graph \(\mathsf R_h\).
+
+This equivalence requires this forcing, the zero initial condition, and
+the aligned uniform mesh. It must not be assumed for arbitrary data.
+Setting `symmetry_reduction = FALSE` runs the full matrix system for comparison.
+
+# The exact space–time error identity
+
+The reconstruction is right-constant:
+\[
+U_{h,m}^\tau(t)=\Psi U^k,\qquad t\in(t_{k-1},t_k].
+\]
+Its value at the isolated point \(t=0\) does not affect an \(L_2\) norm.
+
+Separate the exact solution into
+\[
+u(t)=\sum_{j<J}c_j(t)\phi_j+\sum_{j\geq J}c_j(t)\phi_j.
+\]
+Every high mode is orthogonal to the entire FEM space, and also to the
+resolved continuum modes. Therefore the squared error is a sum of two
+noninteracting nonnegative contributions:
+\[
+E^2=E_{\mathrm{resolved}}^2+E_{\mathrm{tail}}^2.
+\]
+
+## Resolved spatial identity at a fixed time
+
+Write \(c(t)=(c_1(t),\ldots,c_{J-1}(t))^\mathsf T\).
+Orthogonal projection gives
+\[
+\boxed{
+\left\|\sum_{j<J}c_j(t)\phi_j-\Psi U^k\right\|^2
+=(U^k-Pc(t))^\mathsf TC(U^k-Pc(t))
++c(t)^\mathsf T\mathsf R_hc(t).}
+\]
+This form is a sum of squared norms. It avoids evaluating the cancellation-prone
+expression \(\|u\|^2+\|U\|^2-2(u,U)\).
+
+## Integrating one interval using moments
+
+Let
+\[
+\bar c_k=\frac1\tau\int_{t_{k-1}}^{t_k}c(t)\,dt,\qquad
+\Sigma_k=\int_{t_{k-1}}^{t_k}(c-\bar c_k)(c-\bar c_k)^\mathsf T\,dt.
+\]
+Expanding around the mean eliminates all terms linear in \(c-\bar c_k\).
+The interval contribution is
+\[
+\begin{aligned}
+&\tau(U^k-P\bar c_k)^\mathsf TC(U^k-P\bar c_k)
++\tau\bar c_k^\mathsf T\mathsf R_h\bar c_k\\
+&\hspace{1cm}
++\operatorname{tr}\big((P^\mathsf TCP+\mathsf R_h)\Sigma_k\big).
+\end{aligned}
+\]
+Because \(P^\mathsf TCP+\mathsf R_h=I\), this reduces to
+\[
+\boxed{
+E_{\mathrm{resolved}}^2
+=\sum_{k=1}^N\tau\left[
+\delta_k^\mathsf TC\delta_k+
+\bar c_k^\mathsf T\mathsf R_h\bar c_k+
+\sum_{j<J}v_{j,k}
+\right],}
+\]
+where \(\delta_k=U^k-P\bar c_k\) and
+\[
+v_{j,k}=\frac1\tau\int_{t_{k-1}}^{t_k}(c_j(t)-\bar c_{j,k})^2\,dt.
+\]
+
+There is no assumption that different coefficient functions are uncorrelated
+in time. Their cross-covariances disappear because the continuum spatial
+Gram matrix is the identity. This is why the code needs only `variance_sum`.
+
+The reduced implementation replaces \(U^k,P,C\) by their restricted
+counterparts in the first term. The identity remains the same.
+
+# Stable formulas for the time moments
+
+Put
+\[
+d_j=\frac1{j a_j},\qquad t_0=t_{k-1},\qquad z_j=a_j\tau,\qquad
+\omega(z)=\frac{1-e^{-z}}z,\quad\omega(0)=1.
+\]
+A direct integration gives
+\[
+\bar c_{j,k}=d_j[1-e^{-a_jt_0}\omega(z_j)].
+\]
+The code evaluates the equivalent expression
+\[
+\boxed{\bar c_{j,k}
+=d_j\left[-\operatorname{expm1}(-a_jt_0)
++e^{-a_jt_0}(1-\omega(z_j))\right].}
+\]
+Here `expm1(x)` computes \(e^x-1\) accurately even when \(x\) is tiny.
+
+## The function one_minus_average()
+
+Directly subtracting \(\omega(z)\) from 1 loses relative accuracy for
+small \(z\). The series is
+\[
+1-\omega(z)=\frac z2-\frac{z^2}{6}+\frac{z^3}{24}
+-\frac{z^4}{120}+\cdots
+=\sum_{r=1}^\infty\frac{(-1)^{r+1}z^r}{(r+1)!}.
+\]
+For \(z<0.05\), the C++ function starts with \(z/2\) and applies the recurrence
+\[
+\mathrm{term}_r=\mathrm{term}_{r-1}\frac{-z}{r+1}
+\]
+through degree 16. For larger \(z\), it uses
+\(1+\operatorname{expm1}(-z)/z\).
+
+## The function exponential_variance()
+
+The interval variance is
+\[
+v_{j,k}=d_j^2e^{-2a_jt_0}V(z_j),\qquad
+V(z)=\omega(2z)-\omega(z)^2.
+\]
+As \(z\to0\),
+\[
+V(z)=\frac{z^2}{12}-\frac{z^3}{12}
++\frac{17z^4}{360}+O(z^5).
+\]
+The direct formula subtracts two values close to 1, although the result
+is only of size \(z^2\).
+
+For \(z\geq0.05\), the C++ function evaluates that formula using `expm1`.
+For smaller \(z\), it uses the positive centered integral
+\[
+V(z)=\int_0^1
+\left[\operatorname{expm1}(-z\xi)+(1-\omega(z))\right]^2\,d\xi
+\]
+with an eight-point Gauss–Legendre rule. The centered integrand retains
+the small deviations accurately.
+
+Thus the **moment identity** is exact in real arithmetic, while the
+small-argument variance branch is a very accurate numerical quadrature.
+It should not be described as symbolic exact integration at every machine
+operation. This branch, and the spatial residual quadrature, were checked
+independently.
+
+# The unresolved series and its remainder
+
+Since the selected eigenfunctions are orthonormal,
+\[
+E_{\mathrm{tail}}^2
+=\sum_{j=J}^{\infty}\frac{F(a_j,T)}{j^2a_j^2},
+\qquad
+F(a,T)=\int_0^T(1-e^{-at})^2\,dt.
+\]
+Expanding the square and integrating yields
+\[
+\boxed{
+F(a,T)=T-\frac{2(1-e^{-aT})}{a}
++\frac{1-e^{-2aT}}{2a}.}
+\]
+
+## Stable evaluation of \(F\)
+
+Let \(z=aT\). The formula becomes
+\[
+F(a,T)=T\left[
+1+\frac{2\operatorname{expm1}(-z)}z
+-\frac{\operatorname{expm1}(-2z)}{2z}
+\right].
+\]
+Even this expression cancels for small \(z\), so `rough_response_integral()`
+uses, for \(z<0.1\),
+\[
+F(a,T)
+=T\sum_{r=2}^{18}\frac{(-1)^r(2^r-2)z^r}{(r+1)!}
+\]
+as a truncated Taylor evaluation. The leading terms are
+\[
+F(a,T)=T\left(\frac{z^2}{3}-\frac{z^3}{4}
++\frac{7z^4}{60}+\cdots\right).
+\]
+They agree with \(1-e^{-at}\approx at\), which gives \(a^2T^3/3\).
+
+The function returns \(F\), not \(F/a^2\). The caller divides by
+\((j a_j)^2\) exactly once.
+
+## Bounding every term beyond a stopping index
+
+Because \(F(a,T)\leq T\) and
+\[
+a_j\geq\nu\pi^\alpha2^{\alpha j},
+\]
+after summing through \(M\) the remaining squared tail satisfies
+\[
+\begin{aligned}
+0\leq\sum_{j=M+1}^{\infty}\frac{F(a_j,T)}{j^2a_j^2}
+&\leq
+\frac{T}{\nu^2\pi^{2\alpha}}
+\sum_{j=M+1}^{\infty}\frac{2^{-2\alpha j}}{j^2}\\
+&\leq
+\boxed{\frac{T}{\nu^2\pi^{2\alpha}}
+\frac{2^{-2\alpha(M+1)}}{(M+1)^2(1-2^{-2\alpha})}.}
+\end{aligned}
+\]
+The second inequality replaces each \(1/j^2\) by \(1/(M+1)^2\), then sums
+a geometric series.
+
+The loop stops when this bound is at most `relative_tolerance` times the
+accumulated squared tail. The default is \(10^{-13}\). It returns:
+
+- `squared`: the accumulated squared tail;
+- `omitted_squared_bound`: the upper bound above;
+- `last_j`: the last summed index.
+
+The loop limit 450 is a failure guard. If the tolerance has not been met,
+the function stops with an error. It does not silently redefine the
+forcing as a 450-mode forcing.
+
+The bound is a mathematical real-arithmetic truncation bound. The summation
+does not use outward-rounded interval arithmetic, so it is not by itself
+a rigorous bound on every floating-point rounding error.
+
+If the accumulated total squared error is \(A\) and the omitted tail is
+bounded by \(B\), then, ignoring the other numerical evaluation errors,
+\[
+\sqrt A\leq E\leq\sqrt{A+B},\qquad
+\sqrt{A+B}-\sqrt A
+=\frac{B}{\sqrt{A+B}+\sqrt A}\leq\frac{B}{2\sqrt A}.
+\]
+This converts a squared-tail bound into a bound on the reported norm.
+
+# Why the spatial error has order \(h^\alpha/J\)
+
+This section derives the ideal spatial rate, not merely an upper bound
+obtained by assigning regularity indices to a theorem.
+
+## Lower bound from modes invisible to every FEM function
+
+For any \(V_h\)-valued approximation, including the numerical time-stepping
+solution,
+\[
+\|u-U_h\|_{L_2(0,T;L_2)}^2\geq E_{\mathrm{tail}}^2.
+\]
+For fixed \(\nu,T>0\), \(a_JT\to\infty\) as \(J\to\infty\).
+Once \(a_JT\) is sufficiently large, \(F(a_j,T)\) is bounded above and below
+by positive constants times \(T\), uniformly for \(j\geq J\).
+Also \(a_j\asymp2^{\alpha j}\), with constants depending on \(\nu,\kappa,\alpha\).
+
+Consequently
+\[
+E_{\mathrm{tail}}^2
+\asymp\sum_{j\geq J}\frac{2^{-2\alpha j}}{j^2}
+\asymp\frac{2^{-2\alpha J}}{J^2}.
+\]
+For the lower inequality it suffices to retain the \(j=J\) term.
+For the upper inequality use \(j^{-2}\leq J^{-2}\) and a geometric sum.
+Thus no FEM approximation can have an error smaller in order than
+\(h^\alpha/J\) for these data.
+
+## The resolved-mode FEM identities
+
+These identities are used in the mathematical analysis and the independent
+oracle. The production solver does not use them to advance \(U^k\).
+
+Let \(I_h\phi_j\) denote the nodal interpolant of a retained sine.
+Set
+\[
+\theta=\pi2^j h,\qquad
+\rho(\theta)=\frac{2+\cos\theta}{3},\qquad
+\sigma(\theta)=\frac{\sin(\theta/2)}{\theta/2}.
+\]
+The uniform mass and stiffness stencils applied to its nodal sine vector give
+\[
+C(I_h\phi_j)=h\rho(\theta)(I_h\phi_j),\qquad
+G(I_h\phi_j)=\frac{4\sin^2(\theta/2)}h(I_h\phi_j),
+\]
+where these expressions refer to coefficient vectors at interior loop nodes;
+the junction and zero stem rows satisfy the same eigenvector identity.
+
+Hence its generalized eigenvalue is
+\[
+\boxed{
+\mu_{j,h}=\kappa^2+
+\frac{12\sin^2(\theta/2)}{h^2(2+\cos\theta)}.}
+\]
+Since the exact sine–hat load has the factor \(h\sigma^2\),
+\[
+P_h\phi_j=\frac{\sigma^2}{\rho}I_h\phi_j.
+\]
+Discrete sine orthogonality gives \(\|I_h\phi_j\|^2=\rho\), so
+\[
+\gamma_j:=\|P_h\phi_j\|^2=\frac{\sigma^4}{\rho},\qquad
+\|\phi_j-P_h\phi_j\|^2=1-\gamma_j.
+\]
+Taylor expansion gives
+\[
+1-\gamma_j=\frac{\theta^4}{720}+O(\theta^6),\qquad
+\frac{|\mu_{j,h}-\mu_j|}{\mu_j}\leq C\theta^2
+\quad(0<\theta\leq\pi/2).
+\]
+Thus the \(L_2\) projection error is of size \(\theta^2\), not \(\theta^4\);
+the latter is its squared norm.
+
+## Upper bound for the ideal spatial evolution
+
+Define
+\[
+q(a,t)=\frac{1-e^{-at}}a,\qquad
+a_{j,h}=\nu\mu_{j,h}^{\alpha/2}.
+\]
+The ideal spatial FEM solution is
+\[
+u_h(t)=\sum_{j<J}\frac1j q(a_{j,h},t)P_h\phi_j.
+\]
+The retained projected sine modes are mutually orthogonal in the mass norm.
+Projection orthogonality then gives the exact resolved-mode error
+\[
+\frac1{j^2}\left[
+(1-\gamma_j)\int_0^Tq(a_j,t)^2\,dt+
+\gamma_j\int_0^T(q(a_j,t)-q(a_{j,h},t))^2\,dt
+\right].
+\]
+
+We have \(|q(a,t)|\leq1/a\) and
+\[
+|\partial_aq(a,t)|
+=\left|\int_0^t-r e^{-ar}\,dr\right|\leq a^{-2}.
+\]
+The discrete and continuous rates are comparable, with relative difference
+\(O(\theta^2)\). Both resolved error contributions are therefore bounded by
+\(C\theta^4/(j^2a_j^2)\). Summing gives
+\[
+\begin{aligned}
+\|u-u_h\|_{L_2(0,T;L_2)}^2
+&\leq C\left[
+h^4\sum_{j=1}^{J-1}\frac{2^{(4-2\alpha)j}}{j^2}
++\sum_{j\geq J}\frac{2^{-2\alpha j}}{j^2}\right].
+\end{aligned}
+\]
+
+For \(0<\alpha<2\), \(b=2^{4-2\alpha}>1\), and
+\[
+\sum_{j<J}\frac{b^j}{j^2}\leq C_b\frac{b^J}{J^2}.
+\]
+One proof splits the sum at \(J/2\). Above \(J/2\), use
+\(j^{-2}\leq4/J^2\) and a geometric sum. Below \(J/2\), the exponential
+factor is at most \(b^{J/2}\), which is eventually dominated by \(b^J/J^2\).
+A larger constant handles the finitely many small \(J\).
+
+Since \(h=2^{-J}\),
+\[
+h^4\frac{2^{(4-2\alpha)J}}{J^2}
+=\frac{h^{2\alpha}}{J^2}.
+\]
+Combining upper and lower bounds proves
+\[
+\boxed{
+\|u-u_h\|_{L_2(0,T;L_2(\Gamma))}
+\asymp\frac{h^\alpha}{J}
+=\frac{(\log2)h^\alpha}{|\log h|},
+\qquad0<\alpha<2.}
+\]
+
+## A stronger limit, and why an order bound alone is not a slope proof
+
+Two-sided bounds \(\asymp\) alone do not guarantee convergence of successive
+log-log slopes. For this particular uniform dyadic construction, the modal
+formula also gives a positive limiting constant.
+
+To see its structure, write \(j=J+r\) and set
+\[
+\theta_r=\pi2^r,\qquad
+F_r=\frac{12\sin^2(\theta_r/2)}
+{\theta_r^2(2+\cos\theta_r)},\qquad
+\gamma_r=\frac{3[\sin(\theta_r/2)/(\theta_r/2)]^4}{2+\cos\theta_r}.
+\]
+For \(r<0\), define
+\[
+A_r=1-\gamma_r+\gamma_r(1-F_r^{-\alpha/2})^2.
+\]
+For fixed \(r\), as \(J\to\infty\), the shift becomes negligible relative
+to the frequency, both modal rates become large, the transient portion of
+the time integral vanishes, and \(J/j\to1\).
+The scaled squared error converges to
+\[
+\boxed{
+C_\alpha^2=
+\frac{T}{\nu^2\pi^{2\alpha}}
+\left[\sum_{r=0}^{\infty}2^{-2\alpha r}
++\sum_{r=-\infty}^{-1}2^{-2\alpha r}A_r\right]>0.}
+\]
+For negative \(r\), \(A_r=O(2^{4r})\), so the second sum converges precisely
+when \(\alpha<2\). The same geometric estimates used in the upper bound
+control the summation tails; contributions of fixed low modes vanish under
+this scaling. These bounds justify passing to the limit.
+
+Thus the ideal spatial error satisfies the stronger relation
+\[
+\|u-u_h\|_{L_2(0,T;L_2)}
+\sim C_\alpha\,h^\alpha/J.
+\]
+This explains the asymptotic slope model.
+
+## Why \(\alpha=2\) is different, and why \(\alpha=1.9\) is difficult
+
+At \(\alpha=2\), the resolved upper sum becomes
+\[
+h^4\sum_{j<J}\frac1{j^2}=O(h^4),
+\]
+whereas the unresolved squared tail is only \(O(h^4/J^2)\).
+A fixed low mode supplies an \(h^2\) spatial error, so the dominant spatial
+behavior is second order. The formula \(h^2/J\) is not the correct dominant
+error at this endpoint.
+
+As \(\alpha\) approaches 2 from below, the geometric ratio
+\(2^{4-2\alpha}\) approaches 1. Convergence toward the limiting
+\(h^\alpha/J\) regime becomes slow, and low-mode second-order terms remain
+important over practical meshes. The code intentionally requires
+\(0<\alpha<2\); it is not an endpoint implementation.
+
+# Slopes, finite ranges, and the theorem in the manuscript
+
+## Raw and logarithmically corrected slopes
+
+For the leading model,
+\[
+E_J=C\,2^{-\alpha J}/J,
+\]
+the successive raw slope is
+\[
+\log_2(E_J/E_{J+1})
+=\alpha+\log_2((J+1)/J).
+\]
+It exceeds \(\alpha\). The local derivative of the log-log model is
+\(\alpha+1/(J\log2)\).
+
+Multiplying by \(J\) removes the leading logarithmic factor:
+\[
+J E_J\sim C h^\alpha.
+\]
+This is why the second plot uses \(J E\), rather than \(E\), on its vertical axis.
+
+The regression uses the three finest meshes \(J=7,8,9\). Since regression
+is linear in the dependent variable, adding \(\log J\) shifts every fitted
+slope by the same quantity, independent of the numerical errors or of \(\alpha\):
+\[
+s_{\mathrm{corrected}}
+=s_{\mathrm{raw}}
++\frac{\operatorname{Cov}(\log h,\log J)}
+{\operatorname{Var}(\log h)}.
+\]
+The correction is about \(-0.181285\) for this fit range. It is a prescribed
+model correction, not a procedure that is guaranteed to move every finite-range
+slope closer to \(\alpha\).
+
+In particular, the \(\alpha=1.9\) raw slope is about 1.9700, while its
+corrected slope is about 1.7887. The corrected value is farther from 1.9
+on this range. This is consistent with slow preasymptotic behavior near
+second order, rather than evidence that either number is an exact
+asymptotic exponent.
+
+## Connection with the manuscript estimate
+
+The theorem is `lastlasttheorem` in
+[main.tex](../../6ac76d140751a76e98ae4d0b/main.tex). Its spatial exponent is
+\[
+p=\min\{s_0+\alpha/2,\ s_f+\alpha,\ 2\}-\epsilon.
+\]
+Here \(u_0=0\) belongs to every spectral Sobolev space, while the largest
+forcing regularity available is \(s_f=0\). Thus \(p=\alpha-\epsilon\).
+
+Our more specific estimate \(h^\alpha/J\) is compatible with that theorem:
+\[
+\frac{h^\alpha/J}{h^{\alpha-\epsilon}}=\frac{h^\epsilon}{J}\to0.
+\]
+The theorem is an upper bound for a class of data. It does not assert
+that every member of that class has an observed slope exactly \(\alpha\).
+
+The manuscript also contains a rational-error bound for its specified
+rational construction. The production code here uses the positive BRASIL
+inverse representation with a constant term. Its rational order and error
+should not be identified with that particular theorem's rational term
+without an additional approximation argument. The current BRASIL error
+was checked independently against exact fractional rates on the tested cases.
+
+# Temporal error, rational error, and the diffusion parameter
+
+The triangle inequality gives
+\[
+\big|\|u-U_{h,m}^{\tau}\|-\|u-u_h\|\big|
+\leq\|u_h-U_{h,m}^{\tau}\|.
+\]
+Splitting the right-hand side into temporal and rational contributions
+explains what must be small before a spatial slope can be interpreted.
+
+A sufficient asymptotic strategy is to take temporal and rational errors
+\(o(h^\alpha/J)\). Keeping a small \(\tau\) and a sufficiently accurate
+rational approximation fixed instead gives only a finite interval of
+spatial-dominant meshes. That is the strategy validated here.
+
+## What diffusion changes
+
+The rates are \(a_j=\nu\mu_j^{\alpha/2}\). For high modes,
+\[
+a_JT\approx\nu T\pi^\alpha h^{-\alpha}.
+\]
+The approximation \(F(a_J,T)\approx T\), used in the spatial-tail
+asymptotics, requires this quantity to be large.
+
+Smaller \(\nu\) makes the dynamics less stiff and can permit a larger
+time step. It also moves the onset of high-frequency relaxation toward
+finer meshes. Therefore reducing diffusion is not automatically an
+improvement for observing the same spatial asymptotic over a fixed mesh range.
+
+For example, with \(\alpha=0.5\), \(\nu=10^{-3}\), and \(T=1\), the condition
+\(a_JT\gg1\) approximately requires
+\[
+h\ll\pi(\nu T)^{1/\alpha}\approx3.1\times10^{-6}.
+\]
+That is much finer than the displayed mesh range.
+
+The final comparison uses \(\nu=1\) for all curves. A separate diffusion
+scaling was evaluated during validation and retained in the private
+development records. Diffusion is fixed along each \(h\)-refinement curve;
+varying it with \(h\) would change the physical problem during the
+convergence study.
+
+## What rational order changes
+
+At a discrete eigenvalue \(\lambda_h\), the rational evolution is backward
+Euler with the effective positive rate
+\[
+\widehat a_h
+=\frac{\nu\kappa^\alpha}
+{\mathcal R_m(\lambda_h/\kappa^2)}.
+\]
+Its steady solution on that component is proportional to
+\(\mathcal R_m(\lambda_h/\kappa^2)\). Thus a rational approximation error
+can persist in time rather than averaging away.
+
+The main run uses \(m=14\). The validation reruns the finest mesh with
+\(m=12\), keeping the same time step, and separately compares the order-14
+rates with exact fractional rates. The latter comparison is important:
+a small change between two approximations alone would not prove that
+both approximations are accurate.
+
+# A complete pass through the code
+
+## Loading definitions
+
+`load.R` sources `problem.R`, `matrix_solver.R`, `experiment.R`, and
+`plotting.R`. It does not run a convergence case, read credentials, send a
+notification, or compile the C++ code.
+
+The experiment is designed to be called from the project root. This note's
+setup detects that root and sources the definitions using absolute paths.
+
+## rough_mesh(J, kappa)
+
+Its operations, in order, are:
+
+1. Validate the refinement level and positive shift.
+2. Construct the graph drawing.
+3. Select the compatible `MetricGraph` constructor. The current and older
+   APIs accept different input forms.
+4. Set physical edge lengths to exactly 1 and 2.
+5. Build the uniform mesh and assemble \(C,G,K\).
+6. Check dimensions and element lengths.
+7. Find and sort loop interior nodes using `PtE`.
+8. Form the resolved index vector `j <- seq_len(J-1L)`.
+9. Assemble the analytic load columns \(B_j\) and then \(b\).
+10. Return matrices, graph metadata, indices, coordinates, and parameters.
+
+The matrix `B` has zero-initialized stem and junction rows. Only loop
+interior rows need explicit sine–hat entries. In `outer(x, 2^j, ...)`,
+rows correspond to spatial nodes and columns to selected modes.
+The repeated factor in `rep(..., each=length(loop))` multiplies every
+entry of a column by that column's sinc-squared load factor.
+
+## rough_projection(mesh)
+
+It factors \(C\), solves \(CP=B\), and builds \(\mathsf R_h\) from
+elementwise residuals. `crossprod(residual)` means
+\(\mathrm{residual}^\mathsf T\mathrm{residual}\). The factor \(h\) and
+Gauss weights turn these pointwise residual products into integrals.
+The function returns `P` and `residual_gram`.
+
+## rough_rates(), rough_response_integral(), rough_tail()
+
+These implement, respectively,
+\[
+a_j=\nu(\kappa^2+\pi^2 2^{2j})^{\alpha/2},\qquad
+F(a,T),\qquad
+\sum_{j\geq J}\frac{F(a_j,T)}{j^2a_j^2}
+\]
+with the stable branches and remainder bound already derived.
+
+`rough_rates()` returns rates of the **continuous** modes.
+Passing those rates to the C++ routine supplies exact-reference
+coefficients for the error calculation. They are not the numerical FEM
+evolution rates.
+
+## rough_rational_coefficients(), rough_transfer(), rough_operator()
+
+`rough_rational_coefficients()` extracts one exact exponent row from the
+package table, checks finite values and positivity, and sorts the poles.
+It does not interpolate between exponent rows.
+
+`rough_transfer()` constructs the partial fractions of \(H_m\), checks
+their signs, and verifies reconstruction.
+
+`rough_operator()` forms the shifted matrices, stores the transformed
+residues and constant term, and creates `Matrix` factorizations for the
+R reference step.
+
+## rough_matrix_step(operator, rhs)
+
+This function directly evaluates
+\[
+dC^{-1}\mathrm{rhs}
++\sum_\ell w_\ell(K/\kappa^2-z_\ell C)^{-1}\mathrm{rhs}.
+\]
+It is useful for checking the compiled loop against the R matrix formulation.
+It is not a scalar modal solver.
+
+## rough_compile_solver()
+
+`Rcpp::sourceCpp()` compiles `matrix_evolution.cpp` with RcppEigen and
+exposes `rough_matrix_evolve_cpp()` to R. The function checks whether that
+compiled R-callable function already exists before compiling.
+
+It needs a C++ compiler for recomputation. Reading the saved result and
+rendering the results notebook does not require compilation.
+
+## rough_solve()
+
+This function organizes one complete case:
+
+1. Set \(N=\lceil T/\tau_{\mathrm{target}}\rceil\), then use the actual
+   \(\tau=T/N\). This ends the grid at \(T\).
+2. Build the exact symmetry restriction if enabled.
+3. Compute the restricted continuum projection and check that its lift is \(P\).
+4. Build the rational operator for the actual \(\tau\).
+5. Compute the infinite unresolved tail independently of time stepping.
+6. Convert sparse matrices to a general compressed-column representation
+   accepted by the Eigen interface.
+7. Call the C++ matrix time loop.
+8. Lift the final state, and any requested saved states, to the full graph.
+9. Return error components, timing, actual step count, order, tail metadata,
+   and the partial-fraction reconstruction discrepancy.
+
+The `elapsed` field times the compiled call, including its own factorization
+work. It excludes earlier graph construction, R-side factorizations,
+projection setup, and tail setup.
+
+The compiled function creates Eigen factorizations from the explicit
+matrices. It does not reuse R's CHOLMOD factor objects; the two libraries
+have different factor representations. This duplicates some one-time
+setup but does not refactor matrices at every time step.
+
+## The C++ loop, line by line in mathematical terms
+
+The routine begins by checking dimensions. It factors the mass matrix and
+every shifted matrix using `Eigen::SimplicialLDLT`. The factors are stored
+in `unique_ptr` objects because these factorization objects are not
+intended to be copied as ordinary values.
+
+It precomputes the fixed quantities
+\[
+d_j,\qquad 1-\omega(a_j\tau),\qquad V(a_j\tau).
+\]
+
+For each integer \(k=1,\ldots,N\):
+
+1. `rhs = C*u + tau*load` forms \(C U^{k-1}+\tau b\).
+2. `next = remainder*mass_factor.solve(rhs)` evaluates the constant term.
+3. The loop over residues adds every shifted sparse solve.
+4. `u.swap(next)` makes the new vector current, reusing storage.
+5. With \(t_0=(k-1)\tau\), it evaluates the exact coefficient means and
+   the sum of their interval variances.
+6. `delta = u - projection*mean` forms the projected coefficient difference.
+7. `value` is the nonnegative resolved interval contribution
+   \[
+   \tau[\delta^\mathsf TC\delta+\bar c^\mathsf T\mathsf R_h\bar c+
+   \mathrm{variance\_sum}].
+   \]
+8. It rejects a nonfinite or negative contribution.
+9. It adds this contribution using compensated summation.
+10. It saves the vector only if `return_states=TRUE`.
+
+The expression `(k & 4095)==0` tests every 4096th iteration and allows
+an R user interrupt. It does not skip any steps.
+
+`noalias()` tells Eigen that the left-hand side does not overlap the
+input expressions. The separate `u`, `rhs`, and `next` buffers support this
+assumption and avoid unnecessary temporaries.
+
+At the end the function returns
+\[
+\mathrm{error}=\sqrt{\mathrm{resolved\_squared}+\mathrm{tail\_squared}}.
+\]
+The zero-based C++ vector index \(0\) corresponds to mathematical mode
+\(j=1\). The separate `mode_j` vector supplies the actual mathematical \(j\),
+so the amplitude is \(1/(j a_j)\), not \(1/(0a_j)\).
+
+## Why compensated summation is used
+
+There can be up to five million positive interval contributions. Ordinary
+summation can repeatedly lose small increments once the running sum has
+grown. The code carries a compensation:
+\[
+\begin{aligned}
+y&=\mathrm{value}-c,\\
+t&=\mathrm{total}+y,\\
+c&=(t-\mathrm{total})-y,\\
+\mathrm{total}&=t.
+\end{aligned}
+\]
+This reduces accumulation rounding error. It does not eliminate errors
+inside sparse solves, coefficient evaluation, or quadrature.
+
+## rough_parameters() and rough_run_experiment()
+
+The parameters specify five meshes and eight values
+\[
+\alpha=0.5,0.7,0.9,1.1,1.3,1.5,1.7,1.9.
+\]
+The time step is fixed along each spatial refinement curve, but differs
+between curves to keep temporal contamination small.
+
+`expand.grid(J=..., alpha_index=...)` makes \(J\) vary fastest.
+R fills matrices column by column, so reshaping the returned scalar errors
+puts meshes in rows and alpha values in columns. The expression
+`corrected <- errors * parameters$J` scales each row by its own \(J\),
+using R's column-major recycling over the entire matrix.
+
+Each case can run independently. On Unix, `mclapply()` distributes complete
+cases over fork workers. This is computational parallelism, not a different
+numerical method. Worker errors are caught and propagated to the caller.
+
+A checkpoint includes its parameters and MD5 fingerprints of the R/C++
+helper files. A checkpoint with a different identity is rejected. Thus old
+curves are not silently mixed with new parameter choices or source versions.
+
+Before saving compact case summaries, the driver removes `final_state`
+and `states`. The complete results contain parameters, error matrices,
+rates, per-case metadata, source fingerprints, generation time, and session
+information.
+
+## Plotting and the presentation notebook
+
+`rough_convergence_plot()` expands the same mesh/alpha layout as the
+calculation. It plots raw \(E\) or corrected \(JE\), using logarithmic axes.
+
+The dashed raw model is \(A_\alpha h^\alpha/J\), and the dashed corrected
+model is \(A_\alpha h^\alpha\). For either model, the vertical constant is
+the geometric mean of error/model ratios over the fitted meshes:
+\[
+A_\alpha=\exp\left(\frac1{\#\mathcal F}
+\sum_{J\in\mathcal F}\log\frac{E_J}{\mathrm{model}_J}\right).
+\]
+The dashed slopes are prescribed by the model. They are not fitted slopes
+disguised as theoretical predictions. The observed slopes are calculated
+separately by `lm()`.
+
+`rough_save_figures()` saves both PNG and PDF versions.
+`conv_in_h_rough.Rmd` reads the completed result, checks its parameter
+identity, and displays the final figures and tables. It does not rerun
+the matrix evolution while rendering.
+
+# A small worked example: \(J=4\)
+
+Here \(h=1/16\), \(n=16\), and the full graph has 48 nodes.
+The quarter-loop has \(16/2-1=7\) unknowns.
+
+The exact forcing load uses only
+\[
+j=1,2,3,\qquad k_j=2,4,8.
+\]
+It is
+\[
+b=B_1+\frac12B_2+\frac13B_3.
+\]
+All \(j\geq4\) loads vanish. However, all of those modes remain in
+\(E_{\mathrm{tail}}^2\). The highest resolved angular cell frequency is
+\(\theta_3=\pi/2\).
+
+The following example is deliberately not evaluated when rendering this
+note; it shows how to request full states for a small verification case.
+
+```{r worked-example, eval=FALSE, echo=TRUE}
+library(Matrix)
+source("fun/rough/load.R")
+rough_compile_solver(cache_dir = tempdir())
+mesh <- rough_mesh(J = 4L, kappa = 4)
+projection <- rough_projection(mesh, quadrature_order = 16L)
+
+reduced <- rough_solve(
+  mesh, alpha = 1.3, time_step = 0.002, order = 14L,
+  diffusion = 1, T_final = 0.1, projection = projection,
+  return_states = TRUE, symmetry_reduction = TRUE, coefficient_source = "brasil")
+
+full <- rough_solve(
+  mesh, alpha = 1.3, time_step = 0.002, order = 14L,
+  diffusion = 1, T_final = 0.1, projection = projection,
+  return_states = TRUE, symmetry_reduction = FALSE, coefficient_source = "brasil")
+
+max(abs(reduced$states - full$states))
+reduced$error
+reduced$tail
+```
+
+The expected agreement concerns the **lifted full FEM vectors at every
+time step**, not just similarity of final regression slopes.
+
+# Current settings and saved results
+
+These tables are loaded from the saved result rather than retyped.
+The result was generated at `r saved$generated_at`.
+
+```{r final-settings}
+settings <- data.frame(alpha = parameters$alpha,
+  target_tau = format(parameters$time_steps, scientific = TRUE, digits = 7),
+  m = parameters$rational_order, nu = parameters$diffusion)
+knitr::kable(settings, col.names = c("alpha", "Target tau", "m", "nu"))
+```
+
+The actual count and step from the finest mesh are:
+
+```{r actual-steps}
+finest <- Filter(function(x) x$J == max(parameters$J), saved$cases)
+steps <- do.call(rbind, lapply(finest, function(x) data.frame(
+  alpha = x$alpha, N = x$N, actual_tau = format(x$tau, scientific = TRUE, digits = 7),
+  full_nodes = x$n_nodes, solver_nodes = x$n_solver_nodes,
+  tail_last_j = x$tail$last_j)))
+knitr::kable(steps)
+```
+
+```{r final-rates}
+knitr::kable(saved$rates, digits = c(1, 1, 4, 4, 2),
+  col.names = c("alpha", "Reference", "Raw slope", "Corrected slope", "Relative error (%)"))
+```
+
+The percentages in the last column concern corrected **regression slopes**.
+They are not relative errors of the numerical solution.
+
+## What the independent validation establishes
+
+The development record is
+[VALIDATION.md](../../DOCS/NAP/rough_experiment/all_alphas/VALIDATION.md).
+Its files are separate from the results notebook. The recorded checks include:
+
+- Independent local assembly of the full mass and stiffness matrices.
+- Numerical hat integrations checking resolved loads and vanishing high-mode loads.
+- Doubling residual quadrature order.
+- Tighter tail summation compared with the geometric remainder.
+- Every-step agreement with the original full R matrix solver, for all eight alpha values.
+- A direct independent space–time integral of a small FEM solution.
+- A 55-digit spectral calculation compared with all forty reported errors.
+- Actual finest-mesh matrix runs with half the time step.
+- Actual finest-mesh matrix runs at rational order 12.
+
+The full-matrix versus reduced compiled iterate discrepancy in the recorded
+core fixtures was at most approximately \(4.17\times10^{-16}\).
+The direct integral agreed at approximately \(2.37\times10^{-16}\) relative error.
+Across all forty cases, the high-precision comparison had maximum relative
+norm discrepancy approximately \(3.51\times10^{-6}\).
+The independent temporal solution error was at most \(3.08\%\) of the ideal
+spatial error, and the rational solution error was at most \(0.040\%\).
+
+The actual time-step-halving changes of the finest-mesh total error were
+at most \(0.067\%\), and the order-12 versus order-14 changes were at most
+\(0.047\%\). These are different quantities from the auxiliary solution-error
+ratios above.
+
+The spectral oracle uses the explicit uniform-mesh identities in the rate
+analysis and evaluates geometric time sums in high precision. It is an
+independent verification of the matrix algorithm, not the algorithm used
+to generate the published curves. Its finite high-frequency sum runs
+through mode 99; the same geometric tail estimate makes the remaining
+part negligible for the tested alpha values. High precision reduces
+cancellation in the oracle; it does not turn package coefficient rows,
+which originate as floating-point data, into exact minimax coefficients.
+
+# How to reproduce or change the experiment
+
+The main run can be started from the project root with:
+
+```{r reproduce, eval=FALSE, echo=TRUE}
+library(Matrix)
+source("fun/rough/load.R")
+p <- readRDS("data_files/rough_comparison/brasil_h_results.rds")$parameters
+p$coefficient_source <- "brasil"
+result <- rough_run_experiment(
+  parameters = p,
+  checkpoint_dir = "/tmp/rough-h-checkpoints",
+  workers = 3L,
+  cache_dir = "/tmp/rough-rcpp-cache")
+rough_save_figures(result)
+```
+
+The verified development environment uses `/usr/bin/Rscript --vanilla`,
+R 4.5.2. The shell's default R may point to another version and package
+library. This is why a rendering or recomputation command should use the
+installation with the required packages. No global R environment change
+is needed.
+
+The dependency roles are:
+
+| Dependency | Role |
+|---|---|
+| Matrix | Sparse FEM matrices and R reference factorizations |
+| MetricGraph | Metric graph and full FEM assembly |
+| sp | Compatibility input for the older MetricGraph constructor |
+| rSPDE | Positive BRASIL coefficient tables |
+| statmod | Spatial Gauss–Legendre quadrature |
+| Rcpp and RcppEigen | Compiled sparse matrix evolution |
+| ggplot2 | Final convergence figures |
+| knitr and rmarkdown | Tables, source display, and notebook rendering |
+
+Changing \(\alpha\) requires a supported coefficient-table exponent.
+Changing \(J\) preserves the analysis only with aligned dyadic meshes.
+Changing the forcing or initial condition can invalidate both the vanished
+high-mode loads and the quarter-loop symmetry. Changing \(\nu\), \(T\),
+\(\tau\), or \(m\) requires new auxiliary-error checks.
+Changing the time reconstruction changes the norm formula.
+
+If a finite forcing is wanted instead, choose it explicitly and state that
+it is a different experiment. At sufficiently fine meshes, a fixed finite
+sum is smooth and can recover a second-order spatial slope.
+
+# Common mistakes this construction avoids
+
+| Mistake | Why it changes or invalidates the calculation |
+|---|---|
+| Treating \(\phi_j\) as the full ordered graph spectrum | The dyadic family is only a selected orthonormal subset |
+| Checking only the edgewise eigenvalue equation | The vertex continuity and Kirchhoff conditions are part of the operator domain |
+| Calling \(\dot H^s\) a mean-zero space | Here it is a shifted spectral Sobolev space |
+| Replacing the forcing by sampled nodal values | High-frequency functions can vanish at every node but still have nonzero \(L_2\) energy |
+| Omitting modes whose FEM loads vanish from the error | They are the source of the lower spatial-error bound |
+| Replacing \(C^{-1}K\) by \(K\) inside a fractional power | They are different operators in coefficient coordinates |
+| Using an ordinary vector norm | It is not the graph \(L_2\) norm |
+| Dropping the rational constant term | It changes the backward Euler update |
+| Using table exponent \(\alpha\) instead of \(\alpha/2\) | It approximates the wrong fractional power |
+| Interpreting internal `operator$m` as the published rational degree | It is an old-loop compatibility count |
+| Computing \(I-P^\mathsf TCP\) by subtraction for tiny residuals | It can lose relative accuracy and positivity |
+| Computing \(\omega(2z)-\omega(z)^2\) directly for tiny \(z\) | It subtracts nearly equal numbers to obtain a quadratic-small result |
+| Describing every numerical evaluation as exact | Stable Gaussian quadrature and floating-point arithmetic remain present |
+| Applying quarter-loop symmetry to arbitrary data | The restricted subspace need not contain their solution |
+| Claiming fixed \(\tau,m\) give \(h^\alpha/J\) for all \(h\to0\) | Temporal and rational floors eventually dominate |
+| Applying the \(h^\alpha/J\) model at \(\alpha=2\) | The resolved low modes instead supply a dominant \(h^2\) term |
+| Treating three regression points as a proof of the asymptotic exponent | The proof and the finite-range observations are separate pieces of evidence |
+
+# Source map and complete preserved baseline listings
+
+The following map names each implementation file and its role in the derivation.
+Links point to the preserved baseline snapshot.
+
+| File | Main mathematical objects |
+|---|---|
+| [problem.R](../data_files/rough_comparison/brasil_sources/rough/problem.R) | Graph, \(C,K,B,P,\mathsf R_h\), rates, \(F\), infinite tail |
+| [matrix_solver.R](../data_files/rough_comparison/brasil_sources/rough/matrix_solver.R) | \(\mathcal R_m,H_m\), partial fractions, \(S\), restricted matrix systems |
+| [matrix_evolution.cpp](../data_files/rough_comparison/brasil_sources/rough/matrix_evolution.cpp) | Every backward Euler step, means, variances, error accumulation |
+| [experiment.R](../data_files/rough_comparison/brasil_sources/rough/experiment.R) | Parameter grid, complete runs, checkpoints, regressions, saved results |
+| [plotting.R](../data_files/rough_comparison/brasil_sources/rough/plotting.R) | Raw and corrected plots, prescribed model curves, output formats |
+| [load.R](../data_files/rough_comparison/brasil_sources/rough/load.R) | Definition loading without starting computation |
+
+These listings are read directly from the archived files when this document is rendered.
+The mathematical and implementation explanation above describes the version
+inspected on 30 October 2026. If the files are changed later, the prose should
+be reviewed alongside the updated listings.
+
+```{r source-fingerprints}
+paths <- file.path(baseline_root, source_files)
+knitr::kable(data.frame(file = source_files,
+  md5 = unname(tools::md5sum(paths))))
+```
+
+## problem.R: complete source
+
+<details>
+<summary>Show graph, load, projection, rate, and tail functions</summary>
+
+```{r listing-problem, results='asis'}
+source_listing("problem.R")
+```
+
+</details>
+
+## matrix_solver.R: complete source
+
+<details>
+<summary>Show the rational transfer, symmetry restriction, and solver interface</summary>
+
+```{r listing-matrix, results='asis'}
+source_listing("matrix_solver.R")
+```
+
+</details>
+
+## matrix_evolution.cpp: complete source
+
+<details>
+<summary>Show the compiled matrix evolution and stable moment formulas</summary>
+
+```{r listing-cpp, results='asis'}
+source_listing("matrix_evolution.cpp", "cpp")
+```
+
+</details>
+
+## experiment.R: complete source
+
+<details>
+<summary>Show the final parameter grid, driver, checkpoints, and regressions</summary>
+
+```{r listing-experiment, results='asis'}
+source_listing("experiment.R")
+```
+
+</details>
+
+## plotting.R: complete source
+
+<details>
+<summary>Show the final plotting and export functions</summary>
+
+```{r listing-plotting, results='asis'}
+source_listing("plotting.R")
+```
+
+</details>
+
+## load.R: complete source
+
+<details>
+<summary>Show the definition loader</summary>
+
+```{r listing-loader, results='asis'}
+source_listing("load.R")
+```
+
+</details>
+
