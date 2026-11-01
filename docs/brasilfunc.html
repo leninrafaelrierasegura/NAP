@@ -1477,6 +1477,80 @@ padding: 0;
 </style>
 
 
+<style type="text/css">
+.dropdown-submenu {
+position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+top: 0;
+left: 100%;
+margin-top: -6px;
+margin-left: -1px;
+border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+display: block;
+}
+.dropdown-submenu>a:after {
+display: block;
+content: " ";
+float: right;
+width: 0;
+height: 0;
+border-color: transparent;
+border-style: solid;
+border-width: 5px 0 5px 5px;
+border-left-color: #cccccc;
+margin-top: 5px;
+margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+left: -100%;
+margin-left: 10px;
+border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
 
 <!-- tabsets -->
 
@@ -1599,6 +1673,32 @@ border-radius: 0px;
 
 
 
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">BRASIL</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Experiments</a>
+</li>
+<li>
+  <a href="brasilfunc.html">Theory and functions</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
 
 <div id="header">
 
@@ -3085,6 +3185,174 @@ isolated_rough_be_reference &lt;- function(data, spectrum, time_seq, alpha,
          g_average = c(0, rep(1, length(time_seq) - 1L)), dt = dt,
          time_seq = time_seq, alpha = alpha, diffusion = diffusion,
          history_mib = history_mib)
+}</code></pre>
+</div>
+<div id="sampled-reference-mesh-errors-for-rough-forcing" class="section level2">
+<h2>Sampled reference-mesh errors for rough forcing</h2>
+<p>The reference below is the nodal evaluation of a finite continuum
+series. Its consistent P1 mass matrix and right-endpoint time samples
+define the same sampled norm as the smooth reference experiment.
+Factor-four quarter-loop matrices preserve the full-graph norm for these
+data. The compiled kernel advances every shifted FEM matrix step and
+evaluates the sampled quadratic norm; no analytic time integral or
+continuum-tail term is added. Reference cutoff and mesh resolution are
+explicit inputs.</p>
+<pre class="r"><code>rough_sampled_reference &lt;- function(J_reference, cutoff, max_nodes = 2^22,
+                                    max_basis_mib = 2048) {
+    stopifnot(length(J_reference)==1L,is.finite(J_reference),
+      J_reference==as.integer(J_reference),J_reference&gt;=4L,J_reference&lt;=23L,
+      length(cutoff)==1L,is.finite(cutoff),cutoff==as.integer(cutoff),cutoff&gt;=1L,
+      J_reference&gt;=cutoff+2L,max_nodes&gt;0,max_basis_mib&gt;0)
+    cells &lt;- 2^(J_reference-1L)
+    n &lt;- cells-1L
+    if (n&gt;max_nodes || 8*n*cutoff/1024^2&gt;max_basis_mib)
+        stop(&quot;Reference mesh/basis exceeds its allocation guard.&quot;)
+    h &lt;- 2^-J_reference
+    C &lt;- Matrix::bandSparse(n,k=c(-1L,0L,1L),
+      diagonals=list(rep(2*h/3,n-1L),rep(8*h/3,n),rep(2*h/3,n-1L)))
+    x &lt;- seq_len(n)*h
+    E &lt;- outer(x,2^seq_len(cutoff),function(x,k) sinpi(x*k))
+    list(J=as.integer(J_reference),h=h,C=C,x=x,basis=E,cutoff=as.integer(cutoff))
+}
+
+rough_sampled_fem_basis &lt;- function(J, reference_x) {
+    stopifnot(length(J)==1L,is.finite(J),J==as.integer(J),J&gt;=3L,J&lt;=20L,
+      all(is.finite(reference_x)),all(reference_x&gt;0 &amp; reference_x&lt;.5))
+    position &lt;- reference_x*2^J
+    left &lt;- as.integer(floor(position))
+    fraction &lt;- position-left
+    n &lt;- 2^(J-1L)-1L
+    rows &lt;- seq_along(position)
+    keep_left &lt;- left&gt;=1L &amp; left&lt;=n
+    keep_right &lt;- left+1L&gt;=1L &amp; left+1L&lt;=n
+    Matrix::drop0(Matrix::sparseMatrix(
+      i=c(rows[keep_left],rows[keep_right]),
+      j=c(left[keep_left],left[keep_right]+1L),
+      x=c(1-fraction[keep_left],fraction[keep_right]),
+      dims=c(length(position),n)))
+}
+
+rough_sampled_coefficients &lt;- function(times,cutoff,alpha,diffusion=1,kappa=4) {
+    stopifnot(all(is.finite(times)),all(times&gt;=0),cutoff&gt;=1L,cutoff==as.integer(cutoff))
+    j &lt;- seq_len(cutoff)
+    rates &lt;- rough_rates(j,alpha,diffusion,kappa)
+    -expm1(-outer(rates,times))/(j*rates)
+}
+
+rough_compile_sampled_solver &lt;- function(cache_dir=tempdir()) {
+    target &lt;- environment(rough_compile_sampled_solver)
+    if (!exists(&quot;rough_sampled_evolve_cpp&quot;,envir=target,inherits=FALSE))
+        Rcpp::sourceCpp(code=r&quot;----(
+// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::plugins(cpp11)]]
+#include &lt;RcppEigen.h&gt;
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+#include &lt;cmath&gt;
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
+using Eigen::SparseMatrix;
+typedef Eigen::SimplicialLDLT&lt;SparseMatrix&lt;double&gt; &gt; SampledFactor;
+
+// Same shifted FEM update and sampled reference quadratic norm as the
+// smooth notebook. No analytic time moments or continuum-tail sum enters.
+// [[Rcpp::export]]
+Rcpp::List rough_sampled_evolve_cpp(
+    const Eigen::MappedSparseMatrix&lt;double&gt;&amp; C_in, Rcpp::List matrices,
+    Eigen::VectorXd residues, double remainder,
+    Eigen::VectorXd load, Eigen::MatrixXd projection,
+    const Eigen::MappedSparseMatrix&lt;double&gt;&amp; metric_in,
+    Eigen::MatrixXd residual_gram, Eigen::MatrixXd coefficients,
+    Rcpp::IntegerVector target_steps, Eigen::VectorXd weights,
+    double tau, int n_steps) {
+  SparseMatrix&lt;double&gt; C=C_in, metric=metric_in;
+  const int n=C.rows(), modes=projection.cols(), m=residues.size();
+  const int samples=target_steps.size();
+  if (n_steps&lt;1 || tau&lt;=0 || matrices.size()!=m || load.size()!=n ||
+      projection.rows()!=n || coefficients.rows()!=modes ||
+      coefficients.cols()!=samples || weights.size()!=samples ||
+      residual_gram.rows()!=modes || residual_gram.cols()!=modes ||
+      metric.rows()!=n || metric.cols()!=n)
+    Rcpp::stop(&quot;Invalid sampled-reference dimensions.&quot;);
+  SampledFactor mass_factor;
+  mass_factor.compute(C);
+  if (mass_factor.info()!=Eigen::Success) Rcpp::stop(&quot;Mass factorization failed.&quot;);
+  std::vector&lt;std::unique_ptr&lt;SampledFactor&gt; &gt; factors;
+  for (int i=0;i&lt;m;++i) {
+    SparseMatrix&lt;double&gt; A=Rcpp::as&lt;SparseMatrix&lt;double&gt; &gt;(matrices[i]);
+    factors.emplace_back(new SampledFactor());
+    factors.back()-&gt;compute(A);
+    if (factors.back()-&gt;info()!=Eigen::Success) Rcpp::stop(&quot;Shifted factorization failed.&quot;);
+  }
+  VectorXd u=VectorXd::Zero(n),rhs(n),next(n),delta(n);
+  int step=0;
+  double total=0,compensation=0;
+  for(int q=0;q&lt;samples;++q) {
+    if ((q &amp; 4095)==0) Rcpp::checkUserInterrupt();
+    int goal=target_steps[q];
+    if(goal&lt;step || goal&gt;n_steps || goal&lt;1 || !(weights[q]&gt;0))
+      Rcpp::stop(&quot;Invalid reference time-to-step mapping.&quot;);
+    while(step&lt;goal) {
+      if ((step &amp; 4095)==0) Rcpp::checkUserInterrupt();
+      rhs.noalias()=C*u;
+      rhs.noalias()+=tau*load;
+      next=remainder*mass_factor.solve(rhs);
+      for(int i=0;i&lt;m;++i) next.noalias()+=residues[i]*factors[i]-&gt;solve(rhs);
+      u.swap(next);
+      ++step;
+    }
+    delta.noalias()=u-projection*coefficients.col(q);
+    double value=weights[q]*(delta.dot(metric*delta)+
+      coefficients.col(q).dot(residual_gram*coefficients.col(q)));
+    if(!std::isfinite(value) || value&lt;0) Rcpp::stop(&quot;Invalid sampled squared error.&quot;);
+    double adjusted=value-compensation,updated=total+adjusted;
+    compensation=(updated-total)-adjusted;
+    total=updated;
+  }
+  if(step!=n_steps) Rcpp::stop(&quot;Reference grid did not reach the final solver step.&quot;);
+  return Rcpp::List::create(Rcpp::Named(&quot;error&quot;)=std::sqrt(total),
+    Rcpp::Named(&quot;sampled_squared&quot;)=total,Rcpp::Named(&quot;final_state&quot;)=u);
+}
+)----&quot;,env=target,cacheDir=cache_dir,showOutput=FALSE,verbose=FALSE)
+    invisible(TRUE)
+}
+
+rough_sampled_error &lt;- function(mesh,reference,error_projection,alpha,time_step,
+    reference_time_step,m=14L,diffusion=1,T_final=1,
+    max_solver_steps=1e7,max_reference_samples=2e6,max_coefficient_mib=512) {
+    stopifnot(reference$cutoff&gt;=mesh$J-1L,reference$J&gt;mesh$J,
+      length(T_final)==1L,is.finite(T_final),T_final&gt;0,
+      length(time_step)==1L,is.finite(time_step),time_step&gt;0,
+      length(reference_time_step)==1L,is.finite(reference_time_step),reference_time_step&gt;0,
+      length(max_solver_steps)==1L,is.finite(max_solver_steps),max_solver_steps&gt;0,
+      length(max_reference_samples)==1L,is.finite(max_reference_samples),max_reference_samples&gt;0,
+      length(max_coefficient_mib)==1L,is.finite(max_coefficient_mib),max_coefficient_mib&gt;0)
+    solver_N &lt;- ceiling(T_final/time_step)
+    reference_N &lt;- ceiling(T_final/reference_time_step)
+    if (!is.finite(solver_N) || !is.finite(reference_N) ||
+        solver_N&gt;max_solver_steps || reference_N&gt;max_reference_samples ||
+        8*reference_N*reference$cutoff/1024^2&gt;max_coefficient_mib)
+        stop(&quot;Time grid/reference coefficient matrix exceeds its allocation guard.&quot;)
+    grid &lt;- make_time_grid(T_final,time_step)
+    reference_grid &lt;- make_time_grid(T_final,reference_time_step)
+    coefficients &lt;- rough_sampled_coefficients(reference_grid$time_seq[-1L],
+      reference$cutoff,alpha,diffusion,mesh$kappa)
+    target_steps &lt;- findInterval(reference_grid$time_seq[-1L],grid$time_seq,left.open=TRUE)
+    op &lt;- my.fractional.operators.frac(mesh$K,alpha/2,mesh$C,mesh$kappa^2,
+      m,grid$time_step,diffusion)
+    general &lt;- function(A) as(as(A,&quot;generalMatrix&quot;),&quot;CsparseMatrix&quot;)
+    started &lt;- proc.time()[[&quot;elapsed&quot;]]
+    result &lt;- rough_sampled_evolve_cpp(general(mesh$C),
+      lapply(op$partial_fraction_terms,general),op$residues,op$remainder,
+      mesh$load,error_projection$projection,general(error_projection$metric),
+      error_projection$residual_gram,coefficients,as.integer(target_steps),
+      diff(reference_grid$time_seq),grid$time_step,grid$N)
+    result$elapsed &lt;- proc.time()[[&quot;elapsed&quot;]]-started
+    result$tau &lt;- grid$time_step
+    result$reference_tau &lt;- reference_grid$time_step
+    result$N &lt;- grid$N
+    result$reference_N &lt;- reference_grid$N
+    result
 }</code></pre>
 </div>
 <div id="sparse-time-stepping-for-rough-data" class="section level2">

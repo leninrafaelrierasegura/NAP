@@ -7,7 +7,7 @@ output:
     css: visual.css
 ---
 
-All six experiments use the installed **rSPDE BRASIL coefficients** and
+All seven experiments use the installed **rSPDE BRASIL coefficients** and
 consistent FEM matrix solvers. Knit displays saved results without running
 an experiment. The current numerical parameters are recorded in each notebook.
 
@@ -30,3 +30,7 @@ an experiment. The current numerical parameters are recorded in each notebook.
 - [Isolated convergence in rational order](conv_in_m_isolated_rough.html): the
   same infinite rough forcing; orders 1–9, compared with fractional backward
   Euler on the same FEM matrices, with h=1/256, tau=0.02, and diffusion=0.25.
+
+- [Convergence in space with a sampled reference](cov_in_h_rough_as_in_mat.html):
+  the same infinite rough forcing, with a fixed 16-mode continuum reference
+  evaluated on a fine space-time mesh, following the smooth matrix workflow.

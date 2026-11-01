@@ -1552,6 +1552,177 @@ isolated_rough_be_reference <- function(data, spectrum, time_seq, alpha,
 
 ```
 
+## Sampled reference-mesh errors for rough forcing
+
+The reference below is the nodal evaluation of a finite continuum series.
+Its consistent P1 mass matrix and right-endpoint time samples define the
+same sampled norm as the smooth reference experiment. Factor-four
+quarter-loop matrices preserve the full-graph norm for these data.
+The compiled kernel advances every shifted FEM matrix step and evaluates
+the sampled quadratic norm; no analytic time integral or continuum-tail
+term is added. Reference cutoff and mesh resolution are explicit inputs.
+
+```{r brasil-functions-rough-sampled, eval=TRUE}
+rough_sampled_reference <- function(J_reference, cutoff, max_nodes = 2^22,
+                                    max_basis_mib = 2048) {
+    stopifnot(length(J_reference)==1L,is.finite(J_reference),
+      J_reference==as.integer(J_reference),J_reference>=4L,J_reference<=23L,
+      length(cutoff)==1L,is.finite(cutoff),cutoff==as.integer(cutoff),cutoff>=1L,
+      J_reference>=cutoff+2L,max_nodes>0,max_basis_mib>0)
+    cells <- 2^(J_reference-1L)
+    n <- cells-1L
+    if (n>max_nodes || 8*n*cutoff/1024^2>max_basis_mib)
+        stop("Reference mesh/basis exceeds its allocation guard.")
+    h <- 2^-J_reference
+    C <- Matrix::bandSparse(n,k=c(-1L,0L,1L),
+      diagonals=list(rep(2*h/3,n-1L),rep(8*h/3,n),rep(2*h/3,n-1L)))
+    x <- seq_len(n)*h
+    E <- outer(x,2^seq_len(cutoff),function(x,k) sinpi(x*k))
+    list(J=as.integer(J_reference),h=h,C=C,x=x,basis=E,cutoff=as.integer(cutoff))
+}
+
+rough_sampled_fem_basis <- function(J, reference_x) {
+    stopifnot(length(J)==1L,is.finite(J),J==as.integer(J),J>=3L,J<=20L,
+      all(is.finite(reference_x)),all(reference_x>0 & reference_x<.5))
+    position <- reference_x*2^J
+    left <- as.integer(floor(position))
+    fraction <- position-left
+    n <- 2^(J-1L)-1L
+    rows <- seq_along(position)
+    keep_left <- left>=1L & left<=n
+    keep_right <- left+1L>=1L & left+1L<=n
+    Matrix::drop0(Matrix::sparseMatrix(
+      i=c(rows[keep_left],rows[keep_right]),
+      j=c(left[keep_left],left[keep_right]+1L),
+      x=c(1-fraction[keep_left],fraction[keep_right]),
+      dims=c(length(position),n)))
+}
+
+rough_sampled_coefficients <- function(times,cutoff,alpha,diffusion=1,kappa=4) {
+    stopifnot(all(is.finite(times)),all(times>=0),cutoff>=1L,cutoff==as.integer(cutoff))
+    j <- seq_len(cutoff)
+    rates <- rough_rates(j,alpha,diffusion,kappa)
+    -expm1(-outer(rates,times))/(j*rates)
+}
+
+rough_compile_sampled_solver <- function(cache_dir=tempdir()) {
+    target <- environment(rough_compile_sampled_solver)
+    if (!exists("rough_sampled_evolve_cpp",envir=target,inherits=FALSE))
+        Rcpp::sourceCpp(code=r"----(
+// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::plugins(cpp11)]]
+#include <RcppEigen.h>
+#include <memory>
+#include <vector>
+#include <cmath>
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
+using Eigen::SparseMatrix;
+typedef Eigen::SimplicialLDLT<SparseMatrix<double> > SampledFactor;
+
+// Same shifted FEM update and sampled reference quadratic norm as the
+// smooth notebook. No analytic time moments or continuum-tail sum enters.
+// [[Rcpp::export]]
+Rcpp::List rough_sampled_evolve_cpp(
+    const Eigen::MappedSparseMatrix<double>& C_in, Rcpp::List matrices,
+    Eigen::VectorXd residues, double remainder,
+    Eigen::VectorXd load, Eigen::MatrixXd projection,
+    const Eigen::MappedSparseMatrix<double>& metric_in,
+    Eigen::MatrixXd residual_gram, Eigen::MatrixXd coefficients,
+    Rcpp::IntegerVector target_steps, Eigen::VectorXd weights,
+    double tau, int n_steps) {
+  SparseMatrix<double> C=C_in, metric=metric_in;
+  const int n=C.rows(), modes=projection.cols(), m=residues.size();
+  const int samples=target_steps.size();
+  if (n_steps<1 || tau<=0 || matrices.size()!=m || load.size()!=n ||
+      projection.rows()!=n || coefficients.rows()!=modes ||
+      coefficients.cols()!=samples || weights.size()!=samples ||
+      residual_gram.rows()!=modes || residual_gram.cols()!=modes ||
+      metric.rows()!=n || metric.cols()!=n)
+    Rcpp::stop("Invalid sampled-reference dimensions.");
+  SampledFactor mass_factor;
+  mass_factor.compute(C);
+  if (mass_factor.info()!=Eigen::Success) Rcpp::stop("Mass factorization failed.");
+  std::vector<std::unique_ptr<SampledFactor> > factors;
+  for (int i=0;i<m;++i) {
+    SparseMatrix<double> A=Rcpp::as<SparseMatrix<double> >(matrices[i]);
+    factors.emplace_back(new SampledFactor());
+    factors.back()->compute(A);
+    if (factors.back()->info()!=Eigen::Success) Rcpp::stop("Shifted factorization failed.");
+  }
+  VectorXd u=VectorXd::Zero(n),rhs(n),next(n),delta(n);
+  int step=0;
+  double total=0,compensation=0;
+  for(int q=0;q<samples;++q) {
+    if ((q & 4095)==0) Rcpp::checkUserInterrupt();
+    int goal=target_steps[q];
+    if(goal<step || goal>n_steps || goal<1 || !(weights[q]>0))
+      Rcpp::stop("Invalid reference time-to-step mapping.");
+    while(step<goal) {
+      if ((step & 4095)==0) Rcpp::checkUserInterrupt();
+      rhs.noalias()=C*u;
+      rhs.noalias()+=tau*load;
+      next=remainder*mass_factor.solve(rhs);
+      for(int i=0;i<m;++i) next.noalias()+=residues[i]*factors[i]->solve(rhs);
+      u.swap(next);
+      ++step;
+    }
+    delta.noalias()=u-projection*coefficients.col(q);
+    double value=weights[q]*(delta.dot(metric*delta)+
+      coefficients.col(q).dot(residual_gram*coefficients.col(q)));
+    if(!std::isfinite(value) || value<0) Rcpp::stop("Invalid sampled squared error.");
+    double adjusted=value-compensation,updated=total+adjusted;
+    compensation=(updated-total)-adjusted;
+    total=updated;
+  }
+  if(step!=n_steps) Rcpp::stop("Reference grid did not reach the final solver step.");
+  return Rcpp::List::create(Rcpp::Named("error")=std::sqrt(total),
+    Rcpp::Named("sampled_squared")=total,Rcpp::Named("final_state")=u);
+}
+)----",env=target,cacheDir=cache_dir,showOutput=FALSE,verbose=FALSE)
+    invisible(TRUE)
+}
+
+rough_sampled_error <- function(mesh,reference,error_projection,alpha,time_step,
+    reference_time_step,m=14L,diffusion=1,T_final=1,
+    max_solver_steps=1e7,max_reference_samples=2e6,max_coefficient_mib=512) {
+    stopifnot(reference$cutoff>=mesh$J-1L,reference$J>mesh$J,
+      length(T_final)==1L,is.finite(T_final),T_final>0,
+      length(time_step)==1L,is.finite(time_step),time_step>0,
+      length(reference_time_step)==1L,is.finite(reference_time_step),reference_time_step>0,
+      length(max_solver_steps)==1L,is.finite(max_solver_steps),max_solver_steps>0,
+      length(max_reference_samples)==1L,is.finite(max_reference_samples),max_reference_samples>0,
+      length(max_coefficient_mib)==1L,is.finite(max_coefficient_mib),max_coefficient_mib>0)
+    solver_N <- ceiling(T_final/time_step)
+    reference_N <- ceiling(T_final/reference_time_step)
+    if (!is.finite(solver_N) || !is.finite(reference_N) ||
+        solver_N>max_solver_steps || reference_N>max_reference_samples ||
+        8*reference_N*reference$cutoff/1024^2>max_coefficient_mib)
+        stop("Time grid/reference coefficient matrix exceeds its allocation guard.")
+    grid <- make_time_grid(T_final,time_step)
+    reference_grid <- make_time_grid(T_final,reference_time_step)
+    coefficients <- rough_sampled_coefficients(reference_grid$time_seq[-1L],
+      reference$cutoff,alpha,diffusion,mesh$kappa)
+    target_steps <- findInterval(reference_grid$time_seq[-1L],grid$time_seq,left.open=TRUE)
+    op <- my.fractional.operators.frac(mesh$K,alpha/2,mesh$C,mesh$kappa^2,
+      m,grid$time_step,diffusion)
+    general <- function(A) as(as(A,"generalMatrix"),"CsparseMatrix")
+    started <- proc.time()[["elapsed"]]
+    result <- rough_sampled_evolve_cpp(general(mesh$C),
+      lapply(op$partial_fraction_terms,general),op$residues,op$remainder,
+      mesh$load,error_projection$projection,general(error_projection$metric),
+      error_projection$residual_gram,coefficients,as.integer(target_steps),
+      diff(reference_grid$time_seq),grid$time_step,grid$N)
+    result$elapsed <- proc.time()[["elapsed"]]-started
+    result$tau <- grid$time_step
+    result$reference_tau <- reference_grid$time_step
+    result$N <- grid$N
+    result$reference_N <- reference_grid$N
+    result
+}
+
+```
+
 ## Sparse time stepping for rough data
 
 ```{r brasil-functions-5, eval=TRUE}

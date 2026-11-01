@@ -1,6 +1,6 @@
 # BRASIL matrix experiments
 
-Six standalone R Markdown experiments use only installed `rSPDE` BRASIL
+Seven standalone R Markdown experiments use only installed `rSPDE` BRASIL
 coefficient tables. Reusable coefficient, assembly, matrix-solver and error-diagnostic functions
 are in `brasilfunc.Rmd`, including the sparse matrix time-stepping kernel.
 Each notebook contains its own computation loops, regressions, plots and saves.
@@ -16,6 +16,7 @@ changes saved results, or contacts a messaging service. No credentials are neede
 | Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.001; N=200,80,32,13,6,2; diffusion=0.001 |
 | Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:14; h=0.02; tau=0.005; diffusion=1 |
 | Rough, space | `conv_in_h_rough.Rmd` | m=14; J=5:9; alpha-specific time steps; diffusion=1 |
+| Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=5:9; reference cutoff=16; reference h=2^-18 |
 | Rough, time | `conv_in_tau_rough.Rmd` | m=20 for alpha=0.5, otherwise 14; N=5,10,20,40,80,160 |
 | Rough, rational order | `conv_in_m_isolated_rough.Rmd` | m=1:9; h=1/256; tau=0.02; diffusion=0.25 |
 
@@ -29,7 +30,7 @@ saved results. From the project root:
 
 ```r
 rmarkdown::render("conv_in_m_isolated.Rmd", output_dir="docs")
-# Or render all eight pages:
+# Or render all nine pages:
 rmarkdown::render_site()
 ```
 
@@ -64,3 +65,7 @@ Run the focused integration checks from the project root:
 ```sh
 /usr/bin/Rscript --vanilla test_brasil.R
 ```
+
+The sampled-reference rough spatial study uses a fixed finite-series reference
+on a fine space-time mesh. Its cutoff, reference resolution, time steps, and
+rational order were checked in DOCS/NAP; only the selected run is included here.
