@@ -1,8 +1,9 @@
 # BRASIL matrix experiments
 
 Five standalone R Markdown experiments use only installed `rSPDE` BRASIL
-coefficient tables. All theory and implementation functions are in
-`brasilfunc.Rmd`, including the sparse matrix time-stepping kernel.
+coefficient tables. Reusable coefficient, assembly, matrix-solver and error-diagnostic functions
+are in `brasilfunc.Rmd`, including the sparse matrix time-stepping kernel.
+Each notebook contains its own computation loops, regressions, plots and saves.
 
 Open `NAP.Rproj`, then click Knit on any experiment. Knitting reads the
 committed results and images; it never starts an experiment, compiles C++,
@@ -34,8 +35,9 @@ rmarkdown::render_site()
 ## Explicit recomputation
 
 In each notebook, edit **Parameters for the next run**, then manually run the
-`setup`, `parameters`, and `recompute` chunks in order. The computation uses
-those exact notebook variables and overwrites its saved data and figures.
+`setup`, `parameters`, and `recompute` chunks in order. The `recompute` chunk contains the full experiment computation directly: mesh
+assembly, refinement loops, error evaluation, regression, plotting, and saving.
+It uses the notebook variables and overwrites its saved data and figures.
 Knit afterward to refresh the report.
 
 The parameter and recompute chunks have `eval=FALSE`: Knit skips both and

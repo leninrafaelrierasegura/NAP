@@ -23,7 +23,8 @@ always_allow_html: true
 
 Knit displays the saved results. To run a new experiment, edit the **Parameters
 for the next run** chunk, then run the setup, parameters, and recompute chunks
-manually in that order. The recompute chunk overwrites the saved results and
+manually in that order. The computation loops, error calculations, plotting,
+and saving steps are written directly below. The recompute chunk overwrites the saved results and
 figures. Knit again to display them. Parameter and recompute chunks are skipped
 when knitting; the displayed settings always describe the saved results.
 
@@ -126,6 +127,13 @@ workers <- 1L
 ```
 
 ```{r recompute, eval=FALSE}
+# Saved files overwritten by this computation.
+output_file <- "data_files/rough_h_results.rds"
+output_dir <- "data_files/rough"
+root <- getwd()
+cache_dir <- tempdir()
+checkpoint_dir <- tempfile("rough-h-checkpoints-")
+
 parameters <- list(alpha=alpha_vector,J=J_vector,T_final=T_final,
   kappa=kappa,diffusion=diffusion,projection_quadrature=projection_quadrature,
   tail_tolerance=tail_tolerance,time_steps=time_steps,rational_order=m_fixed,
@@ -133,9 +141,97 @@ parameters <- list(alpha=alpha_vector,J=J_vector,T_final=T_final,
   forcing="sum_{j>=1} sin(2^j*pi*x)/j on loop; zero on stem",
   reconstruction="right-constant backward Euler",
   error_integration="analytic time moments, spatial projection residual, bounded infinite tail")
-rough_result <- rough_run_experiment(parameters=parameters,workers=workers,
-  output_file="data_files/rough_h_results.rds")
-rough_save_figures(rough_result)
+
+# Execute the refinement study and compute regression rates.
+stopifnot(length(parameters$alpha) == length(parameters$time_steps), all(parameters$fit_J %in% parameters$J),
+    workers >= 1L, workers == as.integer(workers))
+dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+rough_compile_solver(root, cache_dir)
+cases <- expand.grid(J = parameters$J, alpha_index = seq_along(parameters$alpha))
+case_provenance <- list(parameters = parameters, sources = tools::md5sum(file.path(root, "brasilfunc.Rmd")))
+# Each case assembles its mesh and applies the matrix time-step solver.
+run_case <- function(i) {
+    J <- cases$J[i]
+    a <- cases$alpha_index[i]
+    alpha <- parameters$alpha[a]
+    checkpoint <- file.path(checkpoint_dir, sprintf("J%02d-alpha%03d.rds", J, round(100 * alpha)))
+    if (file.exists(checkpoint)) {
+        saved <- readRDS(checkpoint)
+        if (!identical(saved$identity, case_provenance))
+            stop("Checkpoint source/settings mismatch: ", checkpoint)
+        return(saved$value)
+    }
+    message(sprintf("Matrix experiment: J=%s, h=%g, alpha=%g", J, 2^-J, alpha))
+    mesh <- rough_mesh(J, parameters$kappa)
+    projection <- rough_projection(mesh, parameters$projection_quadrature)
+    value <- rough_solve(mesh, alpha, parameters$time_steps[a], order = parameters$rational_order,
+        diffusion = parameters$diffusion, T_final = parameters$T_final, projection = projection,
+        tail_tolerance = parameters$tail_tolerance, symmetry_reduction = parameters$symmetry_reduction)
+    value$final_state <- value$states <- NULL
+    value$J <- J
+    value$alpha <- alpha
+    value$n_nodes <- nrow(mesh$C)
+    saveRDS(list(identity = case_provenance, value = value), checkpoint)
+    message(sprintf("Finished J=%s alpha=%g: E=%.9g (%.2f s)", J, alpha, value$error, value$elapsed))
+    value
+}
+safe_case <- function(i) tryCatch(run_case(i), error = function(e) list(failed = TRUE, message = conditionMessage(e),
+    case = i))
+values <- if (workers > 1L && .Platform$OS.type == "unix")
+    parallel::mclapply(seq_len(nrow(cases)), safe_case, mc.cores = min(workers, nrow(cases)), mc.preschedule = FALSE) else lapply(seq_len(nrow(cases)), safe_case)
+failed <- vapply(values, function(x) !is.list(x) || isTRUE(x$failed), logical(1))
+if (any(failed))
+    stop("Rough experiment failed: ", paste(vapply(values[failed], function(x) if (is.list(x))
+        x$message else as.character(x), character(1)), collapse = "; "))
+errors <- matrix(vapply(values, `[[`, numeric(1), "error"), nrow = length(parameters$J), ncol = length(parameters$alpha))
+corrected <- errors * parameters$J
+fit <- which(parameters$J %in% parameters$fit_J)
+slope <- function(y) unname(coef(stats::lm(log10(y[fit]) ~ log10(2^-parameters$J[fit])))[2L])
+rates <- data.frame(alpha = parameters$alpha, theoretical = parameters$alpha, raw = apply(errors,
+    2L, slope), corrected = apply(corrected, 2L, slope))
+rates$relative_error_percent <- 100 * abs(rates$corrected - rates$alpha)/rates$alpha
+result <- list(parameters = parameters, errors = errors, corrected_errors = corrected, rates = rates,
+    cases = values, provenance = case_provenance, generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z",
+        tz = "Asia/Riyadh"), session_info = utils::sessionInfo())
+saveRDS(result, output_file)
+rough_result <- result
+
+# Draw reference guides and overwrite the saved figures.
+dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
+for(corrected in c(FALSE,TRUE)) {
+  p <- result$parameters
+  errors <- if (corrected)
+      result$corrected_errors else result$errors
+  frame <- expand.grid(J = p$J, column = seq_along(p$alpha))
+  frame$h <- 2^-frame$J
+  frame$error <- as.vector(errors)
+  frame$alpha <- factor(p$alpha[frame$column], levels = p$alpha)
+  fit <- which(p$J %in% p$fit_J)
+  guide <- frame
+  for (a in seq_along(p$alpha)) {
+      target <- guide$column == a
+      model <- (2^-p$J)^p$alpha[a]
+      if (!corrected)
+          model <- model/p$J
+      constant <- exp(mean(log(errors[fit, a]/model[fit])))
+      guide$error[target] <- constant * model
+  }
+  label <- if (corrected)
+      expression(J %.% E[h]) else expression(E[h])
+  plot <- ggplot2::ggplot(frame, ggplot2::aes(h, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,
+      linetype = "dashed", linewidth = 0.65, alpha = 0.8) + ggplot2::geom_line(linewidth = 0.8) + ggplot2::geom_point(size = 2.2) +
+      ggplot2::scale_x_log10(breaks = 2^-p$J, labels = function(x) paste0("1/", round(1/x))) + ggplot2::scale_y_log10() +
+      ggplot2::scale_color_viridis_d(option = "D", begin = 0.05, end = 0.85) + ggplot2::guides(color = ggplot2::guide_legend(nrow = 2L,
+      byrow = TRUE)) + ggplot2::labs(x = expression(h ~ "(log scale)"), y = label, color = expression(alpha),
+      title = if (corrected)
+          "Spatial convergence after logarithmic correction" else "Spatial convergence with rough forcing") + ggplot2::theme_bw(base_size = 12) + ggplot2::theme(legend.position = "bottom",
+      panel.grid.minor = ggplot2::element_blank(), plot.title = ggplot2::element_text(size = 13, face = "bold"))
+  name <- if(corrected) "conv_h_rough_corrected" else "conv_h_rough_raw"
+  for(extension in c("png","pdf")) ggplot2::ggsave(
+    file.path(output_dir,paste0(name,".",extension)),plot,
+    width=6.2,height=4.7,dpi=300,bg="white")
+}
 ```
 
 # Saved parameters

@@ -14,7 +14,8 @@ output:
 
 Knit displays the saved results. To run a new experiment, edit the **Parameters
 for the next run** chunk, then run the setup, parameters, and recompute chunks
-manually in that order. The recompute chunk overwrites the saved results and
+manually in that order. The computation loops, error calculations, plotting,
+and saving steps are written directly below. The recompute chunk overwrites the saved results and
 figures. Knit again to display them. Parameter and recompute chunks are skipped
 when knitting; the displayed settings always describe the saved results.
 
@@ -77,15 +78,107 @@ error_verbose <- FALSE
 ```
 
 ```{r recompute, eval=FALSE}
-errors_projected <- run_smooth_h(
-  T_final=T_final,kappa=kappa,diffusion=diffusion,alpha_vector=alpha_vector,
-  m_fixed=m_fixed,h_vector=h_vector,time_step=time_step,
-  overkill_h=overkill_h,overkill_time_step=overkill_time_step,N_finite=N_finite,
-  initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
-  AAA=AAA,OMEGA=OMEGA,workers=workers,error_method=error_method,
-  error_n_blocks=error_n_blocks,error_verbose=error_verbose,
-  output_file="data_files/errors_projected_h_mat.RData",
-  figure_file="data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png")
+# Saved files overwritten by this computation.
+output_file <- "data_files/errors_projected_h_mat.RData"
+figure_file <- "data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png"
+
+# Assemble FEM matrices and advance every backward Euler step.
+stopifnot(N_finite >= 4, N_finite%%2 == 0, length(alpha_vector) > 0, all(is.finite(alpha_vector)),
+    all(alpha_vector > 0 & alpha_vector <= 2), length(m_fixed) == 1, m_fixed == floor(m_fixed))
+for (alpha in alpha_vector[alpha_vector != 2]) brasil_coefficients(m_fixed, alpha/2)
+adjusted_N_finite <- N_finite + N_finite/2 + 1
+coeff_U_0 <- numeric(adjusted_N_finite)
+coeff_U_0[5] <- initial_amplitude
+coeff_FF <- numeric(adjusted_N_finite)
+coeff_FF[7] <- forcing_amplitude
+time_grid <- make_time_grid(T_final = T_final, target_step = time_step)
+time_step <- time_grid$time_step
+time_seq <- time_grid$time_seq
+g_average <- average_sine_forcing(time_seq, A = AAA, omega = OMEGA)
+stopifnot(all(coeff_U_0[-5] == 0))
+stopifnot(length(coeff_FF) >= 7L, all(coeff_FF[-7] == 0))
+# Assemble the reference-mesh mass matrix.
+overkill_graph <- gets.graph.tadpole(h = overkill_h)
+overkill_graph$compute_fem()
+overkill_C <- overkill_graph$mesh$C
+error_memory <- estimate_error_memory(n_reference_nodes = nrow(overkill_C), n_exact_modes = if (error_method ==
+    "compressed")
+    sum(coeff_U_0 != 0 | coeff_FF != 0) else NULL, n_reference_samples = ceiling(T_final/overkill_time_step), n_blocks = unique(c(error_n_blocks,
+    10, 100, 1000, 10000, 1e+05, 1e+06)), n_solver_steps = time_grid$N)
+print(error_memory, digits = 3, row.names = FALSE)
+reference_grid <- make_time_grid(T_final = T_final, target_step = overkill_time_step)
+overkill_time_step <- reference_grid$time_step
+overkill_time_seq <- reference_grid$time_seq
+reference_eigen_params <- gets.eigen.params(N_finite = N_finite, kappa = kappa, alpha = alpha_vector[1],
+    graph = overkill_graph)
+reference_eigenvalues <- reference_eigen_params$EIGENVAL
+auxE <- reference_eigen_params$EIGENFUN
+active_modes <- which(coeff_U_0 != 0 | coeff_FF != 0)
+exact_basis <- auxE[, active_modes, drop = FALSE]
+exact_initial <- coeff_U_0[active_modes]
+exact_forcing <- coeff_FF[active_modes]
+m_values <- c()
+# Loop over the refinement values and fractional exponents.
+errors_projected <- matrix(NA_real_, length(h_vector), length(alpha_vector))
+for (i in seq_along(h_vector)) {
+    h <- h_vector[i]
+    graph <- gets.graph.tadpole(h = h)
+    graph$compute_fem()
+    C <- graph$mesh$C
+    L <- kappa^2 * C + graph$mesh$G
+    Psi <- graph$fem_basis(overkill_graph$get_mesh_locations())
+    U_0 <- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
+    spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
+    error_projection <- if (error_method == "compressed")
+        prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
+    cases <- run_reference_cases(seq_along(alpha_vector), function(j) {
+        alpha <- alpha_vector[j]
+        beta <- alpha/2
+        exact_rates <- diffusion * reference_eigenvalues[active_modes]^beta
+        coefficients_at_time <- function(t) exact_modal_coefficients(t, exact_rates, exact_initial,
+            exact_forcing, A = AAA, omega = OMEGA)
+        exact_at_time <- function(t) exact_basis %*% coefficients_at_time(t)
+        my_op_frac <- my.fractional.operators.frac(L = L, beta = beta, C = C, scale.factor = kappa^2,
+            m = m_fixed, time_step = time_step, diffusion = diffusion)
+        solve_fractional_evolution_error(my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
+            Psi, overkill_C, overkill_time_seq, exact_at_time, n_blocks = error_n_blocks, verbose = error_verbose,
+            error_method = error_method, coefficients_at_time = coefficients_at_time, error_projection = error_projection)
+    }, workers = workers)
+    errors_projected[i, ] <- vapply(cases, base::identity, numeric(1))
+}
+# Save the errors together with the settings used for this run.
+attr(errors_projected, "coefficient_source") <- "rSPDE BRASIL"
+attr(errors_projected, "parameters") <- list(study = "h", axis = h_vector, alpha = alpha_vector,
+    m = m_fixed, diffusion = diffusion, kappa = kappa, T = T_final, reference_h = overkill_h, reference_tau = overkill_time_step,
+    N_finite = N_finite, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
+    AAA = AAA, OMEGA = OMEGA, fixed = list(tau = time_step))
+dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+save(errors_projected, file = output_file)
+
+
+# Fit reference guides, draw the curves, and overwrite the saved figure.
+errors <- errors_projected
+axis <- h_vector
+alpha <- alpha_vector
+study <- "h"
+frame <- expand.grid(row = seq_along(axis), column = seq_along(alpha))
+frame$x <- axis[frame$row]
+frame$error <- as.vector(errors)
+frame$alpha <- factor(alpha[frame$column], levels = alpha)
+guide <- frame
+rate <- if (study == "h")
+    2 else 1
+for (j in seq_along(alpha)) {
+    ids <- frame$column == j
+    constant <- exp(mean(log(errors[, j]/axis^rate)))
+    guide$error[ids] <- constant * guide$x[ids]^rate
+}
+plot <- ggplot2::ggplot(frame, ggplot2::aes(x, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,
+    linetype = "dashed") + ggplot2::geom_line() + ggplot2::geom_point() + ggplot2::scale_x_log10() +
+    ggplot2::scale_y_log10() + ggplot2::labs(x = study, y = "Space-time L2 error", color = "alpha") +
+    ggplot2::theme_bw() + ggplot2::theme(legend.position = "bottom")
+dir.create(dirname(figure_file), recursive = TRUE, showWarnings = FALSE)
+ggplot2::ggsave(figure_file, plot, width = 4, height = 5, dpi = 300, bg = "white")
 ```
 
 ## Saved parameters

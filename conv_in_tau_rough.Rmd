@@ -23,7 +23,8 @@ always_allow_html: true
 
 Knit displays the saved results. To run a new experiment, edit the **Parameters
 for the next run** chunk, then run the setup, parameters, and recompute chunks
-manually in that order. The recompute chunk overwrites the saved results and
+manually in that order. The computation loops, error calculations, plotting,
+and saving steps are written directly below. The recompute chunk overwrites the saved results and
 figures. Knit again to display them. Parameter and recompute chunks are skipped
 when knitting; the displayed settings always describe the saved results.
 
@@ -123,15 +124,95 @@ workers <- 1L
 ```
 
 ```{r recompute, eval=FALSE}
+# Saved files overwritten by this computation.
+output_file <- "data_files/rough_tau_results.rds"
+output_dir <- "data_files/rough_tau"
+root <- getwd()
+cache_dir <- tempdir()
+checkpoint_dir <- tempfile("rough-tau-checkpoints-")
+
 parameters <- list(alpha=alpha_vector,J=J_vector,T_final=T_final,
   kappa=kappa,diffusion=diffusion,projection_quadrature=projection_quadrature,
   tail_tolerance=tail_tolerance,N=N_vector,rational_orders=m_fixed,
   fit_indices=fit_indices,forcing="same fixed infinite L2 forcing as conv_in_h_rough",
   reconstruction="right-constant backward Euler",
   error_integration="exact time moments, stable projection residual, certified infinite tail")
-rough_tau_result <- rough_tau_run_experiment(parameters=parameters,workers=workers,
-  output_file="data_files/rough_tau_results.rds")
-rough_tau_save_figures(rough_tau_result)
+
+# Execute the refinement study and compute regression rates.
+stopifnot(length(parameters$alpha) == length(parameters$J), length(parameters$alpha) == length(parameters$diffusion),
+    length(parameters$alpha) == length(parameters$rational_orders), all(parameters$fit_indices %in%
+        seq_along(parameters$N)), workers >= 1)
+dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+rough_compile_solver(root, cache_dir)
+provenance <- list(parameters = parameters, sources = tools::md5sum(file.path(root, "brasilfunc.Rmd")))
+# Each alpha curve keeps its mesh fixed and refines the time grid.
+run_alpha <- function(a) {
+    checkpoint <- file.path(checkpoint_dir, sprintf("alpha%03d.rds", round(100 * parameters$alpha[a])))
+    if (file.exists(checkpoint)) {
+        saved <- readRDS(checkpoint)
+        if (!identical(saved$provenance, provenance))
+            stop("Temporal checkpoint source/settings mismatch.")
+        return(saved$values)
+    }
+    message(sprintf("Preparing tau curve: alpha=%.1f, J=%d", parameters$alpha[a], parameters$J[a]))
+    mesh <- rough_tau_mesh(parameters$J[a], parameters$kappa)
+    projection <- rough_tau_projection(mesh, parameters$projection_quadrature)
+    values <- lapply(parameters$N, function(N) {
+        value <- rough_tau_solve(mesh, parameters$alpha[a], N, parameters$rational_orders[a], parameters$diffusion[a],
+            parameters$T_final, projection, parameters$tail_tolerance)
+        value$states <- value$final_state <- NULL
+        message(sprintf("alpha=%.1f, N=%d, error=%.10g, %.2fs", parameters$alpha[a], N, value$error,
+            value$elapsed))
+        value
+    })
+    saveRDS(list(provenance = provenance, values = values), checkpoint)
+    values
+}
+safe_alpha <- function(a) tryCatch(run_alpha(a), error = function(e) list(failed = TRUE, message = conditionMessage(e)))
+curves <- if (workers > 1L && .Platform$OS.type == "unix")
+    parallel::mclapply(seq_along(parameters$alpha), safe_alpha, mc.cores = min(workers, length(parameters$alpha)),
+        mc.preschedule = FALSE) else lapply(seq_along(parameters$alpha), safe_alpha)
+failed <- vapply(curves, function(x) !is.list(x) || isTRUE(x$failed) || inherits(x, "try-error"),
+    logical(1))
+if (any(failed))
+    stop("Temporal matrix experiment failed: ", paste(vapply(curves[failed], function(x) if (is.list(x))
+        x$message else as.character(x), character(1)), collapse = "; "))
+errors <- vapply(curves, function(x) vapply(x, `[[`, numeric(1), "error"), numeric(length(parameters$N)))
+tau <- parameters$T_final/parameters$N
+fit <- parameters$fit_indices
+slope <- function(e) unname(coef(stats::lm(log10(e[fit]) ~ log10(tau[fit])))[2])
+observed <- apply(errors, 2L, slope)
+result <- list(parameters = parameters, tau = tau, errors = errors, rates = data.frame(alpha = parameters$alpha,
+    theoretical = 1, observed = observed, relative_error_percent = 100 * abs(observed - 1)), curves = curves,
+    provenance = provenance, generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z", tz = "Asia/Riyadh"),
+    session_info = utils::sessionInfo())
+saveRDS(result, output_file)
+rough_tau_result <- result
+
+# Draw reference guides and overwrite the saved figures.
+p <- result$parameters
+errors <- result$errors
+fit <- p$fit_indices
+constants <- apply(errors[fit, , drop = FALSE]/result$tau[fit], 2L, function(x) exp(mean(log(x))))
+frame <- expand.grid(index = seq_along(result$tau), column = seq_along(p$alpha))
+frame$tau <- result$tau[frame$index]
+frame$error <- as.vector(errors)
+frame$alpha <- factor(p$alpha[frame$column], levels = p$alpha)
+guide <- frame
+guide$error <- guide$tau * constants[guide$column]
+plot <- ggplot2::ggplot(frame, ggplot2::aes(tau, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,
+    linetype = "dashed", linewidth = 0.65, alpha = 0.75) + ggplot2::geom_line(linewidth = 0.8) +
+    ggplot2::geom_point(size = 2.1) + ggplot2::scale_x_log10(breaks = result$tau, labels = function(x) paste0("1/",
+    round(1/x))) + ggplot2::scale_y_log10() + ggplot2::scale_color_viridis_d(option = "D", begin = 0.05,
+    end = 0.85) + ggplot2::facet_wrap(~alpha, ncol = 2L, labeller = ggplot2::label_both) + ggplot2::labs(x = expression(tau ~
+    "(log scale)"), y = expression(E[tau]), color = expression(alpha), title = "Temporal convergence with rough forcing") +
+    ggplot2::theme_bw(base_size = 12) + ggplot2::theme(legend.position = "none", panel.grid.minor = ggplot2::element_blank(),
+    plot.title = ggplot2::element_text(size = 13, face = "bold"))
+dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
+for(extension in c("png","pdf")) ggplot2::ggsave(
+  file.path(output_dir,paste0("conv_tau_rough.",extension)),plot,
+  width=8,height=9,dpi=300,bg="white")
 ```
 
 # Saved parameters

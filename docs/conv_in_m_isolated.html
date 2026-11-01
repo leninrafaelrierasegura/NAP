@@ -1720,10 +1720,33 @@ border-radius: 0px;
 <p><a href="index.html">Experiments</a> · <a href="brasilfunc.html">Theory and functions</a></p>
 <p>Knit displays the saved results. To run a new experiment, edit the
 <strong>Parameters for the next run</strong> chunk, then run the setup,
-parameters, and recompute chunks manually in that order. The recompute
-chunk overwrites the saved results and figures. Knit again to display
-them. Parameter and recompute chunks are skipped when knitting; the
-displayed settings always describe the saved results.</p>
+parameters, and recompute chunks manually in that order. The computation
+loops, error calculations, plotting, and saving steps are written
+directly below. The recompute chunk overwrites the saved results and
+figures. Knit again to display them. Parameter and recompute chunks are
+skipped when knitting; the displayed settings always describe the saved
+results.</p>
+<div id="matrix-experiment" class="section level2">
+<h2>Matrix experiment</h2>
+<p>The smooth data are <span class="math inline">\(u_0=a_0e_5\)</span>
+and <span class="math inline">\(f(t)=a_f A\sin(\omega t)e_7\)</span> on
+the length-(1,2) tadpole. Both evolutions use the <strong>same assembled
+consistent P1 FEM matrices</strong>, analytic loads, and
+interval-averaged forcing. For <span class="math inline">\(LV=CV\Lambda\)</span> with <span class="math inline">\(V^\top CV=I\)</span>, the reference is <span class="math display">\[
+U_h^{k+1}=V\operatorname{diag}\!\left(
+  \frac{1}{1+\tau\nu\lambda_j^{\alpha/2}}\right)
+  V^\top(CU_h^k+\tau F^{k+1}).
+\]</span> The rational evolution applies shifted sparse solves with
+installed <code>rSPDE</code> BRASIL coefficients and retains the mass
+solve from the constant term. The numerical eigenbasis supplies an
+independent reference and diagnostic; it does not replace the rational
+matrix solver. The isolated error is <span class="math display">\[
+E_m^2=\tau\sum_{k=1}^N
+(U_h^k-U_{h,m}^k)^\top C(U_h^k-U_{h,m}^k).
+\]</span> All orders use the same mesh and time grid. Dense
+eigendecomposition is restricted to moderate meshes. For <span class="math inline">\(\alpha=2\)</span>, ordinary backward Euler
+provides a control without rational approximation.</p>
+</div>
 <div id="parameters-for-the-next-run" class="section level2">
 <h2>Parameters for the next run</h2>
 <pre class="r"><code>h &lt;- 0.02
@@ -1737,11 +1760,262 @@ initial_amplitude &lt;- 10
 forcing_amplitude &lt;- 10
 AAA &lt;- 1
 OMEGA &lt;- pi</code></pre>
-<pre class="r"><code>r &lt;- run_isolated_brasil(h=h,tau=tau,m_max=m_max,alpha_vector=alpha_vector,
-  T_final=T_final,kappa=kappa,diffusion=diffusion,
-  initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
-  AAA=AAA,OMEGA=OMEGA,output_file=&quot;data_files/isolated_m_results.rds&quot;,
-  figure_dir=&quot;data_files/isolated_m&quot;)</code></pre>
+<pre class="r"><code># Saved files overwritten by this computation.
+output_file &lt;- &quot;data_files/isolated_m_results.rds&quot;
+figure_dir &lt;- &quot;data_files/isolated_m&quot;
+
+# Assemble the common FEM system and its complete numerical eigensystem.
+library(ggplot2)
+coefficient_source &lt;- &quot;brasil&quot;
+stopifnot(length(h) == 1L, is.finite(h), h &gt; 0, length(tau) == 1L, is.finite(tau), tau &gt; 0, length(T_final) ==
+    1L, is.finite(T_final), T_final &gt; 0, length(kappa) == 1L, is.finite(kappa), kappa &gt; 0, length(diffusion) ==
+    1L, is.finite(diffusion), diffusion &gt; 0, length(m_max) == 1L, is.finite(m_max), m_max &gt;= 2, m_max ==
+    floor(m_max), m_max &lt;= max(brasil_supported_orders()), length(alpha_vector) &gt; 0, !anyDuplicated(alpha_vector),
+    all(is.finite(alpha_vector)), all(alpha_vector &gt;= 0.5 &amp; alpha_vector &lt;= 2))
+m_vector &lt;- seq_len(m_max)
+for (alpha in alpha_vector[alpha_vector != 2]) for (m in m_vector) brasil_coefficients(m, alpha/2)
+N &lt;- round(T_final/tau)
+if (!is.finite(N) || N &lt; 1 || N &gt; 1e+06 || abs(T_final/tau - N) &gt; 64 * .Machine$double.eps * max(1,
+    N))
+    stop(&quot;Choose T_final/tau to be an integer between 1 and 1e6.&quot;)
+time_seq &lt;- (0:N) * tau
+if (3/h &gt; 1200)
+    stop(&quot;Choose h &gt;= 0.0025 for this complete-eigensystem notebook.&quot;)
+data &lt;- isolated_tadpole_data(h, kappa, initial_amplitude, forcing_amplitude)
+spectrum &lt;- isolated_discrete_spectrum(data$C, data$L)
+knitr::kable(data.frame(h_requested = h, h_min = data$h_min, h_max = data$h_max, tau = tau, steps = N,
+    dimension = nrow(data$C), source = coefficient_source))
+# Compare sparse rational evolution with exact-discrete backward Euler.
+rows &lt;- list()
+for (alpha in alpha_vector) {
+    reference &lt;- isolated_exact_be_reference(data$C, spectrum, data$initial, data$spatial_load, time_seq,
+        alpha, diffusion, A = AAA, omega = OMEGA)
+    for (m in m_vector) {
+        rows[[length(rows) + 1L]] &lt;- isolated_rational_error(data, spectrum, reference, m)
+    }
+}
+results &lt;- do.call(rbind, rows)
+control_reference &lt;- isolated_exact_be_reference(data$C, spectrum, data$initial, data$spatial_load,
+    time_seq, alpha = 2, diffusion = diffusion, A = AAA, omega = OMEGA)
+control &lt;- isolated_rational_error(data, spectrum, control_reference, m = 1L)
+results$noise_indicator &lt;- pmax(results$absolute_error_disagreement, control$error, .Machine$double.xmin)
+results$resolved &lt;- results$product_error &gt; 100 * results$noise_indicator
+errors &lt;- matrix(results$error, nrow = length(m_vector), dimnames = list(m = m_vector, alpha = alpha_vector))
+knitr::kable(errors, format.args = list(scientific = TRUE, digits = 5))
+# Plot the matrix error and fit slopes in sqrt(m).
+plot_data &lt;- results
+plot_data$alpha_label &lt;- factor(plot_data$alpha, levels = alpha_vector)
+guides &lt;- plot_data
+for (alpha in alpha_vector) {
+    index &lt;- which(guides$alpha == alpha)
+    guides$error[index] &lt;- guides$error[index[1]] * exp(-2 * pi * sqrt(alpha/2) * (sqrt(guides$m[index]) -
+        1))
+}
+p_m_isolated &lt;- ggplot(plot_data, aes(sqrt(m), error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(aes(shape = resolved), size = 2) + geom_line(data = guides, linetype = &quot;dashed&quot;) +
+    scale_shape_manual(values = c(`FALSE` = 1, `TRUE` = 16)) + scale_x_continuous(breaks = sqrt(m_vector),
+    labels = m_vector) + scale_y_continuous(trans = scales::log_trans(base = exp(1)), labels = scales::label_scientific()) +
+    labs(x = &quot;m (square-root positions)&quot;, y = &quot;Isolated space-time error (log scale)&quot;, colour = &quot;alpha&quot;,
+        shape = &quot;Resolved&quot;, subtitle = sprintf(&quot;%s coefficients; h = %g; tau = %g&quot;, coefficient_source,
+            h, tau)) + theme_minimal() + theme(legend.position = &quot;bottom&quot;, plot.background = element_rect(fill = &quot;white&quot;,
+    colour = NA))
+p_m_isolated
+fit_slope &lt;- function(d) {
+    d &lt;- d[is.finite(d$error) &amp; d$error &gt; 0, ]
+    if (nrow(d) &lt; 2)
+        return(NA_real_)
+    unname(coef(lm(log(error) ~ sqrt(m), data = d))[2])
+}
+slopes &lt;- do.call(rbind, lapply(alpha_vector, function(a) {
+    d &lt;- results[results$alpha == a, ]
+    data.frame(alpha = a, benchmark = -2 * pi * sqrt(a/2), all_orders_slope = fit_slope(d), resolved_orders = sum(d$resolved),
+        resolved_only_slope = fit_slope(d[d$resolved, ]))
+}))
+knitr::kable(slopes, digits = 5)
+knitr::kable(spectrum$diagnostics, digits = 10)
+knitr::kable(control[, c(&quot;error&quot;, &quot;product_error&quot;, &quot;final_state_gap_C&quot;)], format.args = list(scientific = TRUE,
+    digits = 5))
+knitr::kable(results[, c(&quot;alpha&quot;, &quot;m&quot;, &quot;error&quot;, &quot;product_error&quot;, &quot;absolute_error_disagreement&quot;, &quot;resolved&quot;)],
+    format.args = list(scientific = TRUE, digits = 5))
+# Evaluate the same BRASIL coefficients on the common scalar interval.
+scalar_m_vector &lt;- m_vector
+scalar_alpha_vector &lt;- alpha_vector[alpha_vector != 2]
+scalar_x_max &lt;- 1000
+scalar_grid_points &lt;- 10001L
+scalar_x &lt;- exp(seq(0, log(scalar_x_max), length.out = scalar_grid_points))
+scalar_rows &lt;- list()
+for (scalar_alpha in scalar_alpha_vector) {
+    scalar_beta &lt;- scalar_alpha/2
+    for (scalar_m in scalar_m_vector) {
+        scalar_roots &lt;- brasil_coefficients(scalar_m, scalar_beta)
+        scalar_error &lt;- abs(brasil_inverse(scalar_x, scalar_roots) - scalar_x^(-scalar_beta))
+        stopifnot(all(is.finite(scalar_error)))
+        scalar_rows[[length(scalar_rows) + 1L]] &lt;- data.frame(alpha = scalar_alpha, m = scalar_m,
+            x = scalar_x, absolute_error = scalar_error)
+    }
+}
+scalar_errors &lt;- if (length(scalar_rows))
+    do.call(rbind, scalar_rows) else NULL
+if (!is.null(scalar_errors)) {
+    scalar_errors$alpha_label &lt;- factor(scalar_errors$alpha, levels = scalar_alpha_vector, labels = paste(&quot;alpha =&quot;,
+        scalar_alpha_vector))
+    scalar_errors$m_label &lt;- factor(scalar_errors$m, levels = scalar_m_vector)
+    scalar_max_errors &lt;- aggregate(absolute_error ~ alpha + m, scalar_errors, max)
+    knitr::kable(scalar_max_errors, col.names = c(&quot;alpha&quot;, &quot;m&quot;, &quot;Sampled maximum absolute error&quot;),
+        format.args = list(scientific = TRUE, digits = 5))
+}
+if (!is.null(scalar_errors)) {
+    p_scalar_error &lt;- ggplot(scalar_errors, aes(x, absolute_error, colour = m_label, group = m_label)) +
+        geom_line(linewidth = 0.6) + facet_wrap(~alpha_label, nrow = 1) + scale_x_log10() + scale_y_log10(labels = scales::label_scientific()) +
+        labs(x = &quot;x (log scale)&quot;, y = &quot;Absolute error |r_m(x) - x^(-alpha/2)| (log scale)&quot;, colour = &quot;m&quot;,
+            subtitle = sprintf(&quot;%s coefficients; common interval [1, 1000]&quot;, coefficient_source),
+            caption = &quot;Dips occur where the rational approximation crosses the target function.&quot;) +
+        theme_minimal() + theme(legend.position = &quot;bottom&quot;)
+    print(p_scalar_error)
+}
+if (!is.null(scalar_errors)) {
+    scalar_max_errors$alpha_label &lt;- factor(scalar_max_errors$alpha, levels = scalar_alpha_vector)
+    scalar_guides &lt;- scalar_max_errors
+    for (scalar_alpha in scalar_alpha_vector) {
+        scalar_index &lt;- which(scalar_guides$alpha == scalar_alpha)
+        scalar_anchor &lt;- scalar_index[scalar_guides$m[scalar_index] == 1L]
+        scalar_guides$absolute_error[scalar_index] &lt;- scalar_max_errors$absolute_error[scalar_anchor] *
+            exp(-2 * pi * sqrt(scalar_alpha/2) * (sqrt(scalar_guides$m[scalar_index]) - 1))
+    }
+    p_scalar_error_m &lt;- ggplot(scalar_max_errors, aes(sqrt(m), absolute_error, colour = alpha_label,
+        group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = scalar_guides,
+        linetype = &quot;dashed&quot;) + scale_x_continuous(breaks = sqrt(scalar_m_vector), labels = scalar_m_vector) +
+        scale_y_continuous(trans = scales::log_trans(base = exp(1)), labels = scales::label_scientific()) +
+        labs(x = &quot;m (square-root positions)&quot;, y = &quot;Sampled maximum absolute scalar error (natural-log scale)&quot;,
+            colour = &quot;alpha&quot;, subtitle = sprintf(&quot;%s coefficients; common interval [1, 1000]&quot;, coefficient_source)) +
+        theme_minimal() + theme(legend.position = &quot;bottom&quot;, plot.background = element_rect(fill = &quot;white&quot;,
+        colour = NA))
+    print(p_scalar_error_m)
+}
+# Evaluate the direct-power error on the reciprocal interval.
+unit_m_vector &lt;- m_vector
+unit_alpha_vector &lt;- alpha_vector[alpha_vector != 2]
+unit_x &lt;- sort(1/scalar_x)
+unit_rows &lt;- list()
+for (unit_alpha in unit_alpha_vector) {
+    unit_beta &lt;- unit_alpha/2
+    for (unit_m in unit_m_vector) {
+        unit_roots &lt;- brasil_coefficients(unit_m, unit_beta)
+        unit_error &lt;- abs(brasil_power(unit_x, unit_roots) - unit_x^unit_beta)
+        stopifnot(all(is.finite(unit_error)))
+        unit_rows[[length(unit_rows) + 1L]] &lt;- data.frame(alpha = unit_alpha, m = unit_m, x = unit_x,
+            absolute_error = unit_error)
+    }
+}
+unit_errors &lt;- if (length(unit_rows))
+    do.call(rbind, unit_rows) else NULL
+if (!is.null(unit_errors)) {
+    unit_errors$alpha_label &lt;- factor(unit_errors$alpha, levels = unit_alpha_vector, labels = paste(&quot;alpha =&quot;,
+        unit_alpha_vector))
+    unit_errors$m_label &lt;- factor(unit_errors$m, levels = unit_m_vector)
+    unit_max_errors &lt;- aggregate(absolute_error ~ alpha + m, unit_errors, max)
+    knitr::kable(unit_max_errors, col.names = c(&quot;alpha&quot;, &quot;m&quot;, &quot;Sampled maximum absolute error on [0.001,1]&quot;),
+        format.args = list(scientific = TRUE, digits = 5))
+}
+if (!is.null(unit_errors)) {
+    p_unit_error &lt;- ggplot(unit_errors, aes(x, absolute_error, colour = m_label, group = m_label)) +
+        geom_line(linewidth = 0.6) + facet_wrap(~alpha_label, nrow = 1) + scale_x_continuous(limits = c(0.001,
+        1), breaks = c(0.001, 0.25, 0.5, 0.75, 1)) + scale_y_continuous(labels = scales::label_scientific()) +
+        labs(x = &quot;x&quot;, y = &quot;Absolute error |B_m(x) - x^(alpha/2)|&quot;, colour = &quot;m&quot;, subtitle = sprintf(&quot;%s coefficients; interval [0.001, 1]&quot;,
+            coefficient_source)) + theme_minimal() + theme(legend.position = &quot;bottom&quot;, plot.background = element_rect(fill = &quot;white&quot;,
+        colour = NA))
+    print(p_unit_error)
+}
+if (!is.null(unit_errors)) {
+    unit_max_errors$alpha_label &lt;- factor(unit_max_errors$alpha, levels = unit_alpha_vector)
+    unit_guides &lt;- unit_max_errors
+    for (unit_alpha in unit_alpha_vector) {
+        unit_index &lt;- which(unit_guides$alpha == unit_alpha)
+        unit_anchor &lt;- unit_index[unit_guides$m[unit_index] == 1L]
+        unit_guides$absolute_error[unit_index] &lt;- unit_max_errors$absolute_error[unit_anchor] * exp(-2 *
+            pi * sqrt(unit_alpha/2) * (sqrt(unit_guides$m[unit_index]) - 1))
+    }
+    p_unit_error_m &lt;- ggplot(unit_max_errors, aes(sqrt(m), absolute_error, colour = alpha_label,
+        group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = unit_guides,
+        linetype = &quot;dashed&quot;) + scale_x_continuous(breaks = sqrt(unit_m_vector), labels = unit_m_vector) +
+        scale_y_continuous(trans = scales::log_trans(base = exp(1)), labels = scales::label_scientific()) +
+        labs(x = &quot;m (square-root positions)&quot;, y = &quot;Sampled maximum absolute error on [0.001,1] (natural-log scale)&quot;,
+            colour = &quot;alpha&quot;, subtitle = sprintf(&quot;%s coefficients; target x^(alpha/2)&quot;, coefficient_source)) +
+        theme_minimal() + theme(legend.position = &quot;bottom&quot;, plot.background = element_rect(fill = &quot;white&quot;,
+        colour = NA))
+    print(p_unit_error_m)
+}
+# Compare the errors on exactly reciprocal, order-dependent grids.
+reciprocal_domain &lt;- &quot;order-dependent&quot;
+reciprocal_domain &lt;- match.arg(reciprocal_domain, c(&quot;order-dependent&quot;, &quot;common&quot;))
+reciprocal_rows &lt;- list()
+for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
+    reciprocal_beta &lt;- reciprocal_alpha/2
+    for (reciprocal_m in m_vector) {
+        reciprocal_delta &lt;- if (reciprocal_domain == &quot;order-dependent&quot;)
+            10^(-(5 + reciprocal_m)/2) else 0.001
+        reciprocal_z &lt;- exp(seq(0, log(1/reciprocal_delta), length.out = 20001L))
+        reciprocal_x &lt;- 1/reciprocal_z
+        reciprocal_roots &lt;- brasil_coefficients(reciprocal_m, reciprocal_beta)
+        reciprocal_large_error &lt;- abs(brasil_inverse(reciprocal_z, reciprocal_roots) - reciprocal_z^(-reciprocal_beta))
+        reciprocal_unit_error &lt;- abs(brasil_power(reciprocal_x, reciprocal_roots) - reciprocal_x^reciprocal_beta)
+        reciprocal_gap &lt;- max(abs(reciprocal_large_error - reciprocal_unit_error))
+        stopifnot(all(is.finite(c(reciprocal_large_error, reciprocal_unit_error))), reciprocal_gap &lt;=
+            1e-12)
+        reciprocal_rows[[length(reciprocal_rows) + 1L]] &lt;- data.frame(alpha = reciprocal_alpha, m = reciprocal_m,
+            delta = reciprocal_delta, large_interval_error = max(reciprocal_large_error), reciprocal_interval_error = max(reciprocal_unit_error),
+            max_pointwise_disagreement = reciprocal_gap)
+    }
+}
+reciprocal_checks &lt;- if (length(reciprocal_rows))
+    do.call(rbind, reciprocal_rows) else NULL
+if (!is.null(reciprocal_checks)) {
+    knitr::kable(reciprocal_checks, format.args = list(scientific = TRUE, digits = 5))
+    reciprocal_labels &lt;- if (reciprocal_domain == &quot;order-dependent&quot;)
+        c(&quot;z in [1, 1/delta_m]&quot;, &quot;x in [delta_m, 1]&quot;) else c(&quot;z in [1, 1000]&quot;, &quot;x in [0.001, 1]&quot;)
+    reciprocal_plot_data &lt;- rbind(data.frame(alpha = reciprocal_checks$alpha, m = reciprocal_checks$m,
+        error = reciprocal_checks$large_interval_error, domain = reciprocal_labels[1]), data.frame(alpha = reciprocal_checks$alpha,
+        m = reciprocal_checks$m, error = reciprocal_checks$reciprocal_interval_error, domain = reciprocal_labels[2]))
+    reciprocal_plot_data$alpha_label &lt;- factor(reciprocal_plot_data$alpha, levels = alpha_vector[alpha_vector !=
+        2])
+    reciprocal_plot_data$domain &lt;- factor(reciprocal_plot_data$domain, levels = reciprocal_labels)
+    reciprocal_guides &lt;- reciprocal_plot_data
+    for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
+        reciprocal_index &lt;- which(reciprocal_guides$alpha == reciprocal_alpha)
+        reciprocal_anchor &lt;- reciprocal_checks$large_interval_error[reciprocal_checks$alpha == reciprocal_alpha &amp;
+            reciprocal_checks$m == 1L]
+        reciprocal_guides$error[reciprocal_index] &lt;- reciprocal_anchor * exp(-2 * pi * sqrt(reciprocal_alpha/2) *
+            (sqrt(reciprocal_guides$m[reciprocal_index]) - 1))
+    }
+}
+if (!is.null(reciprocal_checks)) {
+    p_reciprocal_error_m &lt;- ggplot(reciprocal_plot_data, aes(sqrt(m), error, colour = alpha_label,
+        group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = reciprocal_guides,
+        linetype = &quot;dashed&quot;) + facet_wrap(~domain, nrow = 1) + scale_x_continuous(breaks = sqrt(m_vector),
+        labels = m_vector) + scale_y_continuous(trans = scales::log_trans(base = exp(1)), labels = scales::label_scientific()) +
+        labs(x = &quot;m (square-root positions)&quot;, y = &quot;Sampled maximum absolute error (natural-log scale)&quot;,
+            colour = &quot;alpha&quot;, subtitle = sprintf(&quot;%s coefficients; exactly reciprocal grids&quot;, coefficient_source),
+            caption = &quot;Dashed: matrix-error reference slopes anchored at m = 1; comparison only.&quot;) +
+        theme_minimal() + theme(legend.position = &quot;bottom&quot;, plot.background = element_rect(fill = &quot;white&quot;,
+        colour = NA))
+    print(p_reciprocal_error_m)
+}
+# Overwrite the six figures and save the complete result tables.
+plots &lt;- list(plot = p_m_isolated, `scalar-error-curves` = p_scalar_error, `scalar-error-convergence` = p_scalar_error_m,
+    `unit-interval-error-curves` = p_unit_error, `unit-interval-error-convergence` = p_unit_error_m,
+    `reciprocal-error-comparison-plot` = p_reciprocal_error_m)
+dir.create(figure_dir, recursive = TRUE, showWarnings = FALSE)
+for (name in names(plots)) ggplot2::ggsave(file.path(figure_dir, paste0(name, &quot;.png&quot;)), plots[[name]],
+    width = if (name == &quot;reciprocal-error-comparison-plot&quot;)
+        11 else 8, height = 5, dpi = 144)
+result &lt;- list(parameters = list(h = h, tau = tau, m_max = m_max, alpha_vector = alpha_vector, T_final = T_final,
+    kappa = kappa, diffusion = diffusion, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
+    AAA = AAA, OMEGA = OMEGA), results = results, errors = errors, slopes = slopes, diagnostics = spectrum$diagnostics,
+    control = control, scalar_max_errors = scalar_max_errors, unit_max_errors = unit_max_errors,
+    reciprocal_checks = reciprocal_checks)
+dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+saveRDS(result, output_file)
+r &lt;- result</code></pre>
 </div>
 <div id="saved-parameters" class="section level2">
 <h2>Saved parameters</h2>
@@ -1818,27 +2092,6 @@ OMEGA &lt;- pi</code></pre>
 </tr>
 </tbody>
 </table>
-</div>
-<div id="matrix-experiment" class="section level2">
-<h2>Matrix experiment</h2>
-<p>The smooth data are <span class="math inline">\(u_0=a_0e_5\)</span>
-and <span class="math inline">\(f(t)=a_f A\sin(\omega t)e_7\)</span> on
-the length-(1,2) tadpole. Both evolutions use the <strong>same assembled
-consistent P1 FEM matrices</strong>, analytic loads, and
-interval-averaged forcing. For <span class="math inline">\(LV=CV\Lambda\)</span> with <span class="math inline">\(V^\top CV=I\)</span>, the reference is <span class="math display">\[
-U_h^{k+1}=V\operatorname{diag}\!\left(
-  \frac{1}{1+\tau\nu\lambda_j^{\alpha/2}}\right)
-  V^\top(CU_h^k+\tau F^{k+1}).
-\]</span> The rational evolution applies shifted sparse solves with
-installed <code>rSPDE</code> BRASIL coefficients and retains the mass
-solve from the constant term. The numerical eigenbasis supplies an
-independent reference and diagnostic; it does not replace the rational
-matrix solver. The isolated error is <span class="math display">\[
-E_m^2=\tau\sum_{k=1}^N
-(U_h^k-U_{h,m}^k)^\top C(U_h^k-U_{h,m}^k).
-\]</span> All orders use the same mesh and time grid. Dense
-eigendecomposition is restricted to moderate meshes. For <span class="math inline">\(\alpha=2\)</span>, ordinary backward Euler
-provides a control without rational approximation.</p>
 </div>
 <div id="saved-matrix-results" class="section level2">
 <h2>Saved matrix results</h2>
