@@ -19,12 +19,15 @@ output:
 always_allow_html: true
 ---
 
-Go back to the [Contents](about.html) page.
+[Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE, error = FALSE,
   echo = TRUE, cache = FALSE, fig.align = "center", dpi = 150)
-source("fun/rough/load.R")
+helper <- tempfile(fileext = ".R")
+knitr::purl("brasilfunc.Rmd", output = helper, quiet = TRUE)
+sys.source(helper, envir = environment())
+unlink(helper)
 rough_result <- readRDS("data_files/rough_h_results.rds")
 stopifnot(identical(rough_result$parameters, rough_parameters()))
 p <- rough_result$parameters
@@ -58,7 +61,7 @@ u(s,t)=\sum_{j=1}^{\infty}\frac{1-e^{-a_jt}}{j\,a_j}\phi_j(s).
 $$
 
 ::: {.custom-box}
-Theorem `lastlasttheorem` in `main.tex` gives the spatial term
+The spatial error estimate gives the term
 $h^{\alpha-\epsilon}$ because $s_f=0$ and $u_0=0$ belongs to every spectral
 Sobolev space. For this particular forcing, uniform P1 meshes with
 $h_J=2^{-J}$ give the sharper asymptotic behavior
@@ -161,4 +164,13 @@ cat('<div style="overflow-x:auto">\n',
   knitr::kable(errors, format = "html", caption = "Computed space–time errors.",
     table.attr = 'class="table table-condensed" style="font-size:13px; white-space:nowrap"'),
   '\n</div>\n')
+```
+
+# Recompute explicitly
+
+Knit displays the saved results. Run this chunk manually to replace them.
+
+```{r recompute, eval=FALSE}
+rough_result <- rough_run_experiment()
+rough_save_figures(rough_result)
 ```

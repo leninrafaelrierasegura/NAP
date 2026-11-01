@@ -19,12 +19,15 @@ output:
 always_allow_html: true
 ---
 
-Go back to the [Contents](about.html) page.
+[Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,
   echo=TRUE,cache=FALSE,fig.align="center",dpi=150)
-source("fun/rough/tau/load.R")
+helper <- tempfile(fileext = ".R")
+knitr::purl("brasilfunc.Rmd", output = helper, quiet = TRUE)
+sys.source(helper, envir = environment())
+unlink(helper)
 rough_tau_result <- readRDS("data_files/rough_tau_results.rds")
 stopifnot(identical(rough_tau_result$parameters,rough_tau_parameters()))
 p <- rough_tau_result$parameters
@@ -151,4 +154,13 @@ cat('<div style="overflow-x:auto">\n',
   knitr::kable(errors,format="html",caption="Computed space–time errors.",
     table.attr='class="table table-condensed" style="font-size:13px; white-space:nowrap"'),
   '\n</div>\n')
+```
+
+# Recompute explicitly
+
+Knit displays the saved results. Run this chunk manually to replace them.
+
+```{r recompute, eval=FALSE}
+rough_tau_result <- rough_tau_run_experiment()
+rough_tau_save_figures(rough_tau_result)
 ```

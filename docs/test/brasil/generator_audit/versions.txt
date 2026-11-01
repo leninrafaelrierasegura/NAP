@@ -1,2 +1,0 @@
-Python 3.10.19 | packaged by conda-forge | (main, Oct 22 2025, 22:29:10) [GCC 14.3.0]
-baryrat 2.1.2

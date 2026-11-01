@@ -1,2 +1,0 @@
-alpha =  0.25
-degree =  8

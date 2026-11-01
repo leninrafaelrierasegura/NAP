@@ -1,0 +1,2384 @@
+---
+title: "BRASIL theory and matrix-solver functions"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+    self_contained: true
+    css: visual.css
+---
+
+[Experiments](index.html)
+
+This file contains the theory and all functions for the five experiments.
+Every rational coefficient is read from the installed `rSPDE` BRASIL tables,
+including their constant term. Knitting this file defines functions only.
+The experiment notebooks load saved results; recomputation is explicit.
+
+## Fractional diffusion equations on metric graphs
+
+We analyze and numerically approximate solutions to fractional diffusion
+equations on metric graphs of the form
+\begin{equation}
+\label{eq:maineq}
+\tag{1}
+\left\{
+\begin{aligned}
+    \partial_t u(s,t)+(\kappa^2-\Delta_\Gamma)^{\alpha/2}u(s,t)
+        &=f(s,t), && (s,t)\in\Gamma\times(0,T),\\
+    u(s,0)&=u_0(s), && s\in\Gamma.
+\end{aligned}
+\right.
+\end{equation}
+Here $\Gamma=(\mathcal V,\mathcal E)$ is a compact connected metric graph,
+$\kappa>0$, $\alpha\in(0,2]$ is the fractional diffusion exponent, and
+$f$ and $u_0$ are the right-hand side and initial condition, respectively.
+The Kirchhoff--Laplacian $\Delta_\Gamma$ acts edgewise and has domain
+\begin{equation}
+\label{eq:Kcond}
+\tag{2}
+\mathcal D(\Delta_\Gamma)=
+\left\{\phi\in C(\Gamma):\ \phi|_e\in H^2(e)\ \text{for every }e\in\mathcal E,
+\quad\sum_{e\in\mathcal E_v}\partial_e\phi(v)=0
+\ \text{for every }v\in\mathcal V\right\}.
+\end{equation}
+The derivatives in the vertex condition are directed from the vertex into
+the incident edges, with each edge endpoint counted separately. We write
+$L=\kappa^2-\Delta_\Gamma$ and $\beta=\alpha/2$. Fractional powers of $L$
+are defined spectrally; the vertex conditions are incorporated through $L$.
+
+## Numerical Scheme {#num_scheme}
+
+Let $V_h$ be the space of continuous piecewise linear finite element
+functions on a graph mesh indexed by $h$, and let $P_h$ denote the
+$L_2(\Gamma)$-orthogonal projection onto $V_h$. Define the discrete operator
+$L_h:V_h\to V_h$ by
+\[
+    (L_hv_h,w_h)_{L_2(\Gamma)}
+    =\kappa^2(v_h,w_h)_{L_2(\Gamma)}
+      +(v_h',w_h')_{L_2(\Gamma)},\qquad v_h,w_h\in V_h.
+\]
+Its fractional power induces the discrete bilinear form
+\[
+    \mathfrak a_{h,\alpha}(v_h,w_h)
+    =(L_h^{\alpha/4}v_h,L_h^{\alpha/4}w_h)_{L_2(\Gamma)}.
+\]
+Thus, the spatial operator is discretized first and its fractional power
+is then taken on $V_h$.
+
+Let $t_k=k\tau$, $k=0,\ldots,N$, with $\tau=T/N$. The scheme computes
+$U_h^\tau=\{U_h^k\}_{k=0}^{N}$, where $U_h^k\in V_h$ and
+\[
+\left\{
+\begin{aligned}
+    \left(\delta U_h^{k+1},\phi\right)_{L_2(\Gamma)}
+      +\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
+      &=(f^{k+1},\phi)_{L_2(\Gamma)},\qquad \phi\in V_h,\\
+    U_h^0&=P_hu_0,
+\end{aligned}
+\right.
+\]
+for $k=0,\ldots,N-1$, with
+\[
+    \delta U_h^{k+1}=\frac{U_h^{k+1}-U_h^k}{\tau},
+    \qquad f^{k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}f(t)\,dt.
+\]
+Equivalently,
+\begin{equation}
+\label{system:fully_discrete_scheme}
+\tag{3}
+\left\{
+\begin{aligned}
+    (U_h^{k+1},\phi)_{L_2(\Gamma)}
+      +\tau\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
+      &=(U_h^k,\phi)_{L_2(\Gamma)}
+        +\tau(f^{k+1},\phi)_{L_2(\Gamma)},\qquad\phi\in V_h,\\
+    U_h^0&=P_hu_0.
+\end{aligned}
+\right.
+\end{equation}
+
+At each time step, the finite element solution can be expressed in the
+basis $\{\psi_h^i\}_{i=1}^{N_h}$ as
+\begin{equation}
+\label{num_sol}
+\tag{4}
+    U_h^k(s)=\sum_{i=1}^{N_h}u_i^k\psi_h^i(s),\qquad s\in\Gamma.
+\end{equation}
+Replacing \eqref{num_sol} into \eqref{system:fully_discrete_scheme} yields
+\[
+    \sum_{j=1}^{N_h}u_j^{k+1}
+    \left[(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
+          +\tau\mathfrak a_{h,\alpha}(\psi_h^j,\psi_h^i)\right]
+    =\sum_{j=1}^{N_h}u_j^k(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
+      +\tau(f^{k+1},\psi_h^i)_{L_2(\Gamma)},
+\]
+for $i=1,\ldots,N_h$.
+
+Introduce the mass and stiffness matrices
+\[
+    \mathbf C_{i,j}=(\psi_h^i,\psi_h^j)_{L_2(\Gamma)},\qquad
+    \mathbf G_{i,j}=({\psi_h^i}',{\psi_h^j}')_{L_2(\Gamma)},\qquad
+    \mathbf L=\kappa^2\mathbf C+\mathbf G.
+\]
+The coefficient matrix representing $L_h$ is
+$\mathbf B=\mathbf C^{-1}\mathbf L$. Consequently, the matrix of the
+fractional bilinear form is $\mathbf C\mathbf B^\beta$, and the scheme is
+\begin{equation}
+\label{diff_eq_discrete}
+\tag{5}
+    (\mathbf C+\tau\mathbf C\mathbf B^\beta)\mathbf U^{k+1}
+    =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1},
+\end{equation}
+where $\mathbf U^k$ has components $u_i^k$ and $\mathbf F^k$ has components
+$(f^k,\psi_h^i)_{L_2(\Gamma)}$. In particular,
+$\mathbf C(\mathbf C^{-1}\mathbf L)^\beta$ generally differs from the
+ordinary matrix power $\mathbf L^\beta$.
+
+Introduce the normalized matrix
+$\mathbf A=\mathbf C^{-1}\mathbf L/\kappa^2$. Multiplying
+\eqref{diff_eq_discrete} first by $\mathbf C^{-1}$ and then by
+$\mathbf A^{-\beta}$ gives
+\begin{equation}
+\label{eq:inverse_scheme}
+\tag{6}
+    (\mathbf A^{-\beta}+\tau\kappa^{2\beta}\mathbf I)\mathbf U^{k+1}
+    =\mathbf A^{-\beta}
+      (\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}).
+\end{equation}
+
+### BRASIL rational approximation
+
+Let $0<\beta<1$, and let $\lambda_{1,h}$ and $\lambda_{N_h,h}$ be the
+smallest and largest eigenvalues of $L_h$. These are the generalized
+eigenvalues of $(\mathbf L,\mathbf C)$, with
+$\lambda_{1,h}=\kappa^2$. The interval
+\[
+    J_h=[\kappa^2\lambda_{N_h,h}^{-1},
+         \kappa^2\lambda_{1,h}^{-1}]=[\delta_h,1]
+\]
+contains the spectrum of $\mathbf A^{-1}$.
+
+Using the BRASIL coefficients supplied by rSPDE at exponent $\beta$, let
+\[
+    q_1(x)=\sum_{i=0}^{m}c_ix^i,\qquad
+    q_2(x)=\sum_{j=0}^{m}b_jx^j,\qquad
+    B_m(x)=\frac{q_1(x)}{q_2(x)}\approx x^\beta.
+\]
+Here the target is $x^\beta$ directly, and both polynomial degrees are at
+most $m$. A fixed approximation on $[0,1]$ covers every $J_h$ and allows
+the same coefficients to be used on different meshes. The numerical
+tabulation or interpolation of coefficients need not give an exact
+minimax approximation at every requested exponent.
+
+In the normalized operator variable $y=1/x$, define
+\begin{equation}
+\label{eq:inverse_rational}
+\tag{7}
+    S_m(y)=B_m(y^{-1})
+          =p_\ell(y)^{-1}p_r(y)\approx y^{-\beta},
+    \qquad
+    p_r(y)=y^m q_1(y^{-1}),\quad
+    p_\ell(y)=y^m q_2(y^{-1}).
+\end{equation}
+The supplied partial fraction coefficients represent this same function as
+\[
+    S_m(y)=d_m+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j},
+    \qquad
+    B_m(x)=d_m+\sum_{j=1}^{m}\frac{\rho_jx}{1-\eta_jx}.
+\]
+The source poles $\eta_j$, source residues $\rho_j$, and constant $d_m$
+belong to the inverse-power approximation $S_m$. They are distinct from
+the poles and residues of the time-step function derived below. Assuming
+$q_2(0)\ne0$, the constant is
+\[
+    d_m=B_m(0)=\lim_{y\to\infty}S_m(y)=\frac{c_0}{b_0}.
+\]
+
+For comparison with the root-product notation, if $q_1$ and $q_2$ both
+have degree $m$, with roots $\{r_{1i}\}_{i=1}^{m}$ and
+$\{r_{2j}\}_{j=1}^{m}$ counted with multiplicity, then
+\[
+    p_r(y)=c_m\prod_{i=1}^{m}(1-r_{1i}y),\qquad
+    p_\ell(y)=b_m\prod_{j=1}^{m}(1-r_{2j}y).
+\]
+Thus both products have $m$ factors, and the corresponding normalization
+is $\mathrm{factor}=c_m/b_m$. Define
+\begin{equation}
+\label{eq:PLPR}
+\tag{8}
+    \mathbf P_r=\prod_{i=1}^{m}(\mathbf I-r_{1i}\mathbf A),
+    \qquad
+    \mathbf P_\ell=\frac{\kappa^{2\beta}}{\mathrm{factor}}\,
+      \mathbf C\prod_{j=1}^{m}(\mathbf I-r_{2j}\mathbf A).
+\end{equation}
+This product representation is algebraic; the partial fraction
+coefficients allow the same derivation without forming polynomial products.
+
+Replacing $\mathbf A^{-\beta}$ in \eqref{eq:inverse_scheme} by
+$S_m(\mathbf A)$ gives the rational scheme
+\[
+    (S_m(\mathbf A)+\tau\kappa^{2\beta}\mathbf I)\mathbf U_m^{k+1}
+    =S_m(\mathbf A)
+      (\mathbf U_m^k+\tau\mathbf C^{-1}\mathbf F^{k+1}),
+\]
+where $\mathbf U_m^0$ is the coefficient vector of $P_hu_0$. The subscript
+$m$ distinguishes the rational approximation from the exact discrete
+fractional scheme. In the root-product notation, this is equivalently
+\begin{equation}
+\label{eq:scheme}
+\tag{9}
+    (\mathbf P_r^\top\mathbf C+\tau\mathbf P_\ell^\top)
+       \mathbf U_m^{k+1}
+    =\mathbf P_r^\top(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\end{equation}
+Indeed, setting $\mathbf D=\mathbf L\mathbf C^{-1}/\kappa^2$, we have
+$\mathbf A^\top=\mathbf D$ and
+$p(\mathbf D)\mathbf C=\mathbf C p(\mathbf A)$ for any polynomial $p$.
+The factors that are polynomials in the same matrix commute; no commutation
+of $\mathbf L$ with $\mathbf C^{-1}$ is assumed.
+
+It follows that \eqref{eq:scheme} can be written as
+\[
+    (p_r(\mathbf D)+\tau\kappa^{2\beta}p_\ell(\mathbf D))
+       \mathbf C\mathbf U_m^{k+1}
+    =p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}),
+\]
+and hence
+\begin{equation}
+\label{eq:final_scheme}
+\tag{10}
+    \mathbf U_m^{k+1}=\mathbf C^{-1}
+       (p_r(\mathbf D)+\tau\kappa^{2\beta}p_\ell(\mathbf D))^{-1}
+       p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\end{equation}
+These inverses are well-defined if $S_m$ is finite and positive on the
+spectrum of $\mathbf A$ and its reduced denominator has no zeros there.
+
+### Partial fraction decomposition
+
+Consider the scalar time-step function
+\begin{equation}
+\label{eq:partial_fraction}
+\tag{11}
+    H_m(y)=\frac{S_m(y)}{S_m(y)+\tau\kappa^{2\beta}}
+          =\frac{p_r(y)}{p_r(y)+\tau\kappa^{2\beta}p_\ell(y)}
+          =\sum_{n=1}^{m}\frac{a_n}{y-z_n}+r_\tau.
+\end{equation}
+The last equality assumes a reduced denominator of degree $m$ with simple
+roots $z_n$ and $d_m+\tau\kappa^{2\beta}\ne0$. Lower degrees reduce the
+number of terms; repeated poles require additional powers
+$(y-z_n)^{-\ell}$ up to their multiplicity.
+
+Unlike a strictly proper rational function, $H_m$ generally has a nonzero
+constant term. Taking its limit at infinity yields
+\begin{equation}
+\label{eq:remainder}
+\tag{12}
+    r_\tau=\frac{d_m}{d_m+\tau\kappa^{2\beta}}.
+\end{equation}
+This time-step remainder is not the source constant $d_m$ itself.
+
+Substituting \eqref{eq:partial_fraction} into \eqref{eq:final_scheme} gives
+\begin{equation}
+\label{eq:final_scheme2}
+\tag{13}
+    \mathbf U_m^{k+1}=\mathbf C^{-1}
+      \left(\sum_{n=1}^{m}a_n
+      (\mathbf L\mathbf C^{-1}/\kappa^2-z_n\mathbf I)^{-1}
+      +r_\tau\mathbf I\right)
+      (\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\end{equation}
+Since
+\[
+    (\mathbf L\mathbf C^{-1}/\kappa^2-z_n\mathbf I)^{-1}
+    =\mathbf C(\mathbf L/\kappa^2-z_n\mathbf C)^{-1},
+\]
+we can rewrite \eqref{eq:final_scheme2} as
+\begin{equation}
+\label{eq:final_scheme3}
+\tag{14}
+    \mathbf U_m^{k+1}
+    =\mathbf R_{m,\tau}(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}),
+    \qquad
+    \mathbf R_{m,\tau}=r_\tau\mathbf C^{-1}
+       +\sum_{n=1}^{m}a_n(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}.
+\end{equation}
+Only sparse solves are required: one mass-matrix solve for the constant
+term when $r_\tau\ne0$, and one shifted solve for each pole. For fixed
+$h$, $\tau$, $\kappa$, $\beta$, and $m$, the matrices are unchanged between
+time steps, so their factorizations can be reused.
+
+### Poles and residues of the time-step function
+
+To derive the poles directly from the source partial fractions, set
+$s=\tau\kappa^{2\beta}>0$ and define
+\[
+    F_m(y)=S_m(y)+s
+          =d_m+s+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j}.
+\]
+The time-step poles $z_n$ solve $F_m(z_n)=0$. They are precisely the
+zeros of the reduced combined denominator $p_r+s p_\ell$; the source
+poles $\eta_j$ are removable singularities of $H_m$.
+
+Suppose the source poles are distinct and ordered, and satisfy
+\[
+    \eta_1<\cdots<\eta_m<0,\qquad
+    \rho_j>0,\qquad d_m\ge0.
+\]
+These are assumptions on the selected coefficients, not a guarantee for
+every numerically tabulated or interpolated BRASIL approximation. On each
+real interval between the source poles,
+\[
+    F_m'(y)=-\sum_{j=1}^{m}\frac{\rho_j}{(y-\eta_j)^2}<0.
+\]
+Moreover, $F_m(y)\to d_m+s>0$ as $y\to-\infty$,
+$F_m(y)\to-\infty$ as $y\uparrow\eta_j$, and
+$F_m(y)\to+\infty$ as $y\downarrow\eta_j$. Thus there is exactly one
+simple zero in each of
+\[
+    (-\infty,\eta_1),\quad(\eta_1,\eta_2),\quad\ldots,
+    \quad(\eta_{m-1},\eta_m),
+\]
+and no zero to the right of $\eta_m$. In particular,
+\[
+    z_1<\eta_1<z_2<\eta_2<\cdots<z_m<\eta_m<0.
+\]
+These roots can therefore be characterized by real scalar bracketing
+without expanding the combined denominator into polynomial coefficients.
+
+At a simple pole, $S_m(z_n)=-s$, so the residue is
+\begin{equation}
+\label{eq:residues}
+\tag{15}
+    a_n=\lim_{y\to z_n}(y-z_n)H_m(y)
+        =\frac{S_m(z_n)}{S_m'(z_n)}
+        =\frac{s}{\displaystyle\sum_{j=1}^{m}
+                     \rho_j/(z_n-\eta_j)^2}>0.
+\end{equation}
+Consequently, $0\le r_\tau<1$, and every shifted matrix
+$\mathbf L/\kappa^2-z_n\mathbf C$ is real symmetric positive definite.
+The mass matrix is also positive definite, so all the solves in
+\eqref{eq:final_scheme3} admit sparse Cholesky factorizations. In addition,
+$S_m(y)>0$ for $y\ge1$, and hence $0<H_m(y)<1$ on the discrete spectrum.
+
+The implementation rejects coefficient rows that fail these sign assumptions.
+
+### Integer power and a fixed diffusion coefficient
+
+For $\alpha=2$, we have $\beta=1$ and use the exact inverse $S(y)=y^{-1}$.
+Then
+\[
+    H(y)=\frac{1}{1+\tau\kappa^2y}
+        =\frac{1}{\tau\kappa^2}
+          \left(y+\frac{1}{\tau\kappa^2}\right)^{-1},
+\]
+so the remainder is zero and the scheme reduces to ordinary backward Euler,
+\[
+    (\mathbf C+\tau\mathbf L)\mathbf U^{k+1}
+    =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1}.
+\]
+If the physical equation instead contains a fixed diffusion coefficient
+$\nu>0$, namely $u_t+\nu L^\beta u=f$, the same derivation replaces
+$\tau\kappa^{2\beta}$ by $\tau\nu\kappa^{2\beta}$ in the time-step function,
+its poles, residues, and remainder. The right-hand side remains
+$\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}$, and the integer-power matrix
+is $\mathbf C+\tau\nu\mathbf L$.
+
+# Implementation
+
+## rSPDE BRASIL coefficients
+
+```{r brasil-functions-0, eval=TRUE}
+brasil_supported_orders <- function() {
+    tables <- grep("^m_brasil[0-9]+t$", ls(asNamespace("rSPDE")), value = TRUE)
+    sort(as.integer(sub("^m_brasil([0-9]+)t$", "\\1", tables)))
+}
+
+brasil_coefficients <- function(m, beta) {
+    stopifnot(length(m) == 1L, is.finite(m), m %in% brasil_supported_orders(), length(beta) == 1L, is.finite(beta),
+        beta > 0, beta < 1)
+    table <- get(paste0("m_brasil", m, "t"), envir = asNamespace("rSPDE"))
+    tolerance <- 32 * .Machine$double.eps * max(1, abs(beta))
+    index <- which(abs(table$alpha - beta) <= tolerance)
+    value <- function(column) {
+        if (length(index) == 1L)
+            table[[column]][index]
+        else stats::approx(table$alpha, table[[column]], xout = beta)$y
+    }
+    poles <- vapply(paste0("p", seq_len(m)), value, numeric(1))
+    residues <- vapply(paste0("r", seq_len(m)), value, numeric(1))
+    constant <- value("k")
+    if (any(!is.finite(c(poles, residues, constant))) || any(poles >= 0) || any(residues <= 0) || constant < 0 ||
+        anyDuplicated(poles))
+        stop("BRASIL table at m = ", m, ", beta = ", beta, " requires distinct negative poles, positive residues, and a nonnegative constant.")
+    index <- order(poles)
+    list(poles = unname(poles[index]), residues = unname(residues[index]), constant = unname(constant), m = as.integer(m),
+        beta = beta)
+}
+
+brasil_inverse <- function(y, coefficients) {
+    stopifnot(all(is.finite(y)), all(y > 0))
+    coefficients$constant + as.numeric((1/outer(y, coefficients$poles, "-")) %*% coefficients$residues)
+}
+
+brasil_power <- function(x, coefficients) {
+    stopifnot(all(is.finite(x)), all(x >= 0))
+    coefficients$constant + as.numeric((x/(1 - outer(x, coefficients$poles))) %*% coefficients$residues)
+}
+
+brasil_partial_fractions <- function(coefficients, time_step, scaling) {
+    strength <- time_step * scaling
+    stopifnot(length(strength) == 1L, is.finite(strength), strength > 0)
+    p <- coefficients$poles
+    r <- coefficients$residues
+    constant <- coefficients$constant
+    poles <- numeric(length(p))
+    denominator <- function(y) constant + strength + sum(r/(y - p))
+    for (i in seq_along(p)) {
+        upper <- p[i]
+        lower <- if (i == 1L)
+            2 * upper
+        else p[i - 1L]
+        if (i == 1L)
+            while (denominator(lower) <= 0) lower <- 2 * lower
+        width <- upper - lower
+        normalized <- function(t) {
+            if (t == 0 && i > 1L)
+                return(.Machine$double.xmax)
+            if (t == 1)
+                return(-.Machine$double.xmax)
+            denominator(lower + width * t)
+        }
+        root <- stats::uniroot(normalized, c(0, 1), tol = 2 * .Machine$double.eps, maxiter = 1000L)$root
+        poles[i] <- lower + width * root
+    }
+    residues <- vapply(poles, function(z) strength/sum(r/(z - p)^2), numeric(1))
+    remainder <- constant/(constant + strength)
+    stopifnot(all(is.finite(c(poles, residues, remainder))), all(poles < 0), all(residues > 0), remainder >= 0,
+        remainder < 1)
+    y <- 10^seq(0, 12, length.out = 257L)
+    inverse <- brasil_inverse(y, coefficients)
+    expected <- inverse/(inverse + strength)
+    actual <- remainder + as.numeric((1/outer(y, poles, "-")) %*% residues)
+    reconstruction_error <- max(abs(actual - expected))
+    if (reconstruction_error > 2e-12)
+        stop("Inaccurate BRASIL time-step partial fractions: ", reconstruction_error)
+    list(p = poles, r = residues, k = remainder, reconstruction_error = reconstruction_error)
+}
+```
+
+## Consistent FEM and backward Euler
+
+```{r brasil-functions-1, eval=TRUE}
+my.fractional.operators.frac <- function(L, beta, C, scale.factor, m = 1, time_step, diffusion = 1) {
+    stopifnot(length(diffusion) == 1L, is.finite(diffusion), diffusion > 0, length(time_step) == 1L, is.finite(time_step),
+        time_step > 0, length(beta) == 1L, is.finite(beta), beta > 0, beta <= 1, length(scale.factor) == 1L, is.finite(scale.factor),
+        scale.factor > 0)
+    L <- L/scale.factor
+    if (beta == 1) {
+        L <- L * scale.factor^beta
+        lhs <- C + time_step * diffusion * L
+        return(list(C = C, L = L, m = m, beta = beta, diffusion = diffusion, LHS = lhs, factorization = Matrix::Cholesky(Matrix::forceSymmetric(lhs),
+            LDL = FALSE)))
+    }
+    scaling <- diffusion * scale.factor^beta
+    coefficients <- brasil_coefficients(m, beta)
+    poles_rs_k <- brasil_partial_fractions(coefficients, time_step, scaling)
+    partial_fraction_terms <- lapply(poles_rs_k$p, function(p) L - p * C)
+    remainder <- if (length(poles_rs_k$k))
+        poles_rs_k$k
+    else 0
+    list(C = C, L = L, m = m, beta = beta, diffusion = diffusion, partial_fraction_terms = partial_fraction_terms,
+        residues = poles_rs_k$r, poles = poles_rs_k$p, remainder = remainder, mass_factor = if (remainder != 0) Matrix::Cholesky(Matrix::forceSymmetric(C),
+            LDL = FALSE) else NULL, factorizations = lapply(partial_fraction_terms, function(A) Matrix::Cholesky(Matrix::forceSymmetric(A),
+            LDL = FALSE)))
+}
+
+my.solver.frac <- function(obj, v) {
+    if (obj$beta == 1) {
+        return(if (!is.null(obj$factorization)) Matrix::solve(obj$factorization, v, system = "A") else Matrix::solve(obj$LHS, v))
+    }
+    partial_fraction_terms <- obj$partial_fraction_terms
+    residues <- obj$residues
+    output <- v * 0
+    if (!is.null(obj$remainder) && obj$remainder != 0) {
+        mass_solved <- if (!is.null(obj$mass_factor))
+            Matrix::solve(obj$mass_factor, v, system = "A")
+        else Matrix::solve(obj$C, v)
+        output <- obj$remainder * mass_solved
+    }
+    for (i in seq_along(residues)) {
+        solved <- if (!is.null(obj$factorizations)) {
+            Matrix::solve(obj$factorizations[[i]], v, system = "A")
+        }
+        else Matrix::solve(partial_fraction_terms[[i]], v)
+        output <- output + residues[i] * solved
+    }
+    return(output)
+}
+
+solve_fractional_evolution <- function(my_op_frac, time_step, time_seq, val_at_0, RHST) {
+    CC <- my_op_frac$C
+    SOL <- matrix(NA, nrow = nrow(CC), ncol = length(time_seq))
+    SOL[, 1] <- val_at_0
+    for (k in 1:(length(time_seq) - 1)) {
+        rhs <- CC %*% SOL[, k] + time_step * RHST[, k + 1]
+        SOL[, k + 1] <- as.matrix(my.solver.frac(my_op_frac, rhs))
+    }
+    return(SOL)
+}
+
+estimate_error_memory <- function(n_reference_nodes, n_reference_samples, n_blocks, n_solver_steps = numeric(0),
+    matrix_copies = 6, baseline_gib = 0, n_exact_modes = NULL) {
+    positive_counts <- function(x) {
+        is.numeric(x) && length(x) > 0L && all(is.finite(x)) && all(x >= 1) && all(x == floor(x))
+    }
+    stopifnot(positive_counts(n_reference_nodes), length(n_reference_nodes) == 1L, positive_counts(n_reference_samples),
+        length(n_reference_samples) == 1L, positive_counts(n_blocks), is.numeric(n_solver_steps), length(n_solver_steps) ==
+            0L || positive_counts(n_solver_steps), is.numeric(matrix_copies), length(matrix_copies) == 1L, is.finite(matrix_copies),
+        matrix_copies >= 1, is.numeric(baseline_gib), length(baseline_gib) == 1L, is.finite(baseline_gib), baseline_gib >=
+            0)
+    if (!is.null(n_exact_modes))
+        stopifnot(positive_counts(n_exact_modes), length(n_exact_modes) == 1L)
+    samples <- as.double(n_reference_samples)
+    blocks <- pmin(as.double(n_blocks), samples)
+    per_block <- ceiling(samples/blocks)
+    gib <- 1024^3
+    block_rows <- if (is.null(n_exact_modes))
+        n_reference_nodes
+    else n_exact_modes
+    matrix_bytes <- 8 * as.double(block_rows) * per_block
+    block_bytes <- matrix_copies * matrix_bytes + 128 * per_block
+    time_bytes <- 8 * (samples + 1 + 2 * sum(as.double(n_solver_steps) + 1))
+    data.frame(error_method = if (is.null(n_exact_modes))
+        "reference"
+    else "compressed", requested_blocks = as.double(n_blocks), n_blocks = blocks, samples_per_block = per_block,
+        matrix_gib = matrix_bytes/gib, block_workspace_gib = block_bytes/gib, time_vectors_gib = time_bytes/gib,
+        baseline_gib = baseline_gib, estimated_gib = (block_bytes + time_bytes)/gib + baseline_gib)
+}
+
+prepare_reference_error <- function(Psi, reference_C, reference_basis) {
+    E <- as.matrix(reference_basis)
+    stopifnot(nrow(Psi) == nrow(reference_C), nrow(reference_C) == ncol(reference_C), nrow(E) == nrow(Psi), ncol(E) >=
+        1L, all(is.finite(E)))
+    metric <- Matrix::forceSymmetric(as(Matrix::Matrix(Matrix::crossprod(Psi, reference_C %*% Psi), sparse = TRUE),
+        "CsparseMatrix"))
+    cross <- Matrix::crossprod(Psi, reference_C %*% E)
+    factor <- Matrix::Cholesky(metric, LDL = FALSE)
+    projection <- as.matrix(Matrix::solve(factor, cross, system = "A"))
+    residual <- E - as.matrix(Psi %*% projection)
+    list(metric = metric, projection = projection, residual_gram = as.matrix(Matrix::crossprod(residual, reference_C %*%
+        residual)), exact_gram = as.matrix(Matrix::crossprod(E, reference_C %*% E)))
+}
+
+reference_coefficient_moments <- function(coefficients, weights) {
+    coefficients <- as.matrix(coefficients)
+    stopifnot(nrow(coefficients) >= 1L, ncol(coefficients) == length(weights), length(weights) >= 1L, all(is.finite(coefficients)),
+        all(is.finite(weights)), all(weights > 0))
+    weight <- sum(weights)
+    centered <- sweep(coefficients, 1L, coefficients[, 1L], `-`)
+    shift <- as.numeric(centered %*% (weights/weight))
+    deviations <- sweep(centered, 1L, shift, `-`)
+    list(weight = weight, mean = coefficients[, 1L] + shift, scatter = tcrossprod(sweep(deviations, 2L, sqrt(weights),
+        `*`)))
+}
+
+merge_reference_moments <- function(left, right) {
+    if (is.null(left))
+        return(right)
+    weight <- left$weight + right$weight
+    delta <- right$mean - left$mean
+    list(weight = weight, mean = left$mean + (right$weight/weight) * delta, scatter = left$scatter + right$scatter +
+        (left$weight * (right$weight/weight)) * tcrossprod(delta))
+}
+
+reference_interval_error <- function(u, moments, projection) {
+    delta <- as.numeric(u - projection$projection %*% moments$mean)
+    metric_product <- as.numeric(projection$metric %*% delta)
+    residual_product <- as.numeric(projection$residual_gram %*% moments$mean)
+    variance_terms <- projection$exact_gram * moments$scatter
+    value <- moments$weight * (sum(delta * metric_product) + sum(moments$mean * residual_product)) + sum(variance_terms)
+    scale <- moments$weight * (sum(abs(delta * metric_product)) + sum(abs(moments$mean * residual_product))) +
+        sum(abs(variance_terms))
+    if (!is.finite(value) || value < -128 * .Machine$double.eps * scale)
+        stop("Invalid compressed reference-grid squared error.")
+    max(0, value)
+}
+
+solve_compressed_reference_error <- function(my_op_frac, time_step, time_seq, val_at_0, spatial_load, g_average,
+    reference_times, coefficients_at_time, error_projection, n_blocks = 1000L, verbose = FALSE) {
+    stopifnot(nrow(error_projection$metric) == length(val_at_0), ncol(error_projection$metric) == length(val_at_0),
+        nrow(error_projection$projection) == length(val_at_0))
+    n_modes <- ncol(error_projection$projection)
+    stopifnot(identical(dim(error_projection$exact_gram), c(n_modes, n_modes)), identical(dim(error_projection$residual_gram),
+        c(n_modes, n_modes)))
+    n_samples <- length(reference_times) - 1L
+    n_blocks <- min(n_blocks, n_samples)
+    u <- as.numeric(val_at_0)
+    spatial_load <- as.numeric(spatial_load)
+    solver_step <- 0L
+    active_step <- NULL
+    moments <- NULL
+    total <- compensation <- 0
+    next_ref <- 2L
+    started <- proc.time()[["elapsed"]]
+    finish_interval <- function() {
+        value <- reference_interval_error(u, moments, error_projection)
+        adjusted <- value - compensation
+        updated <- total + adjusted
+        compensation <<- (updated - total) - adjusted
+        total <<- updated
+    }
+    for (block in seq_len(n_blocks)) {
+        last_ref <- if (block == n_blocks)
+            length(reference_times)
+        else 1L + floor(block * n_samples/n_blocks)
+        ids <- seq.int(next_ref, last_ref)
+        times <- reference_times[ids]
+        weights <- times - reference_times[ids - 1L]
+        coefficients <- as.matrix(coefficients_at_time(times))
+        stopifnot(nrow(coefficients) == n_modes, ncol(coefficients) == length(times), all(is.finite(coefficients)))
+        runs <- rle(findInterval(times, time_seq, left.open = TRUE))
+        first_column <- 1L
+        for (run in seq_along(runs$values)) {
+            target <- runs$values[run]
+            if (is.null(active_step) || target != active_step) {
+                if (!is.null(active_step))
+                  finish_interval()
+                while (solver_step < target) {
+                  solver_step <- solver_step + 1L
+                  rhs <- my_op_frac$C %*% u + time_step * spatial_load * g_average[solver_step + 1L]
+                  u <- as.numeric(my.solver.frac(my_op_frac, rhs))
+                }
+                active_step <- target
+                moments <- NULL
+            }
+            last_column <- first_column + runs$lengths[run] - 1L
+            columns <- seq.int(first_column, last_column)
+            moments <- merge_reference_moments(moments, reference_coefficient_moments(coefficients[, columns, drop = FALSE],
+                weights[columns]))
+            first_column <- last_column + 1L
+        }
+        next_ref <- last_ref + 1L
+        if (verbose)
+            message(sprintf("Compressed reference error: block %s/%s, %.1f%%, solver step %s/%s, %.2f s elapsed",
+                block, n_blocks, 100 * (last_ref - 1L)/n_samples, solver_step, length(time_seq) - 1L, proc.time()[["elapsed"]] -
+                  started))
+    }
+    finish_interval()
+    stopifnot(next_ref == length(reference_times) + 1L, solver_step == length(time_seq) - 1L)
+    sqrt(total)
+}
+
+solve_fractional_evolution_error <- function(my_op_frac, time_step, time_seq, val_at_0, spatial_load, g_average,
+    Psi, reference_C, reference_times, exact_at_time = NULL, n_blocks = 1000L, verbose = FALSE, error_method = c("reference",
+        "compressed"), reference_basis = NULL, coefficients_at_time = NULL, error_projection = NULL) {
+    error_method <- match.arg(error_method)
+    stopifnot(length(time_step) == 1L, is.finite(time_step), time_step > 0, length(time_seq) >= 2L, length(reference_times) >=
+        2L, all(is.finite(time_seq)), all(is.finite(reference_times)), all(diff(time_seq) > 0), all(diff(reference_times) >
+        0), reference_times[1] == time_seq[1], tail(reference_times, 1) == tail(time_seq, 1), length(g_average) ==
+        length(time_seq), length(val_at_0) == nrow(my_op_frac$C), length(spatial_load) == length(val_at_0), ncol(Psi) ==
+        length(val_at_0), nrow(Psi) == nrow(reference_C), nrow(reference_C) == ncol(reference_C), if (error_method ==
+        "reference")
+        is.function(exact_at_time)
+    else is.function(coefficients_at_time), length(n_blocks) == 1L, is.finite(n_blocks), n_blocks >= 1, n_blocks ==
+        floor(n_blocks), is.logical(verbose), length(verbose) == 1L, !is.na(verbose))
+    if (error_method == "compressed") {
+        if (is.null(error_projection)) {
+            if (is.null(reference_basis))
+                stop("Compressed error needs reference_basis or error_projection.")
+            error_projection <- prepare_reference_error(Psi, reference_C, reference_basis)
+        }
+        return(solve_compressed_reference_error(my_op_frac, time_step, time_seq, val_at_0, spatial_load, g_average,
+            reference_times, coefficients_at_time, error_projection, n_blocks, verbose))
+    }
+    n_samples <- length(reference_times) - 1L
+    n_blocks <- min(n_blocks, n_samples)
+    samples_per_block <- n_samples/n_blocks
+    n_steps <- length(time_seq) - 1L
+    u <- as.numeric(val_at_0)
+    spatial_load <- as.numeric(spatial_load)
+    solver_step <- 0L
+    projected_step <- -1L
+    u_ref <- NULL
+    next_ref <- 2L
+    error_sum <- 0
+    started <- proc.time()[["elapsed"]]
+    if (verbose) {
+        message(sprintf("Error accumulation: %s reference samples in %s blocks; up to %s samples/block (%.2f GiB per dense matrix).",
+            format(n_samples, big.mark = ",", scientific = FALSE, trim = TRUE), format(n_blocks, big.mark = ",",
+                scientific = FALSE, trim = TRUE), format(ceiling(samples_per_block), big.mark = ",", scientific = FALSE,
+                trim = TRUE), 8 * nrow(reference_C) * ceiling(samples_per_block)/1024^3))
+    }
+    for (block in seq_len(n_blocks)) {
+        last_ref <- if (block == n_blocks) {
+            length(reference_times)
+        }
+        else {
+            1L + floor(block * samples_per_block)
+        }
+        ids <- seq.int(next_ref, last_ref)
+        times <- reference_times[ids]
+        target_steps <- findInterval(times, time_seq, left.open = TRUE)
+        runs <- rle(target_steps)
+        error <- as.matrix(exact_at_time(times))
+        stopifnot(nrow(error) == nrow(reference_C), ncol(error) == length(ids))
+        first_column <- 1L
+        for (run in seq_along(runs$values)) {
+            target <- runs$values[run]
+            while (solver_step < target) {
+                solver_step <- solver_step + 1L
+                rhs <- my_op_frac$C %*% u + time_step * spatial_load * g_average[solver_step + 1L]
+                u <- as.numeric(my.solver.frac(my_op_frac, rhs))
+            }
+            if (projected_step != target) {
+                u_ref <- as.numeric(Psi %*% u)
+                projected_step <- target
+            }
+            last_column <- first_column + runs$lengths[run] - 1L
+            columns <- seq.int(first_column, last_column)
+            error[, columns] <- error[, columns, drop = FALSE] - u_ref
+            first_column <- last_column + 1L
+        }
+        squared <- colSums(error * (reference_C %*% error))
+        weights <- times - reference_times[ids - 1L]
+        error_sum <- error_sum + sum(weights * squared)
+        rm(error)
+        next_ref <- last_ref + 1L
+        if (verbose) {
+            processed <- last_ref - 1L
+            elapsed <- proc.time()[["elapsed"]] - started
+            remaining <- elapsed * (n_samples/processed - 1)
+            message(sprintf("Block %s/%s | %.1f%% | %s/%s samples | solver step %s/%s | elapsed %.1f min | ETA %.1f min",
+                block, n_blocks, 100 * processed/n_samples, format(processed, big.mark = ",", scientific = FALSE,
+                  trim = TRUE), format(n_samples, big.mark = ",", scientific = FALSE, trim = TRUE), solver_step,
+                n_steps, elapsed/60, remaining/60))
+        }
+    }
+    stopifnot(next_ref == length(reference_times) + 1L, solver_step == n_steps)
+    sqrt(error_sum)
+}
+
+construct_piecewise_projection <- function(projected_U_approx, time_seq, overkill_time_seq) {
+    stopifnot(length(time_seq) >= 2L, ncol(projected_U_approx) == length(time_seq), all(is.finite(time_seq)), all(diff(time_seq) >
+        0), all(is.finite(overkill_time_seq)), all(overkill_time_seq >= time_seq[1]), all(overkill_time_seq <=
+        tail(time_seq, 1)))
+    columns <- findInterval(overkill_time_seq, time_seq, left.open = TRUE) + 1L
+    projected_U_approx[, columns, drop = FALSE]
+}
+
+make_time_grid <- function(T_final, target_step) {
+    stopifnot(length(T_final) == 1L, is.finite(T_final), T_final > 0, length(target_step) == 1L, is.finite(target_step),
+        target_step > 0)
+    N <- ceiling(T_final/target_step)
+    time_step <- T_final/N
+    time_seq <- seq(0, T_final, length.out = N + 1)
+    return(list(N = N, time_step = time_step, time_seq = time_seq))
+}
+
+average_sine_forcing <- function(time_seq, A = 1, omega = pi) {
+    dt <- diff(time_seq)
+    stopifnot(length(time_seq) >= 2L, all(is.finite(time_seq)), all(dt > 0))
+    midpoint <- head(time_seq, -1) + dt/2
+    z <- omega * dt/2
+    sinc_z <- rep(1, length(z))
+    nonzero <- z != 0
+    sinc_z[nonzero] <- sin(z[nonzero])/z[nonzero]
+    averages <- A * sin(omega * midpoint) * sinc_z
+    c(0, averages)
+}
+```
+
+## Tadpole data and exact reference
+
+```{r brasil-functions-2, eval=TRUE}
+gets.graph.tadpole <- function(h) {
+  stopifnot(length(h)==1L, is.finite(h), h>0)
+  if ("edges" %in% names(formals(MetricGraph::metric_graph$public_methods$initialize))) {
+    theta <- seq(-pi,pi,length.out=10000L)
+    edges <- list(rbind(c(0,0),c(1,0)), cbind(1+1/pi+cos(theta)/pi,sin(theta)/pi))
+    graph <- MetricGraph::metric_graph$new(edges=edges,verbose=0)
+    graph$set_manual_edge_lengths(edge_lengths=c(1,2))
+    graph$build_mesh(h=h)
+    return(graph)
+  }
+  counts <- as.integer(ceiling(c(1,2)/h))
+  n <- as.integer(2+sum(counts-1L))
+  inside <- list(if(counts[1]>1L) seq.int(3L,counts[1]+1L) else integer(),
+                 if(counts[2]>1L) seq.int(counts[1]+2L,n) else integer())
+  paths <- list(c(1L,inside[[1]],2L), c(2L,inside[[2]],2L))
+  E <- do.call(rbind,lapply(paths,function(v)cbind(head(v,-1L),tail(v,-1L))))
+  lengths <- rep(c(1,2)/counts,counts)
+  fem <- get("assemble_fem",asNamespace("MetricGraph"))(E,lengths,n)
+  PtE <- do.call(rbind,lapply(1:2,function(e)cbind(e,seq_len(counts[e]-1L)/counts[e])))
+  locations <- rbind(c(1,0),c(2,0),PtE)
+  basis <- function(points) {
+    edge <- as.integer(points[,1]); t <- points[,2]*counts[edge]
+    cell <- pmin(floor(t),counts[edge]-1L); weight <- t-cell
+    left <- right <- integer(nrow(points))
+    for(e in 1:2) {
+      ids <- which(edge==e)
+      left[ids] <- paths[[e]][cell[ids]+1L]
+      right[ids] <- paths[[e]][cell[ids]+2L]
+    }
+    Matrix::sparseMatrix(i=rep(seq_len(nrow(points)),2L),j=c(left,right),
+      x=c(1-weight,weight),dims=c(nrow(points),n))
+  }
+  list(mesh=c(fem,list(PtE=PtE,h_e=lengths)),compute_fem=function()invisible(NULL),
+       get_edge_lengths=function()c(1,2),get_mesh_locations=function()locations,fem_basis=basis)
+}
+
+tadpole.eig <- function(k, graph) {
+    x1 <- c(0, graph$get_edge_lengths()[1] * graph$mesh$PtE[graph$mesh$PtE[, 1] == 1, 2])
+    x2 <- c(0, graph$get_edge_lengths()[2] * graph$mesh$PtE[graph$mesh$PtE[, 1] == 2, 2])
+    if (k == 0) {
+        f.e1 <- rep(1, length(x1))
+        f.e2 <- rep(1, length(x2))
+        f1 = c(f.e1[1], f.e2[1], f.e1[-1], f.e2[-1])
+        f = list(phi = f1/sqrt(3))
+    }
+    else {
+        f.e1 <- -2 * sin(pi * k * 1/2) * cos(pi * k * x1/2)
+        f.e2 <- sin(pi * k * x2/2)
+        f1 = c(f.e1[1], f.e2[1], f.e1[-1], f.e2[-1])
+        if ((k%%2) == 1) {
+            f = list(phi = f1/sqrt(3))
+        }
+        else {
+            f.e1 <- (-1)^{
+                k/2
+            } * cos(pi * k * x1/2)
+            f.e2 <- cos(pi * k * x2/2)
+            f2 = c(f.e1[1], f.e2[1], f.e1[-1], f.e2[-1])
+            f <- list(phi = f1, psi = f2/sqrt(3/2))
+        }
+    }
+    return(f)
+}
+
+gets.eigen.params <- function(N_finite = 4, kappa = 1, alpha = 0.5, graph) {
+    EIGENVAL <- NULL
+    EIGENVAL_ALPHA <- NULL
+    EIGENVAL_MINUS_ALPHA <- NULL
+    EIGENFUN <- NULL
+    INDEX <- NULL
+    for (j in 0:N_finite) {
+        lambda_j <- kappa^2 + (j * pi/2)^2
+        lambda_j_alpha_half <- lambda_j^(alpha/2)
+        lambda_j_minus_alpha_half <- lambda_j^(-alpha/2)
+        e_j <- tadpole.eig(j, graph)$phi
+        EIGENVAL <- c(EIGENVAL, lambda_j)
+        EIGENVAL_ALPHA <- c(EIGENVAL_ALPHA, lambda_j_alpha_half)
+        EIGENVAL_MINUS_ALPHA <- c(EIGENVAL_MINUS_ALPHA, lambda_j_minus_alpha_half)
+        EIGENFUN <- cbind(EIGENFUN, e_j)
+        INDEX <- c(INDEX, j)
+        if (j > 0 && (j%%2 == 0)) {
+            lambda_j <- kappa^2 + (j * pi/2)^2
+            lambda_j_alpha_half <- lambda_j^(alpha/2)
+            lambda_j_minus_alpha_half <- lambda_j^(-alpha/2)
+            e_j <- tadpole.eig(j, graph)$psi
+            EIGENVAL <- c(EIGENVAL, lambda_j)
+            EIGENVAL_ALPHA <- c(EIGENVAL_ALPHA, lambda_j_alpha_half)
+            EIGENVAL_MINUS_ALPHA <- c(EIGENVAL_MINUS_ALPHA, lambda_j_minus_alpha_half)
+            EIGENFUN <- cbind(EIGENFUN, e_j)
+            INDEX <- c(INDEX, j + 0.1)
+        }
+    }
+    return(list(EIGENVAL = EIGENVAL, EIGENVAL_ALPHA = EIGENVAL_ALPHA, EIGENVAL_MINUS_ALPHA = EIGENVAL_MINUS_ALPHA,
+        EIGENFUN = EIGENFUN, INDEX = INDEX))
+}
+
+trig_hat_integrals <- function(a, b, w, A = 0, B = 0) {
+    h <- b - a
+    z <- w * h/2
+    theta <- w * (a + b)/2
+    if (abs(z) < 0.001) {
+        S <- 1 - z^2/6 + z^4/120 - z^6/5040
+        Q <- z/3 - z^3/30 + z^5/840 - z^7/45360
+    }
+    else {
+        S <- sin(z)/z
+        Q <- (sin(z) - z * cos(z))/z^2
+    }
+    v <- A * cos(theta) + B * sin(theta)
+    q <- A * sin(theta) - B * cos(theta)
+    h/2 * c(left = S * v + Q * q, right = S * v - Q * q)
+}
+
+project_u0_tadpole <- function(graph, amplitude = 10) {
+    C <- graph$mesh$C
+    PtE <- graph$mesh$PtE
+    lengths <- graph$get_edge_lengths()
+    stopifnot(!is.null(C), length(lengths) == 2L, nrow(C) == 2L + nrow(PtE), length(amplitude) == 1L, is.finite(amplitude))
+    local_load <- function(a, b, w, A, B) {
+        h <- b - a
+        z <- w * h/2
+        theta <- w * (a + b)/2
+        if (abs(z) < 0.001) {
+            S <- 1 - z^2/6 + z^4/120 - z^6/5040
+            Q <- z/3 - z^3/30 + z^5/840 - z^7/45360
+        }
+        else {
+            S <- sin(z)/z
+            Q <- (sin(z) - z * cos(z))/z^2
+        }
+        v <- A * cos(theta) + B * sin(theta)
+        q <- A * sin(theta) - B * cos(theta)
+        h/2 * c(S * v + Q * q, S * v - Q * q)
+    }
+    b0 <- numeric(nrow(C))
+    w <- 3 * pi/2
+    for (edge in 1:2) {
+        idx <- which(PtE[, 1] == edge)
+        idx <- idx[order(PtE[idx, 2])]
+        x <- c(0, lengths[edge] * PtE[idx, 2], lengths[edge])
+        start_node <- if (edge == 1L)
+            1L
+        else 2L
+        nodes <- c(start_node, 2L + idx, 2L)
+        A <- if (edge == 1L)
+            2 * amplitude/sqrt(3)
+        else 0
+        B <- if (edge == 2L)
+            amplitude/sqrt(3)
+        else 0
+        for (j in seq_len(length(x) - 1L)) {
+            load <- local_load(x[j], x[j + 1L], w, A, B)
+            b0[nodes[j]] <- b0[nodes[j]] + load[1]
+            b0[nodes[j + 1L]] <- b0[nodes[j + 1L]] + load[2]
+        }
+    }
+    as.numeric(Matrix::solve(C, b0))
+}
+
+assemble_e7_load_tadpole <- function(graph) {
+    C <- graph$mesh$C
+    PtE <- graph$mesh$PtE
+    lengths <- graph$get_edge_lengths()
+    stopifnot(!is.null(C), length(lengths) == 2L, nrow(C) == 2L + nrow(PtE))
+    b7 <- numeric(nrow(C))
+    for (edge in 1:2) {
+        idx <- which(PtE[, 1] == edge)
+        idx <- idx[order(PtE[idx, 2])]
+        x <- c(0, lengths[edge] * PtE[idx, 2], lengths[edge])
+        start_node <- if (edge == 1L)
+            1L
+        else 2L
+        nodes <- c(start_node, 2L + idx, 2L)
+        for (j in seq_len(length(x) - 1L)) {
+            load <- trig_hat_integrals(x[j], x[j + 1L], w = 2 * pi, A = sqrt(2/3), B = 0)
+            b7[nodes[j]] <- b7[nodes[j]] + load[1]
+            b7[nodes[j + 1L]] <- b7[nodes[j + 1L]] + load[2]
+        }
+    }
+    b7
+}
+
+decayed_sine_convolution <- function(t, rate, A = 1, omega = pi) {
+    stopifnot(all(is.finite(t)), all(t >= 0), length(rate) == 1L, is.finite(rate), rate >= 0, is.finite(A), is.finite(omega))
+    z <- (rate + (0+1i) * omega) * t
+    small <- Mod(z) < 0.5
+    answer <- numeric(length(t))
+    if (any(small)) {
+        zz <- z[small]
+        term <- rep(1 + (0+0i), length(zz))
+        series <- rep(0 + (0+0i), length(zz))
+        for (k in 1:24) {
+            term <- term * zz/(k + 1)
+            series <- series + term
+        }
+        answer[small] <- A * exp(-rate * t[small]) * t[small] * Im(series)
+    }
+    if (any(!small)) {
+        tt <- t[!small]
+        answer[!small] <- A * Im((exp((0+1i) * omega * tt) - exp(-rate * tt))/(rate + (0+1i) * omega))
+    }
+    answer
+}
+
+exact_modal_coefficients <- function(t, rates, initial, forcing, A = 1, omega = pi) {
+    stopifnot(length(rates) == length(initial), length(rates) == length(forcing), all(is.finite(rates)), all(rates >
+        0))
+    out <- matrix(0, nrow = length(rates), ncol = length(t))
+    for (j in seq_along(rates)) {
+        out[j, ] <- initial[j] * exp(-rates[j] * t) + forcing[j] * decayed_sine_convolution(t, rates[j], A = A,
+            omega = omega)
+    }
+    out
+}
+
+run_reference_cases <- function(cases, FUN, workers = 1L) {
+    stopifnot(is.function(FUN), length(workers) == 1L, is.finite(workers), workers >= 1L, workers == as.integer(workers))
+    if (!length(cases))
+        return(list())
+    workers <- min(as.integer(workers), length(cases))
+    task <- function(x) tryCatch(list(value = FUN(x)), error = function(e) list(error = conditionMessage(e)))
+    if (workers > 1L) {
+        if (.Platform$OS.type != "unix")
+            stop("Parallel reference cases require Unix fork workers; set workers = 1 on this platform.")
+        results <- parallel::mclapply(cases, task, mc.cores = workers, mc.preschedule = FALSE)
+    }
+    else results <- lapply(cases, task)
+    failed <- which(vapply(results, function(x) inherits(x, "try-error") || !is.list(x) || !is.null(x$error) ||
+        !("value" %in% names(x)), logical(1)))
+    if (length(failed)) {
+        i <- failed[1L]
+        detail <- if (is.list(results[[i]]))
+            results[[i]]$error
+        else as.character(results[[i]])
+        stop("Reference case ", i, " failed: ", paste(detail, collapse = " "), call. = FALSE)
+    }
+    lapply(results, `[[`, "value")
+}
+```
+
+## Smooth experiments
+
+```{r brasil-functions-3, eval=TRUE}
+save_smooth_figure <- function(errors,axis,alpha,study) {
+  frame <- expand.grid(row=seq_along(axis),column=seq_along(alpha))
+  frame$x <- axis[frame$row]
+  frame$error <- as.vector(errors)
+  frame$alpha <- factor(alpha[frame$column],levels=alpha)
+  guide <- frame
+  rate <- if(study=="h") 2 else 1
+  for(j in seq_along(alpha)) {
+    ids <- frame$column==j
+    constant <- exp(mean(log(errors[,j]/axis^rate)))
+    guide$error[ids] <- constant*guide$x[ids]^rate
+  }
+  plot <- ggplot2::ggplot(frame,ggplot2::aes(x,error,color=alpha,group=alpha))+
+    ggplot2::geom_line(data=guide,linetype="dashed")+ggplot2::geom_line()+
+    ggplot2::geom_point()+ggplot2::scale_x_log10()+ggplot2::scale_y_log10()+
+    ggplot2::labs(x=study,y="Space-time L2 error",color="alpha")+
+    ggplot2::theme_bw()+ggplot2::theme(legend.position="bottom")
+  ggplot2::ggsave(file.path("data_files","tikzpic",
+    paste0("p_",study,"_nicer_tadpole_mat_with_mathpazo.png")),plot,
+    width=4,height=5,dpi=300,bg="white")
+  invisible(plot)
+}
+
+run_smooth_h <- function(workers=1L,output_file="data_files/errors_projected_h_mat.RData") {
+# Parameters
+T_final <- 1
+diffusion <- 1e-3 # nu > 0 in u_t + nu * L^(alpha/2) u = f
+workers <- workers
+error_method <- "compressed" # "reference" retains the original error accumulator
+kappa <- 4
+N_finite <- 4 # choose even
+adjusted_N_finite <- N_finite + N_finite/2 + 1
+# Coefficients for u_0 and f
+coeff_U_0 <- 50*(1:adjusted_N_finite)^-1
+coeff_U_0[-5] <- 0
+coeff_FF <- rep(0, adjusted_N_finite)
+coeff_FF[7] <- 10
+
+AAA = 1
+OMEGA = pi
+
+h_vector <- 2^seq(-7, -3)
+alpha_vector <- seq(0.5, 1.9, 0.2)
+
+# Keep the rational order and actual uniform time grid fixed across all runs.
+m_fixed <- 8
+time_step_target <- 2e-5
+time_grid <- make_time_grid(T_final = T_final, target_step = time_step_target)
+time_step <- time_grid$time_step
+time_seq <- time_grid$time_seq
+g_average <- average_sine_forcing(time_seq, A = AAA, omega = OMEGA)
+
+# The analytic initial projection currently supports only the fifth eigenfunction.
+stopifnot(all(coeff_U_0[-5] == 0))
+# The analytic forcing load currently supports only the seventh eigenfunction.
+stopifnot(length(coeff_FF) >= 7L, all(coeff_FF[-7] == 0))
+
+# Reference quadrature and error accumulation.
+overkill_time_step <- 1e-5
+overkill_h <- 1e-5
+error_verbose <- FALSE # Report completed blocks, percentage, elapsed time, and ETA.
+error_n_blocks <- 1L # More blocks use less memory; blocks may span solver intervals.
+# Heavy setup and convergence computation: run manually to replace saved results.
+overkill_graph <- gets.graph.tadpole(h = overkill_h)
+overkill_graph$compute_fem()
+overkill_C <- overkill_graph$mesh$C
+
+# Preview modeled memory before allocating the reference time vector or solving.
+# estimated_gib excludes FEM/solver objects and other session memory by default.
+error_memory <- estimate_error_memory(
+  n_reference_nodes = nrow(overkill_C),
+  n_exact_modes = if (error_method == "compressed")
+    sum(coeff_U_0 != 0 | coeff_FF != 0) else NULL,
+  n_reference_samples = ceiling(T_final / overkill_time_step),
+  n_blocks = unique(c(error_n_blocks, 10, 100, 1000, 10000, 100000, 1000000)),
+  n_solver_steps = time_grid$N
+)
+print(error_memory, digits = 3, row.names = FALSE)
+# Set error_n_blocks above to the desired count before running the experiment.
+
+# Build a reference grid ending at the same final time as the solver grid.
+reference_grid <- make_time_grid(T_final = T_final, target_step = overkill_time_step)
+overkill_time_step <- reference_grid$time_step
+overkill_time_seq <- reference_grid$time_seq
+
+
+# Spatial eigenfunctions and unfractionalized eigenvalues do not depend on alpha.
+reference_eigen_params <- gets.eigen.params(
+  N_finite = N_finite, kappa = kappa,
+  alpha = alpha_vector[1], graph = overkill_graph
+)
+reference_eigenvalues <- reference_eigen_params$EIGENVAL
+auxE <- reference_eigen_params$EIGENFUN
+active_modes <- which(coeff_U_0 != 0 | coeff_FF != 0)
+exact_basis <- auxE[, active_modes, drop = FALSE]
+exact_initial <- coeff_U_0[active_modes]
+exact_forcing <- coeff_FF[active_modes]
+m_values <- c()
+
+errors_projected <- matrix(NA_real_, length(h_vector), length(alpha_vector))
+for (i in seq_along(h_vector)) {
+  h <- h_vector[i]
+  graph <- gets.graph.tadpole(h = h)
+  graph$compute_fem()
+  C <- graph$mesh$C
+  L <- kappa^2 * C + graph$mesh$G
+  Psi <- graph$fem_basis(overkill_graph$get_mesh_locations())
+  U_0 <- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
+  spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
+  error_projection <- if (error_method == "compressed")
+    prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
+
+  cases <- run_reference_cases(seq_along(alpha_vector), function(j) {
+    alpha <- alpha_vector[j]
+    beta <- alpha / 2
+    exact_rates <- diffusion * reference_eigenvalues[active_modes]^beta
+    coefficients_at_time <- function(t) exact_modal_coefficients(
+      t, exact_rates, exact_initial, exact_forcing, A = AAA, omega = OMEGA)
+    exact_at_time <- function(t) exact_basis %*% coefficients_at_time(t)
+    my_op_frac <- my.fractional.operators.frac(
+      L = L, beta = beta, C = C, scale.factor = kappa^2,
+      m = m_fixed, time_step = time_step, diffusion = diffusion)
+    solve_fractional_evolution_error(
+      my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
+      Psi, overkill_C, overkill_time_seq, exact_at_time,
+      n_blocks = error_n_blocks, verbose = error_verbose,
+      error_method = error_method, coefficients_at_time = coefficients_at_time,
+      error_projection = error_projection)
+  }, workers = workers)
+  errors_projected[i, ] <- vapply(cases, identity, numeric(1))
+
+}
+attr(errors_projected,"coefficient_source") <- "rSPDE BRASIL"
+  attr(errors_projected,"parameters") <- list(study="h",axis=h_vector,alpha=alpha_vector,
+    m=m_fixed,diffusion=diffusion,kappa=kappa,T=T_final,reference_h=overkill_h,
+    reference_tau=overkill_time_step,fixed=list(tau=time_step))
+  save(errors_projected,file=output_file)
+  save_smooth_figure(errors_projected,h_vector,alpha_vector,"h")
+  invisible(errors_projected)
+}
+
+run_smooth_tau <- function(workers=1L,output_file="data_files/errors_projected_tau_mat.RData") {
+# Parameters
+T_final <- 1
+diffusion <- 1e-3 # nu > 0 in u_t + nu * L^(alpha/2) u = f
+workers <- workers
+error_method <- "compressed" # "reference" retains the original error accumulator
+kappa <- 4
+N_finite <- 4 # choose even
+adjusted_N_finite <- N_finite + N_finite/2 + 1
+# Coefficients for u_0 and f
+coeff_U_0 <- 50*(1:adjusted_N_finite)^-1
+coeff_U_0[-5] <- 0
+coeff_FF <- rep(0, adjusted_N_finite)
+coeff_FF[7] <- 10
+# The analytic forcing load currently supports only the seventh eigenfunction.
+stopifnot(length(coeff_FF) >= 7L, all(coeff_FF[-7] == 0))
+
+AAA = 1
+OMEGA = pi
+
+# Requested time steps and fixed spatial mesh size.
+tau_targets <- T_final / c(200L, 80L, 32L, 13L, 6L, 2L)
+h_fixed <- 1e-3
+m_fixed <- 8
+alpha_vector <- seq(0.5, 1.9, 0.2)
+
+# Use the actual uniform steps in both the solver and the convergence fit.
+time_grids <- lapply(tau_targets, function(target) {
+  make_time_grid(T_final = T_final, target_step = target)
+})
+tau_vector <- vapply(time_grids, function(grid) grid$time_step, numeric(1))
+stopifnot(length(unique(tau_vector)) == length(tau_vector))
+
+# Interval averages depend only on the time grid; reuse them for every alpha.
+g_averages <- lapply(time_grids, function(grid) {
+  average_sine_forcing(grid$time_seq, A = AAA, omega = OMEGA)
+})
+
+# Reference quadrature and error accumulation.
+overkill_time_step <- 1e-5
+overkill_h <- 1e-5
+error_verbose <- FALSE
+error_n_blocks <- 1L
+# Heavy setup and convergence computation: run manually to replace saved results.
+overkill_graph <- gets.graph.tadpole(h = overkill_h)
+overkill_graph$compute_fem()
+overkill_C <- overkill_graph$mesh$C
+
+# Preview modeled memory before allocating the reference time vector or solving.
+# estimated_gib excludes FEM/solver objects and other session memory by default.
+error_memory <- estimate_error_memory(
+  n_reference_nodes = nrow(overkill_C),
+  n_exact_modes = if (error_method == "compressed")
+    sum(coeff_U_0 != 0 | coeff_FF != 0) else NULL,
+  n_reference_samples = ceiling(T_final / overkill_time_step),
+  n_blocks = unique(c(error_n_blocks, 10, 100, 1000, 10000, 100000, 1000000)),
+  n_solver_steps = vapply(time_grids, function(grid) grid$N, numeric(1))
+)
+print(error_memory, digits = 3, row.names = FALSE)
+# Set error_n_blocks above to the desired count before running the experiment.
+
+reference_grid <- make_time_grid(
+  T_final = T_final, target_step = overkill_time_step
+)
+overkill_time_step <- reference_grid$time_step
+overkill_time_seq <- reference_grid$time_seq
+
+# The spatial discretization is fixed for every time step and alpha.
+graph <- gets.graph.tadpole(h = h_fixed)
+graph$compute_fem()
+C <- graph$mesh$C
+L <- kappa^2 * C + graph$mesh$G
+Psi <- graph$fem_basis(overkill_graph$get_mesh_locations())
+stopifnot(all(coeff_U_0[-5] == 0))
+U_0 <- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
+
+# Reference spatial modes and loads are independent of alpha, tau, and m.
+reference_eigen_params <- gets.eigen.params(
+  N_finite = N_finite, kappa = kappa,
+  alpha = alpha_vector[1], graph = overkill_graph
+)
+reference_eigenvalues <- reference_eigen_params$EIGENVAL
+overkill_EIGENFUN <- reference_eigen_params$EIGENFUN
+active_modes <- which(coeff_U_0 != 0 | coeff_FF != 0)
+exact_basis <- overkill_EIGENFUN[, active_modes, drop = FALSE]
+exact_initial <- coeff_U_0[active_modes]
+exact_forcing <- coeff_FF[active_modes]
+spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
+error_projection <- if (error_method == "compressed")
+  prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
+m_values <- c()
+
+errors_projected <- matrix(NA_real_, length(tau_vector), length(alpha_vector))
+for (j in seq_along(alpha_vector)) {
+  alpha <- alpha_vector[j]
+  beta <- alpha / 2
+  exact_rates <- diffusion * reference_eigenvalues[active_modes]^beta
+  coefficients_at_time <- function(t) exact_modal_coefficients(
+    t, exact_rates, exact_initial, exact_forcing, A = AAA, omega = OMEGA)
+  exact_at_time <- function(t) exact_basis %*% coefficients_at_time(t)
+
+  cases <- run_reference_cases(seq_along(tau_vector), function(i) {
+    time_grid <- time_grids[[i]]
+    time_step <- time_grid$time_step
+    time_seq <- time_grid$time_seq
+    g_average <- g_averages[[i]]
+    m <- m_fixed
+    my_op_frac <- my.fractional.operators.frac(
+      L = L, beta = beta, C = C, scale.factor = kappa^2,
+      m = m, time_step = time_step, diffusion = diffusion)
+    solve_fractional_evolution_error(
+      my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
+      Psi, overkill_C, overkill_time_seq, exact_at_time,
+      n_blocks = error_n_blocks, verbose = error_verbose,
+      error_method = error_method, coefficients_at_time = coefficients_at_time,
+      error_projection = error_projection)
+  }, workers = workers)
+  errors_projected[, j] <- vapply(cases, identity, numeric(1))
+
+}
+attr(errors_projected,"coefficient_source") <- "rSPDE BRASIL"
+  attr(errors_projected,"parameters") <- list(study="tau",axis=tau_vector,alpha=alpha_vector,
+    m=m_fixed,diffusion=diffusion,kappa=kappa,T=T_final,reference_h=overkill_h,
+    reference_tau=overkill_time_step,fixed=list(h=h_fixed))
+  save(errors_projected,file=output_file)
+  save_smooth_figure(errors_projected,tau_vector,alpha_vector,"tau")
+  invisible(errors_projected)
+}
+
+isolated_discrete_spectrum <- function(C, L, max_dimension = 1200L, max_dense_mib = 1024, residual_tolerance = 1e-08,
+    orthogonality_tolerance = 1e-10) {
+    n <- nrow(C)
+    stopifnot(n >= 1L, ncol(C) == n, identical(dim(L), dim(C)), Matrix::isSymmetric(C, tol = 1e-12), Matrix::isSymmetric(L, tol = 1e-12),
+        length(max_dimension) == 1L, is.finite(max_dimension), max_dimension >= 1, length(max_dense_mib) == 1L,
+        is.finite(max_dense_mib), max_dense_mib > 0, is.finite(residual_tolerance), residual_tolerance > 0, is.finite(orthogonality_tolerance),
+        orthogonality_tolerance > 0)
+    estimated_mib <- 20 * 8 * as.double(n)^2/1024^2
+    if (n > max_dimension || estimated_mib > max_dense_mib)
+        stop("Complete eigendecomposition refused before dense allocation: dimension ", n, ", estimated temporary storage ",
+            round(estimated_mib, 1), " MiB. Choose a moderate isolated-study mesh or explicitly raise the guards.")
+    started <- proc.time()[["elapsed"]]
+    dense_C <- as.matrix(C)
+    dense_L <- as.matrix(L)
+    stopifnot(all(is.finite(dense_C)), all(is.finite(dense_L)))
+    R <- chol(dense_C)
+    Rinv <- backsolve(R, diag(n))
+    symmetric <- Matrix::crossprod(Rinv, dense_L %*% Rinv)
+    ee <- eigen((symmetric + t(symmetric))/2, symmetric = TRUE)
+    stopifnot(all(is.finite(ee$values)), all(ee$values > 0))
+    V <- backsolve(R, ee$vectors)
+    CV <- C %*% V
+    LV <- L %*% V
+    residual <- as.matrix(LV - sweep(as.matrix(CV), 2L, ee$values, `*`))
+    denominator <- sqrt(colSums(as.matrix(LV)^2)) + abs(ee$values) * sqrt(colSums(as.matrix(CV)^2))
+    residual_error <- max(sqrt(colSums(residual^2))/pmax(denominator, .Machine$double.xmin))
+    orthogonality_error <- max(abs(Matrix::crossprod(V, CV) - diag(n)))
+    if (residual_error > residual_tolerance || orthogonality_error > orthogonality_tolerance)
+        stop("Numerical eigensystem failed validation: residual = ", residual_error, ", C-orthogonality = ", orthogonality_error)
+    list(values = ee$values, vectors = V, diagnostics = data.frame(dimension = n, eigenvalue_min = min(ee$values),
+        eigenvalue_max = max(ee$values), relative_residual = residual_error, C_orthogonality_error = orthogonality_error,
+        estimated_dense_mib = estimated_mib, elapsed_seconds = proc.time()[["elapsed"]] - started))
+}
+
+isolated_exact_be_reference <- function(C, spectrum, initial, spatial_load, time_seq, alpha, diffusion = 1, A = 1,
+    omega = pi, max_history_mib = 256) {
+    n <- nrow(C)
+    stopifnot(length(initial) == n, length(spatial_load) == n, all(is.finite(initial)), all(is.finite(spatial_load)),
+        length(time_seq) >= 2L, all(is.finite(time_seq)), all(diff(time_seq) > 0), length(alpha) == 1L, is.finite(alpha),
+        alpha > 0, alpha <= 2, length(diffusion) == 1L, is.finite(diffusion), diffusion > 0, length(A) == 1L, is.finite(A),
+        length(omega) == 1L, is.finite(omega), is.finite(max_history_mib), max_history_mib > 0, identical(dim(spectrum$vectors),
+            c(n, n)), length(spectrum$values) == n)
+    dt <- diff(time_seq)[1L]
+    stopifnot(max(abs(diff(time_seq) - dt)) <= 128 * .Machine$double.eps * max(1, abs(tail(time_seq, 1L))))
+    history_mib <- 2 * 8 * as.double(n) * length(time_seq)/1024^2
+    if (history_mib > max_history_mib)
+        stop("Exact reference history exceeds max_history_mib; use a moderate time grid.")
+    V <- spectrum$vectors
+    x <- as.numeric(Matrix::crossprod(V, C %*% initial))
+    f <- as.numeric(Matrix::crossprod(V, spatial_load))
+    rates <- diffusion * spectrum$values^(alpha/2)
+    mu <- 1/(1 + dt * rates)
+    g <- average_sine_forcing(time_seq, A = A, omega = omega)
+    states <- coefficients <- matrix(0, n, length(time_seq))
+    states[, 1L] <- initial
+    coefficients[, 1L] <- x
+    y <- x
+    for (k in seq_len(length(time_seq) - 1L)) {
+        y <- mu * (y + dt * f * g[k + 1L])
+        coefficients[, k + 1L] <- y
+        states[, k + 1L] <- as.numeric(V %*% y)
+    }
+    list(states = states, coefficients = coefficients, initial_coefficients = x, forcing_coefficients = f, exact_rates = rates,
+        g_average = g, dt = dt, time_seq = time_seq, alpha = alpha, diffusion = diffusion, history_mib = history_mib)
+}
+
+isolated_tadpole_data <- function(h, kappa = 4, initial_amplitude = 10, forcing_amplitude = 10) {
+    stopifnot(length(h) == 1L, is.finite(h), h > 0, length(kappa) == 1L, is.finite(kappa), kappa > 0, is.finite(initial_amplitude),
+        is.finite(forcing_amplitude))
+    graph <- gets.graph.tadpole(h)
+    graph$compute_fem()
+    C <- graph$mesh$C
+    L <- kappa^2 * C + graph$mesh$G
+    PtE <- graph$mesh$PtE
+    lengths <- graph$get_edge_lengths()
+    stopifnot(length(lengths) == 2L, max(abs(lengths - c(1, 2))) < 1e-12, nrow(C) == 2L + nrow(PtE))
+    load <- numeric(nrow(C))
+    element_lengths <- numeric()
+    for (edge in 1:2) {
+        idx <- which(PtE[, 1L] == edge)
+        idx <- idx[order(PtE[idx, 2L])]
+        coordinates <- c(0, lengths[edge] * PtE[idx, 2L], lengths[edge])
+        nodes <- c(if (edge == 1L) 1L else 2L, 2L + idx, 2L)
+        element_lengths <- c(element_lengths, diff(coordinates))
+        for (i in seq_len(length(coordinates) - 1L)) {
+            pair <- trig_hat_integrals(coordinates[i], coordinates[i + 1L], 2 * pi, A = forcing_amplitude * sqrt(2/3))
+            load[nodes[i]] <- load[nodes[i]] + pair[1L]
+            load[nodes[i + 1L]] <- load[nodes[i + 1L]] + pair[2L]
+        }
+    }
+    list(C = C, L = L, initial = project_u0_tadpole(graph, initial_amplitude), spatial_load = load, kappa = kappa,
+        h_requested = h, h_min = min(element_lengths), h_max = max(element_lengths))
+}
+
+isolated_rational_rates <- function(eigenvalues, alpha, m, kappa, diffusion=1, coefficients=NULL) {
+  if(alpha==2) return(diffusion*eigenvalues)
+  if(is.null(coefficients)) coefficients <- brasil_coefficients(m,alpha/2)
+  diffusion*kappa^alpha/brasil_inverse(eigenvalues/kappa^2,coefficients)
+}
+
+isolated_beta_bracket <- function(m,beta) {
+  table <- get(paste0("m_brasil",m,"t"),asNamespace("rSPDE"))
+  grid <- table$alpha; tolerance <- 32*.Machine$double.eps*max(1,abs(beta))
+  list(exact=any(abs(grid-beta)<=tolerance),lower=max(grid[grid<=beta+tolerance]),
+       upper=min(grid[grid>=beta-tolerance]))
+}
+
+
+isolated_rational_error <- function(data,spectrum,reference,m,excitation_tolerance=1e-8) {
+    started <- proc.time()[["elapsed"]]
+    stopifnot(nrow(reference$states) == nrow(data$C), ncol(reference$states) == length(reference$time_seq))
+    coefficients <- if(reference$alpha==2) NULL else brasil_coefficients(m,reference$alpha/2)
+    op <- my.fractional.operators.frac(data$L,reference$alpha/2,data$C,data$kappa^2,
+      m,reference$dt,reference$diffusion)
+    rates <- isolated_rational_rates(spectrum$values,reference$alpha,m,data$kappa,
+      reference$diffusion,coefficients)
+    mu <- 1/(1 + reference$dt * rates)
+    y <- reference$initial_coefficients
+    u <- as.numeric(data$initial)
+    total <- spectral_total <- compensation <- spectral_compensation <- 0
+    for (k in seq_len(length(reference$time_seq) - 1L)) {
+        forcing <- reference$g_average[k + 1L]
+        rhs <- data$C %*% u + reference$dt * data$spatial_load * forcing
+        u <- as.numeric(my.solver.frac(op, rhs))
+        delta <- reference$states[, k + 1L] - u
+        value <- reference$dt * sum(delta * (data$C %*% delta))
+        adjusted <- value - compensation
+        updated <- total + adjusted
+        compensation <- (updated - total) - adjusted
+        total <- updated
+        y <- mu * (y + reference$dt * reference$forcing_coefficients * forcing)
+        dy <- reference$coefficients[, k + 1L] - y
+        value <- reference$dt * sum(dy^2)
+        adjusted <- value - spectral_compensation
+        updated <- spectral_total + adjusted
+        spectral_compensation <- (updated - spectral_total) - adjusted
+        spectral_total <- updated
+    }
+    sparse_error <- sqrt(max(0, total))
+    product_error <- sqrt(max(0, spectral_total))
+    gap <- u - as.numeric(spectrum$vectors %*% y)
+    final_gap <- sqrt(max(0, sum(gap * (data$C %*% gap))))
+    excited <- abs(reference$initial_coefficients) > excitation_tolerance * max(abs(reference$initial_coefficients)) |
+        abs(reference$forcing_coefficients) > excitation_tolerance * max(abs(reference$forcing_coefficients))
+    relative_rate_error <- rates/reference$exact_rates - 1
+    bracket <- if (reference$alpha == 2)
+        list(exact = TRUE, lower = 1, upper = 1)
+    else isolated_beta_bracket(m,reference$alpha/2)
+    data.frame(alpha = reference$alpha, diffusion = reference$diffusion, m = m, error = sparse_error, product_error = product_error,
+        absolute_error_disagreement = abs(sparse_error - product_error), relative_error_disagreement = abs(sparse_error -
+            product_error)/max(product_error, .Machine$double.xmin), final_state_gap_C = final_gap, max_relative_rate_error_full = max(abs(relative_rate_error)),
+        max_relative_rate_error_excited = if (any(excited))
+            max(abs(relative_rate_error[excited]))
+        else 0, excited_numerical_modes = sum(excited), coefficient_source = "brasil", coefficient_beta_exact = bracket$exact,
+        beta_exact_in_package_table = bracket$exact, beta_table_lower = bracket$lower, beta_table_upper = bracket$upper, elapsed_seconds = proc.time()[["elapsed"]] -
+            started)
+}
+
+isolated_parameters <- function() list(h=0.02,tau=0.005,m_max=14L,
+  alpha_vector=seq(0.5,1.9,0.2),T_final=1,kappa=4,diffusion=1)
+
+run_isolated_brasil <- function(output_file="data_files/isolated_m_results.rds") {
+  library(ggplot2)
+h <- 0.02
+tau <- 0.005
+m_max <- 14L
+coefficient_source <- "brasil"  # rSPDE m_brasil<m>t tables; keep their constant term
+
+alpha_vector <- seq(0.5, 1.9, 0.2)
+T_final <- 1
+kappa <- 4
+diffusion <- 1
+stopifnot(length(h) == 1L, is.finite(h), h > 0,
+          length(tau) == 1L, is.finite(tau), tau > 0,
+          length(T_final) == 1L, is.finite(T_final), T_final > 0,
+          length(kappa) == 1L, is.finite(kappa), kappa > 0,
+          length(diffusion) == 1L, is.finite(diffusion), diffusion > 0,
+          length(m_max) == 1L, is.finite(m_max), m_max >= 2,
+          m_max == floor(m_max), m_max <= max(brasil_supported_orders()),
+          length(alpha_vector) > 0, !anyDuplicated(alpha_vector),
+          all(is.finite(alpha_vector)), all(alpha_vector >= 0.5 & alpha_vector <= 2))
+m_vector <- seq_len(m_max)
+# Reject unsupported coefficients before assembling the eigensystem.
+for (alpha in alpha_vector[alpha_vector != 2])
+  for (m in m_vector) brasil_coefficients(m, alpha/2)
+
+# Keep the requested tau exactly; require an integer number of steps.
+N <- round(T_final / tau)
+if (!is.finite(N) || N < 1 || N > 1e6 ||
+    abs(T_final / tau - N) > 64 * .Machine$double.eps * max(1, N))
+  stop("Choose T_final/tau to be an integer between 1 and 1e6.")
+time_seq <- (0:N) * tau
+# A complete eigensystem is dense: reject very fine meshes before assembly.
+if (3 / h > 1200)
+  stop("Choose h >= 0.0025 for this complete-eigensystem notebook.")
+data <- isolated_tadpole_data(h, kappa)
+spectrum <- isolated_discrete_spectrum(data$C, data$L)
+knitr::kable(data.frame(h_requested = h, h_min = data$h_min, h_max = data$h_max,
+  tau = tau, steps = N, dimension = nrow(data$C), source = coefficient_source))
+rows <- list()
+for (alpha in alpha_vector) {
+  reference <- isolated_exact_be_reference(data$C, spectrum, data$initial,
+    data$spatial_load, time_seq, alpha, diffusion)
+  for (m in m_vector) {
+    rows[[length(rows) + 1L]] <- isolated_rational_error(
+      data, spectrum, reference, m)
+  }
+}
+results <- do.call(rbind, rows)
+
+# Classical BE control: exact and sparse implementations should agree.
+control_reference <- isolated_exact_be_reference(data$C, spectrum, data$initial,
+  data$spatial_load, time_seq, alpha = 2, diffusion = diffusion)
+control <- isolated_rational_error(data, spectrum, control_reference, m = 1L)
+results$noise_indicator <- pmax(results$absolute_error_disagreement,
+  control$error, .Machine$double.xmin)
+results$resolved <- results$product_error > 100 * results$noise_indicator
+errors <- matrix(results$error, nrow = length(m_vector),
+  dimnames = list(m = m_vector, alpha = alpha_vector))
+knitr::kable(errors, format.args = list(scientific = TRUE, digits = 5))
+plot_data <- results
+plot_data$alpha_label <- factor(plot_data$alpha, levels = alpha_vector)
+guides <- plot_data
+for (alpha in alpha_vector) {
+  index <- which(guides$alpha == alpha)
+  guides$error[index] <- guides$error[index[1]] *
+    exp(-2 * pi * sqrt(alpha / 2) * (sqrt(guides$m[index]) - 1))
+}
+p_m_isolated <- ggplot(plot_data, aes(sqrt(m), error, colour = alpha_label,
+                                     group = alpha_label)) +
+  geom_line() + geom_point(aes(shape = resolved), size = 2) +
+  geom_line(data = guides, linetype = "dashed") +
+  scale_shape_manual(values = c(`FALSE` = 1, `TRUE` = 16)) +
+  scale_x_continuous(breaks = sqrt(m_vector), labels = m_vector) +
+  scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                     labels = scales::label_scientific()) +
+  labs(x = "m (square-root positions)", y = "Isolated space-time error (log scale)",
+       colour = "alpha", shape = "Resolved",
+       subtitle = sprintf("%s coefficients; h = %g; tau = %g", coefficient_source, h, tau)) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.background = element_rect(fill = "white", colour = NA))
+p_m_isolated
+fit_slope <- function(d) {
+  d <- d[is.finite(d$error) & d$error > 0, ]
+  if (nrow(d) < 2) return(NA_real_)
+  unname(coef(lm(log(error) ~ sqrt(m), data = d))[2])
+}
+slopes <- do.call(rbind, lapply(alpha_vector, function(a) {
+  d <- results[results$alpha == a, ]
+  data.frame(alpha = a, benchmark = -2*pi*sqrt(a/2),
+    all_orders_slope = fit_slope(d), resolved_orders = sum(d$resolved),
+    resolved_only_slope = fit_slope(d[d$resolved, ]))
+}))
+knitr::kable(slopes, digits = 5)
+knitr::kable(spectrum$diagnostics, digits = 10)
+knitr::kable(control[, c("error", "product_error", "final_state_gap_C")],
+             format.args = list(scientific = TRUE, digits = 5))
+knitr::kable(results[, c("alpha", "m", "error", "product_error",
+  "absolute_error_disagreement", "resolved")],
+  format.args = list(scientific = TRUE, digits = 5))
+scalar_m_vector <- m_vector
+scalar_alpha_vector <- alpha_vector[alpha_vector != 2]
+scalar_x_max <- 1e3
+scalar_grid_points <- 10001L
+scalar_x <- exp(seq(0, log(scalar_x_max), length.out = scalar_grid_points))
+
+scalar_rows <- list()
+for (scalar_alpha in scalar_alpha_vector) {
+  scalar_beta <- scalar_alpha / 2
+  for (scalar_m in scalar_m_vector) {
+    scalar_roots <- brasil_coefficients(scalar_m, scalar_beta)
+    scalar_error <- abs(brasil_inverse(scalar_x, scalar_roots) -
+                          scalar_x^(-scalar_beta))
+    stopifnot(all(is.finite(scalar_error)))
+    scalar_rows[[length(scalar_rows) + 1L]] <- data.frame(
+      alpha = scalar_alpha, m = scalar_m, x = scalar_x,
+      absolute_error = scalar_error)
+  }
+}
+scalar_errors <- if (length(scalar_rows)) do.call(rbind, scalar_rows) else NULL
+if (!is.null(scalar_errors)) {
+  scalar_errors$alpha_label <- factor(scalar_errors$alpha,
+    levels = scalar_alpha_vector, labels = paste("alpha =", scalar_alpha_vector))
+  scalar_errors$m_label <- factor(scalar_errors$m, levels = scalar_m_vector)
+  scalar_max_errors <- aggregate(absolute_error ~ alpha + m, scalar_errors, max)
+  knitr::kable(scalar_max_errors,
+    col.names = c("alpha", "m", "Sampled maximum absolute error"),
+    format.args = list(scientific = TRUE, digits = 5))
+}
+if (!is.null(scalar_errors)) {
+  p_scalar_error <- ggplot(scalar_errors,
+    aes(x, absolute_error, colour = m_label, group = m_label)) +
+    geom_line(linewidth = 0.6) +
+    facet_wrap(~ alpha_label, nrow = 1) +
+    scale_x_log10() +
+    scale_y_log10(labels = scales::label_scientific()) +
+    labs(x = "x (log scale)",
+      y = "Absolute error |r_m(x) - x^(-alpha/2)| (log scale)",
+      colour = "m", subtitle = sprintf("%s coefficients; common interval [1, 1000]",
+                                        coefficient_source),
+      caption = "Dips occur where the rational approximation crosses the target function.") +
+    theme_minimal() + theme(legend.position = "bottom")
+  print(p_scalar_error)
+}
+if (!is.null(scalar_errors)) {
+  scalar_max_errors$alpha_label <- factor(scalar_max_errors$alpha,
+                                         levels = scalar_alpha_vector)
+  scalar_guides <- scalar_max_errors
+  for (scalar_alpha in scalar_alpha_vector) {
+    scalar_index <- which(scalar_guides$alpha == scalar_alpha)
+    scalar_anchor <- scalar_index[scalar_guides$m[scalar_index] == 1L]
+    scalar_guides$absolute_error[scalar_index] <-
+      scalar_max_errors$absolute_error[scalar_anchor] *
+      exp(-2 * pi * sqrt(scalar_alpha / 2) *
+            (sqrt(scalar_guides$m[scalar_index]) - 1))
+  }
+  p_scalar_error_m <- ggplot(scalar_max_errors,
+    aes(sqrt(m), absolute_error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(size = 2) +
+    geom_line(data = scalar_guides, linetype = "dashed") +
+    scale_x_continuous(breaks = sqrt(scalar_m_vector), labels = scalar_m_vector) +
+    scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                       labels = scales::label_scientific()) +
+    labs(x = "m (square-root positions)",
+      y = "Sampled maximum absolute scalar error (natural-log scale)", colour = "alpha",
+      subtitle = sprintf("%s coefficients; common interval [1, 1000]", coefficient_source)) +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          plot.background = element_rect(fill = "white", colour = NA))
+  print(p_scalar_error_m)
+}
+unit_m_vector <- m_vector
+unit_alpha_vector <- alpha_vector[alpha_vector != 2]
+unit_x <- sort(1 / scalar_x)
+unit_rows <- list()
+for (unit_alpha in unit_alpha_vector) {
+  unit_beta <- unit_alpha / 2
+  for (unit_m in unit_m_vector) {
+    unit_roots <- brasil_coefficients(unit_m, unit_beta)
+    unit_error <- abs(brasil_power(unit_x, unit_roots) - unit_x^unit_beta)
+    stopifnot(all(is.finite(unit_error)))
+    unit_rows[[length(unit_rows) + 1L]] <- data.frame(
+      alpha = unit_alpha, m = unit_m, x = unit_x, absolute_error = unit_error)
+  }
+}
+unit_errors <- if (length(unit_rows)) do.call(rbind, unit_rows) else NULL
+if (!is.null(unit_errors)) {
+  unit_errors$alpha_label <- factor(unit_errors$alpha, levels = unit_alpha_vector,
+                                   labels = paste("alpha =", unit_alpha_vector))
+  unit_errors$m_label <- factor(unit_errors$m, levels = unit_m_vector)
+  unit_max_errors <- aggregate(absolute_error ~ alpha + m, unit_errors, max)
+  knitr::kable(unit_max_errors,
+    col.names = c("alpha", "m", "Sampled maximum absolute error on [0.001,1]"),
+    format.args = list(scientific = TRUE, digits = 5))
+}
+if (!is.null(unit_errors)) {
+  p_unit_error <- ggplot(unit_errors,
+    aes(x, absolute_error, colour = m_label, group = m_label)) +
+    geom_line(linewidth = 0.6) +
+    facet_wrap(~ alpha_label, nrow = 1) +
+    scale_x_continuous(limits = c(0.001, 1), breaks = c(0.001, 0.25, 0.5, 0.75, 1)) +
+    scale_y_continuous(labels = scales::label_scientific()) +
+    labs(x = "x", y = "Absolute error |B_m(x) - x^(alpha/2)|",
+      colour = "m",
+      subtitle = sprintf("%s coefficients; interval [0.001, 1]", coefficient_source)) +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          plot.background = element_rect(fill = "white", colour = NA))
+  print(p_unit_error)
+}
+if (!is.null(unit_errors)) {
+  unit_max_errors$alpha_label <- factor(unit_max_errors$alpha,
+                                       levels = unit_alpha_vector)
+  unit_guides <- unit_max_errors
+  for (unit_alpha in unit_alpha_vector) {
+    unit_index <- which(unit_guides$alpha == unit_alpha)
+    unit_anchor <- unit_index[unit_guides$m[unit_index] == 1L]
+    unit_guides$absolute_error[unit_index] <-
+      unit_max_errors$absolute_error[unit_anchor] *
+      exp(-2 * pi * sqrt(unit_alpha / 2) *
+            (sqrt(unit_guides$m[unit_index]) - 1))
+  }
+  p_unit_error_m <- ggplot(unit_max_errors,
+    aes(sqrt(m), absolute_error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(size = 2) +
+    geom_line(data = unit_guides, linetype = "dashed") +
+    scale_x_continuous(breaks = sqrt(unit_m_vector), labels = unit_m_vector) +
+    scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                       labels = scales::label_scientific()) +
+    labs(x = "m (square-root positions)",
+      y = "Sampled maximum absolute error on [0.001,1] (natural-log scale)",
+      colour = "alpha",
+      subtitle = sprintf("%s coefficients; target x^(alpha/2)", coefficient_source)) +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          plot.background = element_rect(fill = "white", colour = NA))
+  print(p_unit_error_m)
+}
+reciprocal_domain <- "order-dependent"  # "common" uses [1,1000] and [0.001,1].
+reciprocal_domain <- match.arg(reciprocal_domain, c("order-dependent", "common"))
+reciprocal_rows <- list()
+for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
+  reciprocal_beta <- reciprocal_alpha / 2
+  for (reciprocal_m in m_vector) {
+    reciprocal_delta <- if (reciprocal_domain == "order-dependent")
+      10^(-(5 + reciprocal_m) / 2) else 1e-3
+    reciprocal_z <- exp(seq(0, log(1 / reciprocal_delta), length.out = 20001L))
+    reciprocal_x <- 1 / reciprocal_z
+    reciprocal_roots <- brasil_coefficients(reciprocal_m, reciprocal_beta)
+    reciprocal_large_error <- abs(brasil_inverse(reciprocal_z, reciprocal_roots) -
+                                   reciprocal_z^(-reciprocal_beta))
+    reciprocal_unit_error <- abs(brasil_power(reciprocal_x, reciprocal_roots) -
+                                  reciprocal_x^reciprocal_beta)
+    reciprocal_gap <- max(abs(reciprocal_large_error - reciprocal_unit_error))
+    stopifnot(all(is.finite(c(reciprocal_large_error, reciprocal_unit_error))),
+              reciprocal_gap <= 1e-12)
+    reciprocal_rows[[length(reciprocal_rows) + 1L]] <- data.frame(
+      alpha = reciprocal_alpha, m = reciprocal_m, delta = reciprocal_delta,
+      large_interval_error = max(reciprocal_large_error),
+      reciprocal_interval_error = max(reciprocal_unit_error),
+      max_pointwise_disagreement = reciprocal_gap)
+  }
+}
+reciprocal_checks <- if (length(reciprocal_rows)) do.call(rbind, reciprocal_rows) else NULL
+if (!is.null(reciprocal_checks)) {
+  knitr::kable(reciprocal_checks,
+    format.args = list(scientific = TRUE, digits = 5))
+  reciprocal_labels <- if (reciprocal_domain == "order-dependent")
+    c("z in [1, 1/delta_m]", "x in [delta_m, 1]") else
+    c("z in [1, 1000]", "x in [0.001, 1]")
+  reciprocal_plot_data <- rbind(
+    data.frame(alpha = reciprocal_checks$alpha, m = reciprocal_checks$m,
+      error = reciprocal_checks$large_interval_error, domain = reciprocal_labels[1]),
+    data.frame(alpha = reciprocal_checks$alpha, m = reciprocal_checks$m,
+      error = reciprocal_checks$reciprocal_interval_error, domain = reciprocal_labels[2]))
+  reciprocal_plot_data$alpha_label <- factor(reciprocal_plot_data$alpha,
+                                            levels = alpha_vector[alpha_vector != 2])
+  reciprocal_plot_data$domain <- factor(reciprocal_plot_data$domain,
+                                        levels = reciprocal_labels)
+  reciprocal_guides <- reciprocal_plot_data
+  for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
+    reciprocal_index <- which(reciprocal_guides$alpha == reciprocal_alpha)
+    reciprocal_anchor <- reciprocal_checks$large_interval_error[
+      reciprocal_checks$alpha == reciprocal_alpha & reciprocal_checks$m == 1L]
+    reciprocal_guides$error[reciprocal_index] <- reciprocal_anchor *
+      exp(-2 * pi * sqrt(reciprocal_alpha / 2) *
+            (sqrt(reciprocal_guides$m[reciprocal_index]) - 1))
+  }
+}
+if (!is.null(reciprocal_checks)) {
+  p_reciprocal_error_m <- ggplot(reciprocal_plot_data,
+    aes(sqrt(m), error, colour = alpha_label, group = alpha_label)) +
+    geom_line() + geom_point(size = 2) +
+    geom_line(data = reciprocal_guides, linetype = "dashed") +
+    facet_wrap(~ domain, nrow = 1) +
+    scale_x_continuous(breaks = sqrt(m_vector), labels = m_vector) +
+    scale_y_continuous(trans = scales::log_trans(base = exp(1)),
+                       labels = scales::label_scientific()) +
+    labs(x = "m (square-root positions)",
+      y = "Sampled maximum absolute error (natural-log scale)", colour = "alpha",
+      subtitle = sprintf("%s coefficients; exactly reciprocal grids", coefficient_source),
+      caption = "Dashed: matrix-error reference slopes anchored at m = 1; comparison only.") +
+    theme_minimal() +
+    theme(legend.position = "bottom",
+          plot.background = element_rect(fill = "white", colour = NA))
+  print(p_reciprocal_error_m)
+}
+  plots <- list(`plot`=p_m_isolated,`scalar-error-curves`=p_scalar_error,`scalar-error-convergence`=p_scalar_error_m,`unit-interval-error-curves`=p_unit_error,`unit-interval-error-convergence`=p_unit_error_m,`reciprocal-error-comparison-plot`=p_reciprocal_error_m)
+  dir.create("data_files/isolated_m",recursive=TRUE,showWarnings=FALSE)
+  for(name in names(plots)) ggplot2::ggsave(file.path("data_files/isolated_m",paste0(name,".png")),
+    plots[[name]],width=if(name=="reciprocal-error-comparison-plot")11 else 8,height=5,dpi=144)
+  result <- list(parameters=isolated_parameters(),results=results,errors=errors,slopes=slopes,
+    diagnostics=spectrum$diagnostics,control=control,scalar_max_errors=scalar_max_errors,
+    unit_max_errors=unit_max_errors,reciprocal_checks=reciprocal_checks)
+  saveRDS(result,output_file)
+  invisible(result)
+}
+```
+
+## Rough experiments
+
+```{r brasil-functions-4, eval=TRUE}
+rough_mesh <- function(J, kappa = 4) {
+    stopifnot(length(J) == 1L, is.finite(J), J == as.integer(J), J >= 2L, J <= 20L, length(kappa) == 1L, is.finite(kappa),
+        kappa > 0)
+    theta <- seq(-pi, pi, length.out = 129L)
+    edges <- list(rbind(c(0, 0), c(1, 0)), cbind(1 + 1/pi + cos(theta)/pi, sin(theta)/pi))
+    constructor <- MetricGraph::metric_graph$public_methods$initialize
+    if ("edges" %in% names(formals(constructor))) {
+        graph <- MetricGraph::metric_graph$new(edges = edges, verbose = 0)
+        graph$set_manual_edge_lengths(edge_lengths = c(1, 2))
+    }
+    else {
+        lines <- sp::SpatialLines(lapply(seq_along(edges), function(i) sp::Lines(list(sp::Line(edges[[i]])), ID = as.character(i))))
+        graph <- MetricGraph::metric_graph$new(lines = lines, remove_circles = FALSE, verbose = FALSE)
+        graph$edge_lengths <- c(1, 2)
+    }
+    h <- 2^-J
+    graph$build_mesh(h = h)
+    graph$compute_fem()
+    C <- graph$mesh$C
+    K <- kappa^2 * C + graph$mesh$G
+    PtE <- graph$mesh$PtE
+    stopifnot(nrow(C) == 3L * 2^J, max(abs(graph$mesh$h_e - h)) < 1e-13)
+    loop <- which(PtE[, 1L] == 2L)
+    loop <- loop[order(PtE[loop, 2L])]
+    loop_nodes <- c(2L, 2L + loop, 2L)
+    x <- seq(0, 2, by = h)
+    stopifnot(length(loop_nodes) == length(x))
+    j <- seq_len(J - 1L)
+    theta_j <- pi * 2^j * h
+    B <- matrix(0, nrow(C), length(j))
+    B[2L + loop, ] <- outer(2 * PtE[loop, 2L], 2^j, function(x, k) sinpi(x * k)) * rep(h * (sin(theta_j/2)/(theta_j/2))^2,
+        each = length(loop))
+    load <- as.numeric(B %*% (1/j))
+    list(J = J, h = h, C = C, K = K, graph = graph, B = B, load = load, j = j, loop_nodes = loop_nodes, loop_x = x,
+        kappa = kappa)
+}
+
+rough_projection <- function(mesh, quadrature_order = 16L) {
+    stopifnot(quadrature_order >= 8L, quadrature_order == as.integer(quadrature_order))
+    Cfactor <- Matrix::Cholesky(Matrix::forceSymmetric(mesh$C), LDL = FALSE)
+    P <- as.matrix(Matrix::solve(Cfactor, mesh$B, system = "A"))
+    rule <- statmod::gauss.quad(quadrature_order, kind = "legendre")
+    z <- (rule$nodes + 1)/2
+    weights <- rule$weights/2
+    nodes <- mesh$loop_nodes
+    left <- head(nodes, -1L)
+    right <- tail(nodes, -1L)
+    R <- matrix(0, length(mesh$j), length(mesh$j))
+    for (q in seq_along(z)) {
+        x <- head(mesh$loop_x, -1L) + mesh$h * z[q]
+        exact <- outer(x, 2^mesh$j, function(x, k) sinpi(x * k))
+        residual <- exact - ((1 - z[q]) * P[left, , drop = FALSE] + z[q] * P[right, , drop = FALSE])
+        R <- R + mesh$h * weights[q] * Matrix::crossprod(residual)
+    }
+    stem <- c(1L, 2L + which(mesh$graph$mesh$PtE[, 1L] == 1L), 2L)
+    for (q in seq_along(z)) {
+        residual <- (1 - z[q]) * P[head(stem, -1L), , drop = FALSE] + z[q] * P[tail(stem, -1L), , drop = FALSE]
+        R <- R + mesh$h * weights[q] * Matrix::crossprod(residual)
+    }
+    list(P = P, residual_gram = R)
+}
+
+rough_rates <- function(j, alpha, diffusion = 1, kappa = 4) {
+    stopifnot(all(is.finite(j)), all(j >= 1), all(j == floor(j)), length(alpha) == 1L, is.finite(alpha), alpha >
+        0, alpha < 2, length(diffusion) == 1L, is.finite(diffusion), diffusion > 0, length(kappa) == 1L, is.finite(kappa),
+        kappa > 0)
+    diffusion * (kappa^2 + pi^2 * 2^(2 * j))^(alpha/2)
+}
+
+rough_response_integral <- function(a, T_final = 1) {
+    stopifnot(all(is.finite(a)), all(a > 0), T_final > 0, is.finite(T_final))
+    z <- a * T_final
+    answer <- T_final * (1 + 2 * expm1(-z)/z - expm1(-2 * z)/(2 * z))
+    small <- z < 0.1
+    if (any(small)) {
+        zz <- z[small]
+        value <- rep(0, length(zz))
+        for (n in 2:18) value <- value + (-1)^n * (2^n - 2) * zz^n/factorial(n + 1)
+        answer[small] <- T_final * value
+    }
+    answer
+}
+
+rough_tail <- function(J, alpha, diffusion = 1, kappa = 4, T_final = 1, relative_tolerance = 1e-13) {
+    stopifnot(J >= 1L, J == as.integer(J), relative_tolerance > 0, relative_tolerance < 1)
+    total <- 0
+    for (j in J:450L) {
+        a <- rough_rates(j, alpha, diffusion, kappa)
+        term <- rough_response_integral(a, T_final)/(j * a)^2
+        total <- total + term
+        next_j <- j + 1L
+        bound <- T_final/(diffusion^2 * pi^(2 * alpha)) * 2^(-2 * alpha * next_j)/next_j^2/(1 - 2^(-2 * alpha))
+        if (bound <= relative_tolerance * total)
+            return(list(squared = total, omitted_squared_bound = bound, last_j = j))
+    }
+    stop("Infinite forcing tail did not meet its requested tolerance.")
+}
+
+rough_rational_coefficients <- function(beta, order = 16L) {
+    stopifnot(beta > 0, beta < 1, order %in% 1:20)
+    table <- get(paste0("m_brasil", order, "t"), envir = asNamespace("rSPDE"))
+    row <- which(abs(table$alpha - beta) < 32 * .Machine$double.eps)
+    if (length(row) != 1L)
+        stop("No exact BRASIL coefficient row at beta = ", beta)
+    poles <- as.numeric(table[row, paste0("p", seq_len(order))])
+    residues <- as.numeric(table[row, paste0("r", seq_len(order))])
+    constant <- table$k[row]
+    stopifnot(all(is.finite(c(poles, residues, constant))), all(poles < 0), all(residues > 0), constant >= 0)
+    index <- order(poles)
+    list(poles = poles[index], residues = residues[index], constant = constant, order = as.integer(order), beta = beta)
+}
+
+rough_transfer <- function(coefficients, tau, diffusion = 1, kappa = 4) {
+    p <- coefficients$poles
+    r <- coefficients$residues
+    strength <- tau * diffusion * kappa^(2 * coefficients$beta)
+    stopifnot(is.finite(strength), strength > 0)
+    constant <- coefficients$constant
+    poles <- numeric(length(p))
+    for (i in seq_along(p)) {
+        upper <- p[i]
+        lower <- if (i == 1L)
+            2 * upper
+        else p[i - 1L]
+        f <- function(x) constant + strength + sum(r/(x - p))
+        if (i == 1L)
+            while (f(lower) <= 0) lower <- 2 * lower
+        width <- upper - lower
+        normalized <- function(z) {
+            if (z == 0 && i > 1L)
+                return(.Machine$double.xmax)
+            if (z == 1)
+                return(-.Machine$double.xmax)
+            f(lower + width * z)
+        }
+        root <- stats::uniroot(normalized, c(0, 1), tol = 2 * .Machine$double.eps, maxiter = 1000L)$root
+        poles[i] <- lower + width * root
+    }
+    residues <- vapply(poles, function(z) strength/sum(r/(z - p)^2), numeric(1))
+    remainder <- constant/(constant + strength)
+    stopifnot(all(is.finite(c(poles, residues, remainder))), all(poles < 0), all(residues > 0), remainder >= 0,
+        remainder < 1)
+    x <- 10^seq(0, 10, length.out = 257L)
+    inverse <- vapply(x, function(z) constant + sum(r/(z - p)), numeric(1))
+    expected <- inverse/(inverse + strength)
+    actual <- remainder + vapply(x, function(z) sum(residues/(z - poles)), numeric(1))
+    reconstruction_error <- max(abs(actual - expected))
+    if (reconstruction_error > 2e-12)
+        stop("Inaccurate partial fractions: ", format(reconstruction_error, digits = 5))
+    list(poles = poles, residues = residues, remainder = remainder, reconstruction_error = reconstruction_error,
+        coefficients = coefficients)
+}
+
+rough_operator <- function(mesh, alpha, tau, order = 16L, diffusion = 1) {
+    transfer <- rough_transfer(rough_rational_coefficients(alpha/2, order), tau, diffusion, mesh$kappa)
+    A <- lapply(transfer$poles, function(p) mesh$K/mesh$kappa^2 - p * mesh$C)
+    list(C = mesh$C, partial_fraction_terms = A, factorizations = lapply(A, function(A) Matrix::Cholesky(Matrix::forceSymmetric(A),
+        LDL = FALSE)), mass_factor = Matrix::Cholesky(Matrix::forceSymmetric(mesh$C), LDL = FALSE), beta = alpha/2,
+        m = order, residues = transfer$residues, remainder = transfer$remainder, transfer = transfer,
+        order = order)
+}
+
+rough_matrix_step <- function(operator, rhs) {
+    output <- operator$remainder * as.numeric(Matrix::solve(operator$mass_factor, rhs, system = "A"))
+    for (i in seq_along(operator$residues)) output <- output + operator$residues[i] * as.numeric(Matrix::solve(operator$factorizations[[i]],
+        rhs, system = "A"))
+    output
+}
+
+rough_symmetry_embedding <- function(mesh) {
+    n <- as.integer(1/mesh$h)
+    quarter <- n/2L
+    r <- seq_len(quarter - 1L)
+    rows <- mesh$loop_nodes[1L + c(r, n - r, n + r, 2L * n - r)]
+    Matrix::sparseMatrix(i = rows, j = rep(r, 4L), x = rep(c(1, -1, 1, -1), each = length(r)), dims = c(nrow(mesh$C),
+        length(r)))
+}
+
+rough_solve <- function(mesh, alpha, time_step, order = 16L, diffusion = 1, T_final = 1, projection = rough_projection(mesh),
+    tail_tolerance = 1e-13, return_states = FALSE, symmetry_reduction = TRUE) {
+    stopifnot(is.finite(time_step), time_step > 0, T_final > 0)
+    N <- ceiling(T_final/time_step)
+    tau <- T_final/N
+    solver_mesh <- mesh
+    solver_projection <- projection$P
+    embedding <- NULL
+    if (symmetry_reduction) {
+        embedding <- rough_symmetry_embedding(mesh)
+        solver_mesh$C <- Matrix::crossprod(embedding, mesh$C %*% embedding)
+        solver_mesh$K <- Matrix::crossprod(embedding, mesh$K %*% embedding)
+        solver_mesh$load <- as.numeric(Matrix::crossprod(embedding, mesh$load))
+        factor <- Matrix::Cholesky(Matrix::forceSymmetric(solver_mesh$C), LDL = FALSE)
+        solver_projection <- as.matrix(Matrix::solve(factor, Matrix::crossprod(embedding, mesh$B), system = "A"))
+        if (max(abs(embedding %*% solver_projection - projection$P)) > 1e-11)
+            stop("The continuum projections do not lie in the selected symmetry subspace.")
+    }
+    operator <- rough_operator(solver_mesh, alpha, tau, order, diffusion)
+    tail <- rough_tail(mesh$J, alpha, diffusion, mesh$kappa, T_final, tail_tolerance)
+    general <- function(A) as(as(A, "generalMatrix"), "CsparseMatrix")
+    started <- proc.time()[["elapsed"]]
+    result <- rough_matrix_evolve_cpp(general(solver_mesh$C), lapply(operator$partial_fraction_terms, general),
+        operator$residues, operator$remainder, solver_mesh$load, solver_projection, projection$residual_gram, rough_rates(mesh$j,
+            alpha, diffusion, mesh$kappa), mesh$j, tau, N, tail$squared, return_states)
+    result$elapsed <- proc.time()[["elapsed"]] - started
+    result$n_solver_nodes <- nrow(solver_mesh$C)
+    if (!is.null(embedding)) {
+        result$final_state <- as.numeric(embedding %*% result$final_state)
+        if (return_states)
+            result$states <- as.matrix(embedding %*% result$states)
+    }
+    result$tau <- tau
+    result$N <- N
+    result$order <- order
+    result$tail <- tail
+    result$transfer_reconstruction_error <- operator$transfer$reconstruction_error
+    result
+}
+
+rough_parameters <- function() {
+    list(J = 5:9, alpha = seq(0.5, 1.9, 0.2), time_steps = c(5e-04, 0.000125, 1/30000, 1e-05, 1/320000, 1e-06,
+        4e-07, 2e-07), rational_order = 14L, symmetry_reduction = TRUE, T_final = 1, diffusion = 1, kappa = 4,
+        projection_quadrature = 16L, tail_tolerance = 1e-13, fit_J = 7:9, forcing = "sum_{j>=1} sin(2^j*pi*x)/j on loop; zero on stem",
+        reconstruction = "right-constant backward Euler", error_integration = "analytic time moments, spatial projection residual, bounded infinite tail")
+}
+
+rough_run_experiment <- function(parameters = rough_parameters(), output_file = file.path("data_files", "rough_h_results.rds"),
+    checkpoint_dir = tempfile("rough-checkpoints-"), workers = 1L, root = getwd(), cache_dir = tempdir()) {
+    stopifnot(length(parameters$alpha) == length(parameters$time_steps), all(parameters$fit_J %in% parameters$J),
+        workers >= 1L, workers == as.integer(workers))
+    dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
+    dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+    rough_compile_solver(root, cache_dir)
+    cases <- expand.grid(J = parameters$J, alpha_index = seq_along(parameters$alpha))
+    identity <- list(parameters=parameters,sources=tools::md5sum(file.path(root,"brasilfunc.Rmd")))
+    run_case <- function(i) {
+        J <- cases$J[i]
+        a <- cases$alpha_index[i]
+        alpha <- parameters$alpha[a]
+        checkpoint <- file.path(checkpoint_dir, sprintf("J%02d-alpha%03d.rds", J, round(100 * alpha)))
+        if (file.exists(checkpoint)) {
+            saved <- readRDS(checkpoint)
+            if (!identical(saved$identity, identity))
+                stop("Checkpoint source/settings mismatch: ", checkpoint)
+            return(saved$value)
+        }
+        message(sprintf("Matrix experiment: J=%s, h=%g, alpha=%g", J, 2^-J, alpha))
+        mesh <- rough_mesh(J, parameters$kappa)
+        projection <- rough_projection(mesh, parameters$projection_quadrature)
+        value <- rough_solve(mesh, alpha, parameters$time_steps[a], order = parameters$rational_order, diffusion = parameters$diffusion,
+            T_final = parameters$T_final, projection = projection, tail_tolerance = parameters$tail_tolerance,
+            symmetry_reduction = parameters$symmetry_reduction)
+        value$final_state <- value$states <- NULL
+        value$J <- J
+        value$alpha <- alpha
+        value$n_nodes <- nrow(mesh$C)
+        saveRDS(list(identity = identity, value = value), checkpoint)
+        message(sprintf("Finished J=%s alpha=%g: E=%.9g (%.2f s)", J, alpha, value$error, value$elapsed))
+        value
+    }
+    safe_case <- function(i) tryCatch(run_case(i), error = function(e) list(failed = TRUE, message = conditionMessage(e),
+        case = i))
+    values <- if (workers > 1L && .Platform$OS.type == "unix")
+        parallel::mclapply(seq_len(nrow(cases)), safe_case, mc.cores = min(workers, nrow(cases)), mc.preschedule = FALSE)
+    else lapply(seq_len(nrow(cases)), safe_case)
+    failed <- vapply(values, function(x) !is.list(x) || isTRUE(x$failed), logical(1))
+    if (any(failed))
+        stop("Rough experiment failed: ", paste(vapply(values[failed], function(x) if (is.list(x))
+            x$message
+        else as.character(x), character(1)), collapse = "; "))
+    errors <- matrix(vapply(values, `[[`, numeric(1), "error"), nrow = length(parameters$J), ncol = length(parameters$alpha))
+    corrected <- errors * parameters$J
+    fit <- which(parameters$J %in% parameters$fit_J)
+    slope <- function(y) unname(coef(stats::lm(log10(y[fit]) ~ log10(2^-parameters$J[fit])))[2L])
+    rates <- data.frame(alpha = parameters$alpha, theoretical = parameters$alpha, raw = apply(errors, 2L, slope),
+        corrected = apply(corrected, 2L, slope))
+    rates$relative_error_percent <- 100 * abs(rates$corrected - rates$alpha)/rates$alpha
+    result <- list(parameters = parameters, errors = errors, corrected_errors = corrected, rates = rates, cases = values,
+        provenance = identity, generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z", tz = "Asia/Riyadh"), session_info = utils::sessionInfo())
+    saveRDS(result, output_file)
+    result
+}
+
+rough_convergence_plot <- function(result, corrected = FALSE) {
+    p <- result$parameters
+    errors <- if (corrected)
+        result$corrected_errors
+    else result$errors
+    frame <- expand.grid(J = p$J, column = seq_along(p$alpha))
+    frame$h <- 2^-frame$J
+    frame$error <- as.vector(errors)
+    frame$alpha <- factor(p$alpha[frame$column], levels = p$alpha)
+    fit <- which(p$J %in% p$fit_J)
+    guide <- frame
+    for (a in seq_along(p$alpha)) {
+        target <- guide$column == a
+        model <- (2^-p$J)^p$alpha[a]
+        if (!corrected)
+            model <- model/p$J
+        constant <- exp(mean(log(errors[fit, a]/model[fit])))
+        guide$error[target] <- constant * model
+    }
+    label <- if (corrected)
+        expression(J %.% E[h])
+    else expression(E[h])
+    ggplot2::ggplot(frame, ggplot2::aes(h, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,
+        linetype = "dashed", linewidth = 0.65, alpha = 0.8) + ggplot2::geom_line(linewidth = 0.8) + ggplot2::geom_point(size = 2.2) +
+        ggplot2::scale_x_log10(breaks = 2^-p$J, labels = function(x) paste0("1/", round(1/x))) + ggplot2::scale_y_log10() +
+        ggplot2::scale_color_viridis_d(option = "D", begin = 0.05, end = 0.85) + ggplot2::guides(color = ggplot2::guide_legend(nrow = 2L,
+        byrow = TRUE)) + ggplot2::labs(x = expression(h ~ "(log scale)"), y = label, color = expression(alpha),
+        title = if (corrected)
+            "Spatial convergence after logarithmic correction"
+        else "Spatial convergence with rough forcing") + ggplot2::theme_bw(base_size = 12) + ggplot2::theme(legend.position = "bottom",
+        panel.grid.minor = ggplot2::element_blank(), plot.title = ggplot2::element_text(size = 13, face = "bold"))
+}
+
+rough_save_figures <- function(result, output_dir = file.path("data_files", "rough")) {
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+    for (corrected in c(FALSE, TRUE)) {
+        plot <- rough_convergence_plot(result, corrected)
+        name <- if (corrected)
+            "conv_h_rough_corrected"
+        else "conv_h_rough_raw"
+        for (extension in c("png", "pdf")) ggplot2::ggsave(file.path(output_dir, paste0(name, ".", extension)),
+            plot, width = 6.2, height = 4.7, dpi = 300, bg = "white")
+    }
+    invisible(output_dir)
+}
+
+rough_tau_mesh <- function(J, kappa = 4) {
+    stopifnot(length(J) == 1L, is.finite(J), J == as.integer(J), J >= 3L, J <= 22L, length(kappa) == 1L, is.finite(kappa),
+        kappa > 0)
+    h <- 2^-J
+    cells <- as.integer(2^(J - 1L))
+    n <- cells - 1L
+    C <- Matrix::bandSparse(n, k = c(-1L, 0L, 1L), diagonals = list(rep(2 * h/3, n - 1L), rep(8 * h/3, n), rep(2 *
+        h/3, n - 1L)))
+    G <- Matrix::bandSparse(n, k = c(-1L, 0L, 1L), diagonals = list(rep(-4/h, n - 1L), rep(8/h, n), rep(-4/h, n -
+        1L)))
+    j <- seq_len(J - 1L)
+    x <- seq_len(n) * h
+    theta <- pi * 2^j * h
+    B <- outer(x, 2^j, function(x, k) sinpi(x * k)) * rep(4 * h * (sin(theta/2)/(theta/2))^2, each = n)
+    list(J = J, h = h, C = C, K = kappa^2 * C + G, B = B, j = j, kappa = kappa, load = as.numeric(B %*% (1/j)),
+        x = x)
+}
+
+rough_tau_projection <- function(mesh, quadrature_order = 16L) {
+    stopifnot(quadrature_order >= 8L, quadrature_order == as.integer(quadrature_order))
+    factor <- Matrix::Cholesky(Matrix::forceSymmetric(mesh$C), LDL = FALSE)
+    P <- as.matrix(Matrix::solve(factor, mesh$B, system = "A"))
+    rule <- statmod::gauss.quad(quadrature_order, "legendre")
+    z <- (rule$nodes + 1)/2
+    n <- nrow(P)
+    left <- rbind(rep(0, ncol(P)), P)
+    right <- rbind(P, rep(0, ncol(P)))
+    starts <- (0:n) * mesh$h
+    residual_gram <- matrix(0, ncol(P), ncol(P))
+    for (q in seq_along(z)) {
+        exact <- outer(starts + mesh$h * z[q], 2^mesh$j, function(x, k) sinpi(x * k))
+        residual <- exact - ((1 - z[q]) * left + z[q] * right)
+        residual_gram <- residual_gram + 2 * mesh$h * rule$weights[q] * Matrix::crossprod(residual)
+    }
+    list(P = P, residual_gram = residual_gram)
+}
+
+rough_tau_solve <- function(mesh, alpha, N, order, diffusion, T_final = 1, projection = rough_tau_projection(mesh),
+    tail_tolerance = 1e-13, return_states = FALSE) {
+    stopifnot(N >= 1, N == as.integer(N), is.finite(T_final), T_final > 0)
+    tau <- T_final/N
+    operator <- rough_operator(mesh, alpha, tau, order, diffusion)
+    tail <- rough_tail(mesh$J, alpha, diffusion, mesh$kappa, T_final, tail_tolerance)
+    general <- function(A) as(as(A, "generalMatrix"), "CsparseMatrix")
+    started <- proc.time()[["elapsed"]]
+    result <- rough_matrix_evolve_cpp(general(mesh$C), lapply(operator$partial_fraction_terms, general), operator$residues,
+        operator$remainder, mesh$load, projection$P, projection$residual_gram, rough_rates(mesh$j, alpha, diffusion,
+            mesh$kappa), mesh$j, tau, as.integer(N), tail$squared, return_states)
+    result$elapsed <- proc.time()[["elapsed"]] - started
+    result$tau <- tau
+    result$N <- N
+    result$order <- order
+    result$alpha <- alpha
+    result$diffusion <- diffusion
+    result$J <- mesh$J
+    result$n_solver_nodes <- nrow(mesh$C)
+    result$tail <- tail
+    result$transfer_reconstruction_error <- operator$transfer$reconstruction_error
+    result
+}
+
+rough_tau_parameters <- function() {
+    alpha <- seq(0.5, 1.9, 0.2)
+    kappa <- 4
+    list(alpha = alpha, J = c(20L, 16L, 13L, 11L, 10L, 9L, 8L, 8L), diffusion = (kappa^2 + 4 * pi^2)^(-alpha/2),
+        rational_orders = c(20L, rep(14L, 7L)), N = c(5L, 10L, 20L, 40L, 80L, 160L), fit_indices = 4:6, T_final = 1,
+        kappa = kappa, projection_quadrature = 16L, tail_tolerance = 1e-13, forcing = "same fixed infinite L2 forcing as conv_in_h_rough",
+        reconstruction = "right-constant backward Euler", error_integration = "exact time moments, stable projection residual, certified infinite tail")
+}
+
+rough_tau_run_experiment <- function(parameters = rough_tau_parameters(), output_file = "data_files/rough_tau_results.rds",
+    checkpoint_dir = tempfile("rough-tau-"), workers = 3L, root = getwd(), cache_dir = tempdir()) {
+    stopifnot(length(parameters$alpha) == length(parameters$J), length(parameters$alpha) == length(parameters$diffusion),
+        length(parameters$alpha) == length(parameters$rational_orders), all(parameters$fit_indices %in% seq_along(parameters$N)),
+        workers >= 1)
+    dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
+    dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
+    rough_compile_solver(root, cache_dir)
+    provenance <- list(parameters=parameters,sources=tools::md5sum(file.path(root,"brasilfunc.Rmd")))
+    run_alpha <- function(a) {
+        checkpoint <- file.path(checkpoint_dir, sprintf("alpha%03d.rds", round(100 * parameters$alpha[a])))
+        if (file.exists(checkpoint)) {
+            saved <- readRDS(checkpoint)
+            if (!identical(saved$provenance, provenance))
+                stop("Temporal checkpoint source/settings mismatch.")
+            return(saved$values)
+        }
+        message(sprintf("Preparing tau curve: alpha=%.1f, J=%d", parameters$alpha[a], parameters$J[a]))
+        mesh <- rough_tau_mesh(parameters$J[a], parameters$kappa)
+        projection <- rough_tau_projection(mesh, parameters$projection_quadrature)
+        values <- lapply(parameters$N, function(N) {
+            value <- rough_tau_solve(mesh, parameters$alpha[a], N, parameters$rational_orders[a], parameters$diffusion[a],
+                parameters$T_final, projection, parameters$tail_tolerance)
+            value$states <- value$final_state <- NULL
+            message(sprintf("alpha=%.1f, N=%d, error=%.10g, %.2fs", parameters$alpha[a], N, value$error, value$elapsed))
+            value
+        })
+        saveRDS(list(provenance = provenance, values = values), checkpoint)
+        values
+    }
+    safe_alpha <- function(a) tryCatch(run_alpha(a), error = function(e) list(failed = TRUE, message = conditionMessage(e)))
+    curves <- if (workers > 1L && .Platform$OS.type == "unix")
+        parallel::mclapply(seq_along(parameters$alpha), safe_alpha, mc.cores = min(workers, length(parameters$alpha)),
+            mc.preschedule = FALSE)
+    else lapply(seq_along(parameters$alpha), safe_alpha)
+    failed <- vapply(curves, function(x) !is.list(x) || isTRUE(x$failed) || inherits(x, "try-error"), logical(1))
+    if (any(failed))
+        stop("Temporal matrix experiment failed: ", paste(vapply(curves[failed], function(x) if (is.list(x))
+            x$message
+        else as.character(x), character(1)), collapse = "; "))
+    errors <- vapply(curves, function(x) vapply(x, `[[`, numeric(1), "error"), numeric(length(parameters$N)))
+    tau <- parameters$T_final/parameters$N
+    fit <- parameters$fit_indices
+    slope <- function(e) unname(coef(stats::lm(log10(e[fit]) ~ log10(tau[fit])))[2])
+    observed <- apply(errors, 2L, slope)
+    result <- list(parameters = parameters, tau = tau, errors = errors, rates = data.frame(alpha = parameters$alpha,
+        theoretical = 1, observed = observed, relative_error_percent = 100 * abs(observed - 1)), curves = curves,
+        provenance = provenance, generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z", tz = "Asia/Riyadh"),
+        session_info = utils::sessionInfo())
+    saveRDS(result, output_file)
+    result
+}
+
+rough_tau_convergence_plot <- function(result) {
+    p <- result$parameters
+    errors <- result$errors
+    fit <- p$fit_indices
+    constants <- apply(errors[fit, , drop = FALSE]/result$tau[fit], 2L, function(x) exp(mean(log(x))))
+    frame <- expand.grid(index = seq_along(result$tau), column = seq_along(p$alpha))
+    frame$tau <- result$tau[frame$index]
+    frame$error <- as.vector(errors)
+    frame$alpha <- factor(p$alpha[frame$column], levels = p$alpha)
+    guide <- frame
+    guide$error <- guide$tau * constants[guide$column]
+    ggplot2::ggplot(frame, ggplot2::aes(tau, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,
+        linetype = "dashed", linewidth = 0.65, alpha = 0.75) + ggplot2::geom_line(linewidth = 0.8) + ggplot2::geom_point(size = 2.1) +
+        ggplot2::scale_x_log10(breaks = result$tau, labels = function(x) paste0("1/", round(1/x))) + ggplot2::scale_y_log10() +
+        ggplot2::scale_color_viridis_d(option = "D", begin = 0.05, end = 0.85) + ggplot2::facet_wrap(~alpha, ncol = 2L,
+        labeller = ggplot2::label_both) + ggplot2::labs(x = expression(tau ~ "(log scale)"), y = expression(E[tau]),
+        color = expression(alpha), title = "Temporal convergence with rough forcing") + ggplot2::theme_bw(base_size = 12) +
+        ggplot2::theme(legend.position = "none", panel.grid.minor = ggplot2::element_blank(), plot.title = ggplot2::element_text(size = 13,
+            face = "bold"))
+}
+
+rough_tau_save_figures <- function(result, output_dir = "data_files/rough_tau") {
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+    plot <- rough_tau_convergence_plot(result)
+    name <- "conv_tau_rough"
+    for (extension in c("png", "pdf")) ggplot2::ggsave(file.path(output_dir, paste0(name, ".", extension)), plot,
+        width = 8, height = 9, dpi = 300, bg = "white")
+    invisible(output_dir)
+}
+```
+
+## Sparse time stepping for rough data
+
+```{r brasil-functions-5, eval=TRUE}
+rough_compile_solver <- function(root=getwd(),cache_dir=tempdir()) {
+  target <- environment(rough_compile_solver)
+  if(!exists("rough_matrix_evolve_cpp",envir=target,inherits=FALSE))
+    Rcpp::sourceCpp(code=r"----(// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::plugins(cpp11)]]
+#include <RcppEigen.h>
+#include <memory>
+#include <vector>
+#include <cmath>
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
+using Eigen::SparseMatrix;
+typedef Eigen::SimplicialLDLT<SparseMatrix<double> > SparseFactor;
+
+static double one_minus_average(double z) {
+  if (z >= .05) return 1.0 + std::expm1(-z)/z;
+  double term = z/2.0, value = term;
+  for (int k=2; k<=16; ++k) { term *= -z/(k+1.0); value += term; }
+  return value;
+}
+
+static double exponential_variance(double z) {
+  if (z >= .05) {
+    double average = -std::expm1(-z)/z;
+    return -std::expm1(-2*z)/(2*z) - average*average;
+  }
+  // Centered 8-point Gauss rule; expm1 retains the O(z) deviations.
+  static const double nodes[8] = {
+    .0198550717512319,.101666761293187,.237233795041836,.408282678752175,
+    .591717321247825,.762766204958164,.898333238706813,.980144928248768};
+  static const double weights[8] = {
+    .0506142681451881,.111190517226687,.156853322938944,.181341891689181,
+    .181341891689181,.156853322938944,.111190517226687,.0506142681451881};
+  double shift = one_minus_average(z), value = 0;
+  for (int q=0; q<8; ++q) {
+    double deviation = std::expm1(-z*nodes[q]) + shift;
+    value += weights[q]*deviation*deviation;
+  }
+  return value;
+}
+
+// Every time step applies the shifted FEM matrix solves. No eigenvalues or
+// modal recurrence of the discrete operator are used in this routine.
+// [[Rcpp::export]]
+Rcpp::List rough_matrix_evolve_cpp(
+    const Eigen::MappedSparseMatrix<double>& C_in, Rcpp::List matrices,
+    Eigen::VectorXd residues, double remainder, Eigen::VectorXd load,
+    Eigen::MatrixXd projection, Eigen::MatrixXd residual_gram,
+    Eigen::VectorXd rates, Eigen::VectorXd mode_j,
+    double tau, int n_steps, double tail_squared, bool return_states = false) {
+  SparseMatrix<double> C = C_in;
+  int n = C.rows(), m = residues.size(), modes = rates.size();
+  if (n_steps < 1 || tau <= 0 || matrices.size()!=m || load.size()!=n ||
+      projection.rows()!=n || projection.cols()!=modes || mode_j.size()!=modes ||
+      residual_gram.rows()!=modes || residual_gram.cols()!=modes)
+    Rcpp::stop("Invalid rough matrix solver dimensions.");
+  SparseFactor mass_factor;
+  mass_factor.compute(C);
+  if (mass_factor.info()!=Eigen::Success) Rcpp::stop("Mass factorization failed.");
+  std::vector<std::unique_ptr<SparseFactor> > factors;
+  for (int i=0; i<m; ++i) {
+    SparseMatrix<double> A = Rcpp::as<SparseMatrix<double> >(matrices[i]);
+    factors.emplace_back(new SparseFactor());
+    factors.back()->compute(A);
+    if (factors.back()->info()!=Eigen::Success) Rcpp::stop("Shifted factorization failed.");
+  }
+  VectorXd u=VectorXd::Zero(n), rhs(n), next(n), mean(modes), delta(n);
+  VectorXd amplitude(modes), average_shift(modes), variance(modes);
+  for (int j=0; j<modes; ++j) {
+    amplitude[j]=1.0/(mode_j[j]*rates[j]);
+    average_shift[j]=one_minus_average(rates[j]*tau);
+    variance[j]=exponential_variance(rates[j]*tau);
+  }
+  MatrixXd states(return_states ? n : 0, return_states ? n_steps+1 : 0);
+  if (return_states) states.col(0)=u;
+  double total=0, compensation=0;
+  for (int k=1; k<=n_steps; ++k) {
+    if ((k & 4095)==0) Rcpp::checkUserInterrupt();
+    rhs.noalias()=C*u;
+    rhs.noalias()+=tau*load;
+    next=remainder*mass_factor.solve(rhs);
+    for (int i=0; i<m; ++i) next.noalias()+=residues[i]*factors[i]->solve(rhs);
+    u.swap(next);
+    double variance_sum=0;
+    for (int j=0; j<modes; ++j) {
+      double z=rates[j]*tau*(k-1.0), decay=std::exp(-z);
+      mean[j]=amplitude[j]*(-std::expm1(-z)+decay*average_shift[j]);
+      variance_sum+=amplitude[j]*amplitude[j]*decay*decay*variance[j];
+    }
+    delta.noalias()=u-projection*mean;
+    double value=tau*(delta.dot(C*delta)+mean.dot(residual_gram*mean)+variance_sum);
+    if (!std::isfinite(value) || value < 0) Rcpp::stop("Invalid squared matrix error.");
+    double adjusted=value-compensation, updated=total+adjusted;
+    compensation=(updated-total)-adjusted;
+    total=updated;
+    if (return_states) states.col(k)=u;
+  }
+  return Rcpp::List::create(Rcpp::Named("error")=std::sqrt(total+tail_squared),
+    Rcpp::Named("resolved_squared")=total, Rcpp::Named("tail_squared")=tail_squared,
+    Rcpp::Named("final_state")=u, Rcpp::Named("states")=states);
+}
+)----",env=target,cacheDir=cache_dir,
+                    showOutput=FALSE,verbose=FALSE)
+  invisible(TRUE)
+}
+```
