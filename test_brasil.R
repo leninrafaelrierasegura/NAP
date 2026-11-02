@@ -1,4 +1,5 @@
 # Run from the project root. Checks use small matrices and temporary outputs.
+grDevices::pdf(file=NULL)
 f <- tempfile(fileext='.R')
 knitr::purl('brasilfunc.Rmd',output=f,quiet=TRUE)
 e <- new.env(parent=globalenv()); sys.source(f,e); unlink(f)
@@ -49,7 +50,21 @@ for(alpha in c(.5,2/3,1.9,2)) {
 h <- readRDS('data_files/rough_h_results.rds')
 t <- readRDS('data_files/rough_tau_results.rds')
 iso <- readRDS('data_files/isolated_m_results.rds')
-stopifnot(nrow(iso$results)==112L,all(h$parameters$alpha==t$parameters$alpha))
+stopifnot(nrow(iso$results)==length(iso$parameters$alpha_vector)*iso$parameters$m_max,
+  all(h$parameters$alpha==t$parameters$alpha))
+sampled_h <- readRDS('data_files/rough_h_as_in_mat_results.rds')
+sampled_tau <- readRDS('data_files/rough_tau_as_in_mat_results.rds')
+rough_m <- readRDS('data_files/isolated_m_rough_results.rds')
+stopifnot(identical(sampled_h$parameters$alpha,sampled_tau$parameters$alpha),
+  identical(sampled_h$parameters$alpha,rough_m$parameters$alpha_vector),
+  identical(sampled_h$parameters$diffusion,sampled_tau$parameters$diffusion),
+  identical(sampled_h$parameters$diffusion,rough_m$parameters$diffusion),
+  identical(sampled_h$parameters$h,sampled_tau$tau),length(sampled_tau$tau)==8L,
+  max(sampled_tau$tau)/min(sampled_tau$tau)==128,
+  all(sampled_tau$parameters$h==rough_m$parameters$h),
+  all(sampled_h$parameters$time_steps==rough_m$parameters$tau),
+  nrow(rough_m$results)==length(rough_m$parameters$alpha_vector)*rough_m$parameters$m_max,
+  all(rough_m$results$resolved))
 # Reproduce a cheap original spatial case using the embedded matrix kernel.
 e$rough_compile_solver()
 J <- h$parameters$J[1]; alpha <- h$parameters$alpha[1]
@@ -77,6 +92,29 @@ if(!'edges'%in%names(formals(MetricGraph::metric_graph$public_methods$initialize
   stopifnot(max(abs(B-Matrix::Diagonal(nrow(B))))<1e-13)
 }
 cat('Time histories, preserved parameters, rough baseline and symmetry checks pass.\n')
+
+# Verify the new coordinate restriction against physical FEM matrices and an
+# independently assembled reference-mass norm, without using the closed-form
+# cross products on the physical side of the comparison.
+physical <- e$rough_tau_mesh(5L,3)
+invariant <- e$rough_invariant_mesh(5L,3)
+V <- outer(physical$x,2^invariant$j,function(x,k)sinpi(x*k))/
+  rep(sqrt(invariant$mode_mass),each=nrow(physical$C))
+reference <- e$rough_sampled_reference(12L,10L)
+Psi <- e$rough_sampled_fem_basis(5L,reference$x)
+P <- e$rough_invariant_projection(invariant,e$rough_invariant_reference(12L,10L))
+stopifnot(max(abs(Matrix::crossprod(V,physical$C%*%V)-diag(4L)))<1e-12,
+  max(abs(Matrix::crossprod(V,physical$K%*%V)-as.matrix(invariant$K)))<1e-9,
+  max(abs(as.numeric(Matrix::crossprod(V,physical$load))-invariant$load))<1e-12,
+  max(abs(Matrix::crossprod(Psi%*%V,reference$C%*%reference$basis)-P$projection))<1e-12)
+spectrum_rough <- e$isolated_discrete_spectrum(physical$C,physical$K)
+data_rough <- list(C=physical$C,L=physical$K,initial=numeric(nrow(physical$C)),
+  spatial_load=physical$load,kappa=3)
+reference_rough <- e$isolated_rough_be_reference(data_rough,spectrum_rough,seq(0,.1,by=.005),.7,.2)
+original_error <- e$isolated_rational_error(data_rough,spectrum_rough,reference_rough,3L)
+e$rough_compile_invariant_solver()
+invariant_error <- e$rough_invariant_isolated_error(invariant,.7,.005,3L,.2,.1)
+stopifnot(abs(original_error$error-invariant_error$error)<1e-12)
 
 # Exercise the actual notebook chunks with edited settings. All output paths are
 # redirected to a temporary directory; committed results must stay byte-identical.
@@ -141,4 +179,19 @@ x <- manual_run("conv_in_tau_rough.Rmd",list(alpha_vector=c(.5,.9),J_vector=c(4L
 stopifnot(identical(x$result$parameters$N,c(2L,4L)),identical(x$result$parameters$diffusion,c(.2,.3)),
   identical(x$result$tau,c(.05,.025)),identical(dim(x$result$errors),c(2L,2L)),
   identical(original_hashes,tools::md5sum(original_files)))
-cat("All five actual notebook workflows honor edited parameters and save data/figures; committed results unchanged.\n")
+sampled_common <- list(alpha_vector=c(.7,1.7),T_final=.1,kappa=3,diffusion=.2,
+  m_fixed=3L,reference_cutoff=16L,reference_J=18L,reference_time_step=.002,
+  max_tail_squared_fraction=.01)
+x <- manual_run("conv_in_tau_rough_as_in_mat.Rmd",c(sampled_common,list(J_fixed=5L,
+  J_vector=c(5L,5L),N_vector=c(4L,2L),fit_indices=1:2)),"sampled-rough-tau")
+stopifnot(identical(dim(x$result$errors),c(2L,2L)),x$result$parameters$diffusion==.2,
+  all(x$result$parameters$J==5L),identical(x$result$tau,c(.025,.05)))
+x <- manual_run("cov_in_h_rough_as_in_mat.Rmd",c(sampled_common,list(J_vector=4:3,
+  time_steps=c(.005,.005),fit_J=4:3,workers=1L)),"sampled-rough-h")
+stopifnot(identical(dim(x$result$errors),c(2L,2L)),all(x$result$parameters$time_steps==.005))
+x <- manual_run("conv_in_m_isolated_rough.Rmd",list(alpha_vector=c(.7,1.7),
+  T_final=.1,kappa=3,diffusion=.2,J=5L,tau=.005,m_max=3L),"isolated-rough-m")
+stopifnot(identical(dim(x$result$errors),c(3L,2L)),x$result$parameters$J==5L,
+  x$result$parameters$tau==.005,max(x$result$results$absolute_error_disagreement)<1e-10,
+  identical(original_hashes,tools::md5sum(original_files)))
+cat("All eight actual notebook workflows honor edited parameters and save data/figures; committed results unchanged.\n")

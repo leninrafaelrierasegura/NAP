@@ -31,12 +31,12 @@ stopifnot(identical(result$coefficient_source, "rSPDE BRASIL"),
 
 ## The experiment
 
-This is the rough temporal study of `conv_in_tau_rough.Rmd`, evaluated with
+This is a consistent-parameter rough temporal study, evaluated with
 the sampled reference-mesh workflow of `conv_in_tau_mat.Rmd` and
 `cov_in_h_rough_as_in_mat.Rmd`. On the tadpole with stem length 1 and loop
 length 2, solve
 $$
-u_t+\nu_\alpha L^{\alpha/2}u=g,\qquad u(0)=0,
+u_t+\nu L^{\alpha/2}u=g,\qquad u(0)=0,
 \qquad L=\kappa^2-\Delta_\Gamma,
 $$
 where the same infinite forcing is used for every time step and exponent:
@@ -47,7 +47,7 @@ g=\sum_{j=1}^{\infty}\frac{\phi_j}{j},\qquad
 $$
 It belongs to $L_2(\Gamma)$ and has no positive spectral Sobolev regularity.
 With $\mu_j=\kappa^2+\pi^2 2^{2j}$ and
-$a_j=\nu_\alpha\mu_j^{\alpha/2}$, the exact continuum solution is
+$a_j=\nu\mu_j^{\alpha/2}$, the exact continuum solution is
 $$
 u(t)=\sum_{j=1}^{\infty}b_j(t)\phi_j,
 \qquad b_j(t)=\frac{1-e^{-a_jt}}{j a_j}.
@@ -56,12 +56,24 @@ $$
 For each $\alpha$, refine only $\tau=T/N$. The solver mesh, rational order,
 diffusion coefficient, reference cutoff, reference mesh, and reference time
 grid stay fixed along that curve. The reference temporal order is **one**.
-Use
-$$
-\nu_\alpha=(\kappa^2+4\pi^2)^{-\alpha/2},\qquad a_1=1,
-$$
-as in the original rough temporal study, so that the slowest forced mode
-has the same time scale for every $\alpha$.
+The three consistent rough studies use the same six exponents
+$\alpha=0.7,0.9,\ldots,1.7$, $\nu=0.25$, $\kappa=4$, and $T=1$.
+The endpoint exponents 0.5 and 1.9 are omitted consistently from all three
+after the joint diagnostics. Every retained exponent uses the same grid
+and fit window; the original endpoint diagnostics are preserved.
+The h and tau axes are the same eight values $2^{-10},\ldots,2^{-3}$.
+Their span is 128, preserving eight consecutive dyadic refinement levels.
+The fixed temporal mesh and isolated mesh are both $h=2^{-20}$;
+the fixed spatial step and isolated step are both $\tau=10^{-7}$.
+Both sampled-reference studies use m=14, cutoff 20, reference $h=2^{-22}$,
+and reference $\tau=10^{-5}$. Every axis point and every isolated order
+$m=1,\ldots,9$ is retained. No fit window is chosen to match a benchmark.
+
+Diagnostics and rejected candidates are retained in
+`/home/rierasl/Desktop/DOCS/NAP/consistent_rough_parameters_2026-11-02`.
+Selection requires small fixed-parameter sensitivity and well-resolved
+all-point curves; it does not rank isolated slopes against the dashed guide.
+These are the best qualifying settings in the recorded grid, not a global optimum.
 
 ### Sampled error and reference truncation
 
@@ -83,18 +95,21 @@ $$
 \big(Eb(s_q)-\Psi U^{k(q)}\big).
 $$
 This is the reference-mass/right-endpoint-time norm used in the smooth
-matrix study. No PDE is solved on the reference mesh. The shared
-`prepare_reference_error()` and `solve_compressed_reference_error()`
-functions evaluate the same sampled norm using centered weighted sums of
-sampled coefficients within each solver interval. These are discrete
-sample moments, **not analytic time integrals**.
+matrix study. No PDE is solved on the reference mesh. The uniform P1 matrices have an exact invariant space spanned by the
+interpolants of $\sin(2^j\pi x)$, $j=1,\ldots,J-1$. All other FEM
+coordinates remain exactly zero for this load and zero initial data.
+The computation uses mass-normalized coordinates in this space, where
+$C=I$ and $K$ contains the **discrete P1 eigenvalues**. It retains every
+forced FEM mode. The rational evolution still applies the shifted sparse
+matrix solves and the BRASIL constant at every step.
 
-The solver uses consistent P1 matrices, analytic sine–hat loads, and BRASIL
-shifted sparse solves including the constant contribution. Every solver
-step is advanced, including steps with no reference sample. The invariant
-quarter-loop representation has a factor of four in its matrices and
-integrals to retain the full-graph norm. It does not replace FEM evolution
-by discrete eigenfunction recurrences.
+On nested dyadic grids the reference Gram matrices and cross products are
+available in closed form. `rough_invariant_projection()` gives exactly the
+same reference-mass sampled norm as explicit nodal interpolation. This
+algebraic reduction removes large reference histories and mesh arrays;
+it changes neither the FEM problem nor the reference cutoff or time sum.
+Comparisons against the original quarter-loop matrices, loads, sampled
+norms, and complete numerical eigensystems are saved with the diagnostics.
 
 In the exact continuum norm, orthogonality gives
 $$
@@ -104,7 +119,7 @@ $$
 and
 $$
 \|u-u_K\|^2\le B_K=
-\frac{T}{\nu_\alpha^2\pi^{2\alpha}}
+\frac{T}{\nu^2\pi^{2\alpha}}
 \frac{2^{-2\alpha(K+1)}}{(K+1)^2(1-2^{-2\alpha})}.
 $$
 The bound is recorded and checked against the measured squared error. It
@@ -119,16 +134,18 @@ resolutions must be reconsidered if the refinement range is extended.
 ```{r parameters, eval=FALSE}
 T_final <- 1
 kappa <- 4
-alpha_vector <- seq(0.5,1.9,0.2)
-J_vector <- c(20L,16L,13L,11L,10L,9L,8L,8L)
-N_vector <- c(5L,10L,20L,40L,80L,160L)
-diffusion <- (kappa^2+4*pi^2)^(-alpha_vector/2)
-m_fixed <- c(20L,rep(14L,7L))
+alpha_vector <- seq(0.7,1.7,0.2)
+diffusion <- 0.25
+J_fixed <- 20L
+J_vector <- rep(J_fixed,length(alpha_vector))
+J_axis <- 10:3
+tau_vector <- 2^-J_axis
+N_vector <- as.integer(T_final/tau_vector)
+m_fixed <- 14L
 reference_cutoff <- 20L
 reference_J <- 22L
 reference_time_step <- 1e-5
-fit_indices <- 4:6
-error_n_blocks <- 10L
+fit_indices <- seq_along(tau_vector)
 max_tail_squared_fraction <- 0.002
 ```
 
@@ -139,8 +156,8 @@ stopifnot(length(alpha_vector)>0L, !anyDuplicated(alpha_vector),
     all(is.finite(alpha_vector)), all(alpha_vector>0 & alpha_vector<2),
     length(J_vector)==length(alpha_vector), all(is.finite(J_vector)),
     all(J_vector==as.integer(J_vector)), all(J_vector>=3 & J_vector<=22),
-    length(diffusion)==length(alpha_vector), all(is.finite(diffusion)), all(diffusion>0),
-    length(m_fixed)==length(alpha_vector), all(is.finite(m_fixed)),
+    length(diffusion)==1L, all(is.finite(diffusion)), all(diffusion>0),
+    length(m_fixed)==1L, all(is.finite(m_fixed)),
     all(m_fixed==as.integer(m_fixed)), all(m_fixed>=1 & m_fixed<=20),
     length(N_vector)>=2L, !anyDuplicated(N_vector), all(is.finite(N_vector)),
     all(N_vector>=1 & N_vector==as.integer(N_vector)), all(N_vector<=1e7),
@@ -154,13 +171,12 @@ stopifnot(length(alpha_vector)>0L, !anyDuplicated(alpha_vector),
     reference_J>max(J_vector), reference_J>=reference_cutoff+2L,
     length(reference_time_step)==1L, is.finite(reference_time_step), reference_time_step>0,
     ceiling(T_final/reference_time_step)<=2e6,
-    length(error_n_blocks)==1L, is.finite(error_n_blocks),
-    error_n_blocks>=1L, error_n_blocks==as.integer(error_n_blocks),
     length(max_tail_squared_fraction)==1L, is.finite(max_tail_squared_fraction),
     max_tail_squared_fraction>0, max_tail_squared_fraction<1)
 for (a in seq_along(alpha_vector))
-    rough_rational_coefficients(alpha_vector[a]/2, m_fixed[a])
-reference <- rough_sampled_reference(reference_J, reference_cutoff)
+    rough_rational_coefficients(alpha_vector[a]/2, m_fixed)
+rough_compile_sampled_solver()
+reference <- rough_invariant_reference(reference_J, reference_cutoff)
 reference_grid <- make_time_grid(T_final, reference_time_step)
 time_grids <- lapply(N_vector, function(N)
     list(N=N, time_step=T_final/N, time_seq=seq(0,T_final,length.out=N+1L)))
@@ -172,22 +188,14 @@ errors <- matrix(NA_real_, length(N_vector), length(alpha_vector))
 cases <- vector("list", length(alpha_vector))
 for (a in seq_along(alpha_vector)) {
     message(sprintf("Preparing sampled tau curve: alpha=%.1f, J=%d", alpha_vector[a],J_vector[a]))
-    mesh <- rough_tau_mesh(J_vector[a], kappa)
-    Psi <- rough_sampled_fem_basis(mesh$J, reference$x)
-    projection <- prepare_reference_error(Psi, reference$C, reference$basis)
-    coefficients_at_time <- local({
-        exponent <- alpha_vector[a]
-        nu <- diffusion[a]
-        function(t) rough_sampled_coefficients(t, reference_cutoff, exponent, nu, kappa)
-    })
+    mesh <- rough_invariant_mesh(J_vector[a], kappa)
+    projection <- rough_invariant_projection(mesh,reference)
     values <- lapply(seq_along(N_vector), function(i) {
         grid <- time_grids[[i]]
         started <- proc.time()[["elapsed"]]
-        operator <- rough_operator(mesh, alpha_vector[a], grid$time_step, m_fixed[a], diffusion[a])
-        error <- solve_compressed_reference_error(operator, grid$time_step, grid$time_seq,
-            numeric(nrow(mesh$C)), mesh$load, c(0,rep(1,grid$N)),
-            reference_grid$time_seq, coefficients_at_time, projection,
-            n_blocks=error_n_blocks, verbose=FALSE)
+        value <- rough_sampled_error(mesh,reference,projection,alpha_vector[a],
+            grid$time_step,reference_time_step,m_fixed,diffusion,T_final)
+        error <- value$error
         if (!is.finite(error) || error<=0) stop("Invalid sampled error.")
         fraction <- cutoff_squared_bound[a]/error^2
         if (!is.finite(fraction) || fraction>max_tail_squared_fraction)
@@ -195,12 +203,11 @@ for (a in seq_along(alpha_vector)) {
         message(sprintf("alpha=%.1f, N=%d, error=%.10g",alpha_vector[a],grid$N,error))
         list(error=error,N=grid$N,tau=grid$time_step,
             omitted_squared_fraction=fraction,
-            transfer_reconstruction_error=operator$transfer$reconstruction_error,
             elapsed=proc.time()[["elapsed"]]-started)
     })
     errors[,a] <- vapply(values, `[[`, numeric(1), "error")
     cases[[a]] <- values
-    rm(mesh,Psi,projection)
+    rm(mesh,projection)
     gc(verbose=FALSE)
 }
 fit <- fit_indices
@@ -212,7 +219,9 @@ result <- list(parameters=list(study="rough_tau_sampled_reference",
     diffusion=diffusion,rational_orders=m_fixed,N=N_vector,fit_indices=fit_indices,
     reference_cutoff=reference_cutoff,reference_J=reference_J,reference_h=reference$h,
     reference_tau=reference_grid$time_step,reference_N=reference_grid$N,
-    reference_nodes=nrow(reference$C),error_n_blocks=error_n_blocks,
+    reference_nodes=reference$physical_dimension,
+    evolved_modes=J_vector-1L,
+    solver_coordinates="exact forced P1 invariant subspace",axis_span=128,excluded_alpha=c(0.5,1.9),
     max_tail_squared_fraction=max_tail_squared_fraction,
     forcing="fixed infinite sum phi_j/j; zero on stem",
     reconstruction="right-constant backward Euler",
@@ -236,7 +245,7 @@ for (a in seq_along(alpha_vector)) {
 plot <- ggplot2::ggplot(frame,ggplot2::aes(tau,error,color=alpha,group=alpha)) +
     ggplot2::geom_line(data=guide,linetype="dashed") +
     ggplot2::geom_line() + ggplot2::geom_point() +
-    ggplot2::scale_x_log10(breaks=tau,labels=function(x)format(x,digits=4,trim=TRUE)) +
+    ggplot2::scale_x_log10(breaks=tau,labels=function(x)paste0("1/",round(1/x))) +
     ggplot2::scale_y_log10() + ggplot2::scale_color_viridis_d() +
     ggplot2::facet_wrap(~alpha,ncol=2L,labeller=ggplot2::label_both) +
     ggplot2::labs(x="Time step (log scale)",y="Sampled space-time L2 error",
@@ -292,11 +301,8 @@ alternative remains available in `conv_in_tau_rough.Rmd`.
 if (!is.null(result$validation)) knitr::kable(result$validation,digits=6)
 ```
 
-For the selected default run, reference-time refinement was checked at the
-finest solver step for every exponent. Reference-space and cutoff refinement
-were checked at the two endpoint exponents. The sampled errors were also
-compared with the saved analytic-error results at all matching solver settings. These checks give
-numerical evidence about reference accuracy; they are not certified
-enclosures for sampling or floating-point errors. Diagnostic scripts and
-tables for the selected run are retained in
-`/home/rierasl/Desktop/DOCS/NAP/rough_tau_sampled_reference_2026-11-02`.
+Reference-time, reference-space, and cutoff refinements are checked at the
+finest axis point for every retained exponent. Fixed-mesh refinement and an
+exact fractional FEM comparison check spatial and rational contamination.
+The saved diagnostics cover all six exponents; these numerical sensitivity
+checks are not certified error enclosures. See the common diagnostic directory above.

@@ -56,57 +56,67 @@ E_m^2=\tau\sum_{k=1}^N
 $$
 The unresolved continuum modes cancel in this comparison. An infinite-tail
 term would measure an additional continuum error, so it is not added to
-$E_m$. This differs from the h/tau rough experiments, which compare against
-the continuum solution and must include that tail.
+$E_m$. The sampled-reference h/tau studies instead compare with a fixed truncated
+continuum reference, check an omitted-tail budget, and do not add that bound
+to their plotted errors.
 
 ### Fractional reference and rational matrix evolution
 
-The exact-discrete reference uses the complete numerical eigensystem
-$$KV=CV\Lambda,\qquad V^\top CV=I$$
-and the backward Euler recurrence
+The uniform P1 eigenpairs are known analytically. In mass-normalized
+coordinates, the exact discrete fractional backward Euler reference is
 $$
-x_i^0=0,\qquad
-x_i^k=\frac{x_i^{k-1}+\tau(V^\top F)_i}
-               {1+\tau\nu\lambda_i^{\alpha/2}},\qquad
-U_{h,\mathrm{frac}}^k=Vx^k.
+x_j^k=\frac{x_j^{k-1}+\tau f_{h,j}}
+ {1+\tau\nu\lambda_{h,j}^{\alpha/2}},\qquad x_j^0=0.
 $$
-“Exact” means the fractional power of the assembled discrete operator,
-up to numerical eigendecomposition error; time stepping is still backward
-Euler. Every numerical eigenmode is retained in this reference.
+It retains all $J-1$ forced FEM modes; every other FEM coordinate is exactly
+zero. No continuum eigenvalue replaces $\lambda_{h,j}$, and no nonzero
+FEM mode is truncated. The reference is streamed, avoiding a dense numerical
+eigendecomposition or a stored space-time history at the fine shared mesh.
 
-The rational evolution uses `my.fractional.operators.frac()` and
-`my.solver.frac()`. It applies shifted sparse solves at every time step
-and retains the BRASIL constant contribution through a mass-matrix solve.
-Its eigensystem-based counterpart is an independent diagnostic, not the
-solver used for the plotted error.
+The uniform P1 matrices have an exact invariant space spanned by the
+interpolants of $\sin(2^j\pi x)$, $j=1,\ldots,J-1$. All other FEM
+coordinates remain exactly zero for this load and zero initial data.
+The computation uses mass-normalized coordinates in this space, where
+$C=I$ and $K$ contains the **discrete P1 eigenvalues**. It retains every
+forced FEM mode. The rational evolution still applies the shifted sparse
+matrix solves and the BRASIL constant at every step.
 
-Matrices are assembled directly in the invariant quarter-loop subspace
-$[0,1/2]$, with Dirichlet endpoints. Signed reflections recover the full
-loop and the stem stays zero. The matrices and loads include a factor of
-four, so the mass norm is the full-graph norm. This is the same invariant
-FEM subspace as in the rough h/tau notebooks; it makes the complete
-fractional reference inexpensive without changing these data.
+On nested dyadic grids the reference Gram matrices and cross products are
+available in closed form. `rough_invariant_projection()` gives exactly the
+same reference-mass sampled norm as explicit nodal interpolation. This
+algebraic reduction removes large reference histories and mesh arrays;
+it changes neither the FEM problem nor the reference cutoff or time sum.
+Comparisons against the original quarter-loop matrices, loads, sampled
+norms, and complete numerical eigensystems are saved with the diagnostics.
+
+The independently evaluated rational-product recurrence checks the shifted
+sparse matrix evolution. Only the latter supplies the plotted error.
 
 ## Selected settings and coefficients
 
-The diagnostic sweep and rejected candidates are kept in
-`/home/rierasl/Desktop/DOCS/NAP/isolated_m_rough_study_2026-11-01`.
-Selection balances a common decreasing order range and the straightness
-of log(error) against sqrt(m) for all eight alphas. It does not tune the
-forcing or alter BRASIL entries to match the dashed benchmark.
+The three consistent rough studies use the same six exponents
+$\alpha=0.7,0.9,\ldots,1.7$, $\nu=0.25$, $\kappa=4$, and $T=1$.
+The endpoint exponents 0.5 and 1.9 are omitted consistently from all three
+after the joint diagnostics. Every retained exponent uses the same grid
+and fit window; the original endpoint diagnostics are preserved.
+The h and tau axes are the same eight values $2^{-10},\ldots,2^{-3}$.
+Their span is 128, preserving eight consecutive dyadic refinement levels.
+The fixed temporal mesh and isolated mesh are both $h=2^{-20}$;
+the fixed spatial step and isolated step are both $\tau=10^{-7}$.
+Both sampled-reference studies use m=14, cutoff 20, reference $h=2^{-22}$,
+and reference $\tau=10^{-5}$. Every axis point and every isolated order
+$m=1,\ldots,9$ is retained. No fit window is chosen to match a benchmark.
 
-The selected run uses $J=8$, $h=1/256$, $\tau=0.02$, $\nu=0.25$,
-and $m=1,\ldots,9$. The screening considered orders through 14. Some
-higher-order errors have resolved reversals; the selected range is a
-common decreasing window, not a claim that rational errors must decrease
-at every order. The diffusion differs from the unit diffusion in the
-rough spatial notebook and stays fixed across this entire m-study.
-The screening rule requires decreasing curves and worst-alpha $R^2\ge0.99$,
-then favors the longest common order range and highest worst-alpha $R^2$.
-This is a selection criterion within the tested grid, not a global optimum.
-Mesh refinement changes the excited spectrum and the measured slopes:
-these fits describe the selected finite FEM problem, not mesh-independent
-asymptotic exponents.
+Diagnostics and rejected candidates are retained in
+`/home/rierasl/Desktop/DOCS/NAP/consistent_rough_parameters_2026-11-02`.
+Selection requires small fixed-parameter sensitivity and well-resolved
+all-point curves; it does not rank isolated slopes against the dashed guide.
+These are the best qualifying settings in the recorded grid, not a global optimum.
+
+Mesh refinement changes the excited discrete spectrum and the measured m
+slopes. These fits describe this fixed FEM problem and are not claims of
+mesh-independent asymptotic exponents. All nine orders are retained even
+if an error reversal occurs.
 
 All poles, residues, and constants come from exact rows of the installed
 `rSPDE` BRASIL tables. Only rows used by the selected run are exported in
@@ -117,10 +127,10 @@ time-step partial fractions from them.
 ## Parameters for the next run
 
 ```{r parameters, eval=FALSE}
-J <- 8L
-tau <- 0.02
+J <- 20L
+tau <- 1e-7
 m_max <- 9L
-alpha_vector <- seq(0.5,1.9,0.2)
+alpha_vector <- seq(0.7,1.7,0.2)
 T_final <- 1
 kappa <- 4
 diffusion <- 0.25
@@ -138,13 +148,18 @@ stopifnot(length(m_max)==1L,is.finite(m_max),m_max>=2L,
           length(T_final)==1L,is.finite(T_final),T_final>0,
           length(diffusion)==1L,is.finite(diffusion),diffusion>0)
 N <- round(T_final/tau)
-if (!is.finite(N) || N<1L || N>1e6 ||
+if (!is.finite(N) || N<1L || N>1e7 ||
     abs(T_final/tau-N)>64*.Machine$double.eps*max(1,N))
-    stop("Choose an integer T_final/tau between 1 and 1e6.")
-time_seq <- (0:N)*tau
+    stop("Choose an integer T_final/tau between 1 and 1e7.")
 m_vector <- seq_len(m_max)
-data <- isolated_rough_tadpole_data(J,kappa)
-spectrum <- isolated_discrete_spectrum(data$C,data$L)
+rough_compile_invariant_solver()
+data <- rough_invariant_mesh(J,kappa)
+theta_min <- pi/2^(J-1L)
+theta_max <- pi-theta_min
+full_lambda <- function(theta) kappa^2+12*sin(theta/2)^2/(data$h^2*(2+cos(theta)))
+diagnostics <- data.frame(dimension=data$physical_dimension,evolved_modes=length(data$j),
+    eigenvalue_min=full_lambda(theta_min),eigenvalue_max=full_lambda(theta_max),
+    reference="exact uniform-P1 forced subspace; all other FEM coordinates zero")
 
 # Preserve exactly the installed coefficient rows used in this run.
 coefficient_rows <- list()
@@ -160,18 +175,13 @@ for (alpha in alpha_vector[alpha_vector!=2]) for (m in m_vector) {
         pole=cf$poles,residue=cf$residues,constant=cf$constant)
 }
 
-control_ref <- isolated_rough_be_reference(data,spectrum,time_seq,2,diffusion)
-control <- isolated_rational_error(data,spectrum,control_ref,m=1L)
+control <- rough_invariant_isolated_error(data,2,tau,1L,diffusion,T_final)
 rows <- list()
 for (alpha in alpha_vector) {
-    reference <- isolated_rough_be_reference(data,spectrum,time_seq,alpha,diffusion)
-    reference_norm <- sqrt(tau*sum(reference$coefficients[,-1L,drop=FALSE]^2))
     for (m in m_vector) {
-        value <- isolated_rational_error(data,spectrum,reference,m)
-        value$reference_norm <- reference_norm
-        value$relative_error <- value$error/reference_norm
-        value$noise_indicator <- max(value$absolute_error_disagreement,
-                                    control$error,.Machine$double.xmin)
+        value <- rough_invariant_isolated_error(data,alpha,tau,m,diffusion,T_final)
+        value$noise_indicator <- max(value$absolute_error_disagreement,control$error,
+            100*.Machine$double.eps*value$reference_norm,.Machine$double.xmin)
         value$resolved <- value$product_error>100*value$noise_indicator
         rows[[length(rows)+1L]] <- value
     }
@@ -232,13 +242,14 @@ result <- list(
     parameters=list(study="isolated_m_rough",J=J,h=2^-J,tau=tau,N=N,
       m_max=m_max,alpha_vector=alpha_vector,T_final=T_final,kappa=kappa,
       diffusion=diffusion,initial="zero",forcing="fixed infinite sum phi_j/j",
-      projected_forcing_modes=data$projected_forcing_modes,
+      projected_forcing_modes=length(data$j),
+      solver_coordinates="exact forced P1 invariant subspace",excluded_alpha=c(0.5,1.9),
       reconstruction="right-constant backward Euler",
       subspace="quarter-loop with full-graph mass normalization"),
     coefficient_source="rSPDE BRASIL",
     rSPDE_version=as.character(utils::packageVersion("rSPDE")),
     coefficients=coefficient_rows,results=results,errors=errors,slopes=slopes,
-    diagnostics=spectrum$diagnostics,control=control,
+    diagnostics=diagnostics,control=control,
     source_hashes=tools::md5sum(c("brasilfunc.Rmd","conv_in_m_isolated_rough.Rmd")),
     generated_at=format(Sys.time(),"%Y-%m-%d %H:%M:%S %Z",tz="Asia/Riyadh"))
 dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
@@ -287,14 +298,15 @@ knitr::kable(r$errors,format.args=list(scientific=TRUE,digits=6))
 
 ## Selected-run numerical checks
 
-The complete generalized eigensystem is checked for relative residuals
-and C-orthogonality. An independent spectral rational evolution checks
-the sparse error. An alpha=2 classical backward Euler control checks
+The exact invariant FEM matrices, loads, and sampled norm were checked
+against the original matrices and complete numerical eigensystems on
+small meshes. An independent rational-product evolution checks the sparse error. An alpha=2 classical backward Euler control checks
 numerical disagreement without rational approximation.
 
 A point is called resolved when its independent spectral error exceeds
 100 times the larger of the sparse/spectral error-norm disagreement and
-the classical control error. This is an empirical resolution check.
+the classical control error, with a floor of 100 machine epsilons times
+the reference norm. This is an empirical resolution check.
 The same-space relative error is $E_m/\|U_{h,\mathrm{frac}}\|_{L_2(0,T;L_2)}$.
 
 ```{r checks, echo=FALSE}

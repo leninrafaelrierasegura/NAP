@@ -107,20 +107,40 @@ norm, just as in `cov_in_h_mat.Rmd`. The analytic time coefficients are
 evaluated at reference times; there is no numerical PDE solve on the
 reference mesh.
 
-`prepare_reference_error()` compresses this quadratic norm into a coarse
-metric, a projected reference basis, and a residual Gram matrix. The
-compiled kernel evaluates that same sampled norm and advances every
-shifted-solve FEM time step. It uses no analytic time-integrated error
-formula and adds no infinite-tail error. Small-case diagnostics compare it
-with both the direct and compressed R error routines used by the smooth
-notebook.
+The uniform P1 matrices have an exact invariant space spanned by the
+interpolants of $\sin(2^j\pi x)$, $j=1,\ldots,J-1$. All other FEM
+coordinates remain exactly zero for this load and zero initial data.
+The computation uses mass-normalized coordinates in this space, where
+$C=I$ and $K$ contains the **discrete P1 eigenvalues**. It retains every
+forced FEM mode. The rational evolution still applies the shifted sparse
+matrix solves and the BRASIL constant at every step.
 
-To save memory and work, the matrices and reference mesh represent the
-invariant quarter-loop $[0,1/2]$. Signed reflections reconstruct the full
-loop, while the stem is zero. Matrices carry a factor of four so that
-their mass norms equal the full-graph norms. This preserves the sampled
-reference calculation; it is a symmetry reduction, not a discrete modal
-time-stepping solver.
+On nested dyadic grids the reference Gram matrices and cross products are
+available in closed form. `rough_invariant_projection()` gives exactly the
+same reference-mass sampled norm as explicit nodal interpolation. This
+algebraic reduction removes large reference histories and mesh arrays;
+it changes neither the FEM problem nor the reference cutoff or time sum.
+Comparisons against the original quarter-loop matrices, loads, sampled
+norms, and complete numerical eigensystems are saved with the diagnostics.
+
+The three consistent rough studies use the same six exponents
+$\alpha=0.7,0.9,\ldots,1.7$, $\nu=0.25$, $\kappa=4$, and $T=1$.
+The endpoint exponents 0.5 and 1.9 are omitted consistently from all three
+after the joint diagnostics. Every retained exponent uses the same grid
+and fit window; the original endpoint diagnostics are preserved.
+The h and tau axes are the same eight values $2^{-10},\ldots,2^{-3}$.
+Their span is 128, preserving eight consecutive dyadic refinement levels.
+The fixed temporal mesh and isolated mesh are both $h=2^{-20}$;
+the fixed spatial step and isolated step are both $\tau=10^{-7}$.
+Both sampled-reference studies use m=14, cutoff 20, reference $h=2^{-22}$,
+and reference $\tau=10^{-5}$. Every axis point and every isolated order
+$m=1,\ldots,9$ is retained. No fit window is chosen to match a benchmark.
+
+Diagnostics and rejected candidates are retained in
+`/home/rierasl/Desktop/DOCS/NAP/consistent_rough_parameters_2026-11-02`.
+Selection requires small fixed-parameter sensitivity and well-resolved
+all-point curves; it does not rank isolated slopes against the dashed guide.
+These are the best qualifying settings in the recorded grid, not a global optimum.
 
 The reference grid must resolve the highest retained frequency. The code
 requires `reference_J >= reference_cutoff + 2`, giving at least eight
@@ -132,16 +152,18 @@ vanishing or aliasing on an inadequately resolved dyadic reference mesh.
 ```{r parameters, eval=FALSE}
 T_final <- 1
 kappa <- 4
-diffusion <- 1
-alpha_vector <- seq(0.5,1.9,0.2)
-J_vector <- 5:9
-time_steps <- c(1e-3,2.5e-4,1/15000,2e-5,6.25e-6,2e-6,8e-7,4e-7)
+diffusion <- 0.25
+alpha_vector <- seq(0.7,1.7,0.2)
+J_vector <- 10:3
+h_vector <- 2^-J_vector
+time_step <- 1e-7
+time_steps <- rep(time_step,length(alpha_vector))
 m_fixed <- 14L
-reference_cutoff <- 16L
-reference_J <- 18L
+reference_cutoff <- 20L
+reference_J <- 22L
 reference_time_step <- 1e-5
-fit_J <- 7:9
-workers <- 1L
+fit_J <- J_vector
+workers <- 12L
 max_tail_squared_fraction <- 0.002
 ```
 
@@ -162,12 +184,12 @@ stopifnot(length(alpha_vector)>0L,!anyDuplicated(alpha_vector),
     is.finite(max_tail_squared_fraction),max_tail_squared_fraction>0)
 for (alpha in alpha_vector)
     rough_rational_coefficients(alpha/2,m_fixed)
-reference <- rough_sampled_reference(reference_J,reference_cutoff)
 rough_compile_sampled_solver()
-meshes <- lapply(J_vector,function(J) rough_tau_mesh(J,kappa))
+reference <- rough_invariant_reference(reference_J,reference_cutoff)
+rough_compile_sampled_solver()
+meshes <- lapply(J_vector,function(J) rough_invariant_mesh(J,kappa))
 projections <- lapply(meshes,function(mesh) {
-    Psi <- rough_sampled_fem_basis(mesh$J,reference$x)
-    prepare_reference_error(Psi,reference$C,reference$basis)
+    rough_invariant_projection(mesh,reference)
 })
 cases <- expand.grid(mesh_index=seq_along(J_vector),
                      alpha_index=seq_along(alpha_vector))
@@ -214,7 +236,9 @@ result <- list(parameters=list(study="rough_h_sampled_reference",
     J=J_vector,h=axis,time_steps=actual_steps,m=m_fixed,
     reference_cutoff=reference_cutoff,reference_J=reference_J,
     reference_h=reference$h,reference_tau=values[[1L]]$reference_tau,
-    reference_nodes=nrow(reference$C),fit_J=fit_J,
+    reference_nodes=reference$physical_dimension,fit_J=fit_J,
+    evolved_modes=J_vector-1L,
+    solver_coordinates="exact forced P1 invariant subspace",axis_span=128,excluded_alpha=c(0.5,1.9),
     max_tail_squared_fraction=max_tail_squared_fraction,
     forcing="fixed infinite sum phi_j/j; zero on stem",
     reconstruction="right-constant backward Euler",
@@ -317,18 +341,20 @@ knitr::kable(data.frame(h=p$h,r$errors,check.names=FALSE),
     format.args=list(scientific=TRUE,digits=6))
 ```
 
+## Saved sensitivity checks
+
+```{r saved-validation, echo=FALSE}
+if (!is.null(r$validation)) knitr::kable(r$validation,digits=6)
+```
+
 ## What was checked before selecting these parameters
 
-The diagnostics and rejected parameter choices are in
-`/home/rierasl/Desktop/DOCS/NAP/rough_h_sampled_reference_2026-11-01`.
-They include comparison with the existing analytic-error method at the
-same solver settings, doubling the reference spatial resolution, increasing
-the series cutoff, halving the reference-time step, and checking solver-time
-refinement. A complete numerical spectrum bounds the isolated rational
-contribution. Small cases compare the sampled kernel with the smooth
-notebook's direct and compressed routines and with full-graph mass integration.
+The common diagnostic directory listed above contains every candidate and
+all-point screening rule. At the finest mesh, all six alphas were checked by
+halving the fixed time step, doubling the reference spatial resolution,
+increasing the cutoff, halving the reference-time step, and replacing the
+rational resolvent with the exact fractional FEM resolvent.
 
-The selected parameters keep those discrepancies below the documented
-diagnostic thresholds. They do not turn the sampled norm into an exact
-continuum norm. The original `conv_in_h_rough.Rmd` remains the alternative
-that accounts directly for the infinite tail and time-integrated error.
+The original `conv_in_h_rough.Rmd` remains a separate study with its original
+parameters and analytic-time/infinite-tail error. Its saved slopes do not
+describe the consistent sampled-reference configuration here.

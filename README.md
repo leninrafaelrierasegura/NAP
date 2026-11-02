@@ -16,15 +16,24 @@ changes saved results, or contacts a messaging service. No credentials are neede
 | Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.02; tau=1/N; diffusion=0.001 |
 | Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:8; h=0.02; tau=1e-5; diffusion=0.001 |
 | Rough, space | `conv_in_h_rough.Rmd` | m=14; J=5:9; alpha-specific time steps; diffusion=1 |
-| Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=5:9; reference cutoff=16; reference h=2^-18 |
-| Rough, time with sampled reference | `conv_in_tau_rough_as_in_mat.Rmd` | same rough temporal solver settings; reference cutoff=20; reference h=2^-22 |
+| Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=10:3; tau=1e-7; diffusion=0.25; reference cutoff=20 |
+| Rough, time with sampled reference | `conv_in_tau_rough_as_in_mat.Rmd` | m=14; fixed h=2^-20; N=1024,512,256,128,64,32,16,8; diffusion=0.25 |
 | Rough, time | `conv_in_tau_rough.Rmd` | m=20 for alpha=0.5, otherwise 14; N=5,10,20,40,80,160 |
-| Rough, rational order | `conv_in_m_isolated_rough.Rmd` | m=1:9; h=1/256; tau=0.02; diffusion=0.25 |
+| Rough, rational order | `conv_in_m_isolated_rough.Rmd` | m=1:9; h=2^-20; tau=1e-7; diffusion=0.25 |
 
 The smooth h/tau studies use the same eight counts `N=200,104,54,28,14,7,4,2`, giving h/tau values from 0.005 to 0.5. The isolated m study uses their fixed h and tau.
 
-All studies use alpha=0.5,0.7,...,1.9, kappa=4 and T=1. The rough temporal
-study keeps its alpha-specific mesh and diffusion. Each notebook lists them.
+The two sampled-reference rough studies and isolated rough m study use
+alpha=0.7,0.9,...,1.7 and diffusion=0.25. Their eight shared h/tau values are
+2^(-10:-3), spanning 128 as required by dyadic refinement. The isolated
+study matches the fixed h=2^-20 and tau=1e-7 of those two studies. Both
+sampled references use cutoff 20, reference h=2^-22 and reference tau=1e-5.
+All sweep points and m=1:9 are retained; the common exclusion of alpha=0.5
+and 1.9 and the full diagnostic screen are recorded in DOCS/NAP.
+
+All studies use kappa=4 and T=1. The smooth studies and original rough
+h/tau studies retain alpha=0.5,0.7,...,1.9. The original
+`conv_in_tau_rough.Rmd` keeps its alpha-specific mesh and diffusion.
 
 ## Rendering
 
@@ -57,10 +66,13 @@ Invalid signed coefficient rows are rejected, not altered. The shared graph
 helper supports both current and older MetricGraph APIs.
 
 The rational evolution always uses shifted sparse matrix solves and retains
-the BRASIL constant term. Both isolated studies use a complete numerical
-FEM eigensystem only for their reference and independent diagnostic. The rough
-order study uses the invariant quarter-loop matrices with full-graph mass
-normalization. Its parameter diagnostics remain in DOCS/NAP; the project
+the BRASIL constant term. The smooth isolated study uses a complete numerical
+FEM eigensystem for its reference and independent diagnostic. The three
+consistent rough studies use an exact restriction to every forced P1 sine
+mode, with full-graph mass normalization. Unforced FEM coordinates remain
+exactly zero. The rough isolated reference is streamed; its rational solver
+still uses shifted sparse matrix solves, checked by an independent product
+recurrence. Physical FEM and evolved dimensions are recorded separately. Its parameter diagnostics remain in DOCS/NAP; the project
 contains only the selected run and installed BRASIL coefficient rows.
 
 Run the focused integration checks from the project root:
@@ -73,10 +85,11 @@ The sampled-reference rough spatial study uses a fixed finite-series reference
 on a fine space-time mesh. Its cutoff, reference resolution, time steps, and
 rational order were checked in DOCS/NAP; only the selected run is included here.
 
-The sampled-reference rough temporal study uses the same meshes, diffusion
-coefficients, rational orders, and time steps as the original rough temporal
-study. It evaluates a fixed 20-mode analytic reference on a fine space-time
-mesh, following the smooth temporal notebook. It reports raw first-order
-temporal slopes and checks an omitted-tail budget of 0.002 in squared norm.
-Reference sensitivity and analytic-error comparisons are documented in
-`/home/rierasl/Desktop/DOCS/NAP/rough_tau_sampled_reference_2026-11-02`.
+The consistent sampled-reference rough studies retain the original infinite
+forcing and sampled P1 reference-mass/right-endpoint-time norm. The exact
+invariant reduction was checked against the original matrices, loads,
+full-eigensystem reference, and sampled norm on small meshes. It avoids large
+mesh arrays and stored reference histories at the shared fine settings.
+Reference sensitivity, all candidate parameters, and reproducible diagnostics
+are retained in
+`/home/rierasl/Desktop/DOCS/NAP/consistent_rough_parameters_2026-11-02`.

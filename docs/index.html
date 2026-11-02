@@ -514,7 +514,7 @@ smooth finite-mode data.</li>
 <li><a href="conv_in_tau_mat.html">Convergence in time</a>: order eight,
 fixed spatial mesh.</li>
 <li><a href="conv_in_m_isolated.html">Isolated convergence in rational
-order</a>: orders 1–14, compared with exact-discrete backward Euler on
+order</a>: orders 1–8, compared with exact-discrete backward Euler on
 the same FEM matrices.</li>
 </ul>
 </div>
@@ -530,16 +530,21 @@ otherwise.</p></li>
 <li><p><a href="conv_in_m_isolated_rough.html">Isolated convergence in
 rational order</a>: the same infinite rough forcing; orders 1–9,
 compared with fractional backward Euler on the same FEM matrices, with
-h=1/256, tau=0.02, and diffusion=0.25.</p></li>
+h=2^-20, tau=1e-7, and diffusion=0.25.</p></li>
 <li><p><a href="cov_in_h_rough_as_in_mat.html">Convergence in space with
 a sampled reference</a>: the same infinite rough forcing, with a fixed
-16-mode continuum reference evaluated on a fine space-time mesh,
+20-mode continuum reference evaluated on a fine space-time mesh,
 following the smooth matrix workflow.</p></li>
 <li><p><a href="conv_in_tau_rough_as_in_mat.html">Convergence in time
-with a sampled reference</a>: the rough temporal experiment evaluated
-with the smooth matrix reference-grid workflow, using a controlled
-finite-series reference and raw temporal slopes.</p></li>
+with a sampled reference</a>: the same sampled reference-grid workflow,
+using a controlled finite-series reference and raw temporal
+slopes.</p></li>
 </ul>
+<p>The sampled-reference rough h/tau studies and isolated rough m study
+share alpha=0.7,0.9,…,1.7 and diffusion=0.25. Their h/tau axes contain
+the same eight dyadic values from 2^-10 to 2^-3 (span 128). The isolated
+study uses their fixed h=2^-20 and tau=1e-7. All points are included in
+the fits.</p>
 </div>
 
 

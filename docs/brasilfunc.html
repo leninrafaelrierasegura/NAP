@@ -3463,6 +3463,165 @@ Rcpp::List rough_matrix_evolve_cpp(
   invisible(TRUE)
 }</code></pre>
 </div>
+<div id="exact-forced-fem-subspace-for-the-consistent-rough-studies" class="section level2">
+<h2>Exact forced FEM subspace for the consistent rough studies</h2>
+<p>On a dyadic uniform quarter-loop mesh, let <span class="math inline">\(s_j\)</span> be the nodal samples of <span class="math inline">\(\sin(2^j\pi x)\)</span> and <span class="math inline">\(z_j=\pi 2^j h\)</span>. Including the existing
+factor four, <span class="math display">\[
+c_j=s_j^\top C s_j=\frac{2+\cos z_j}{3},\quad
+\lambda_{h,j}=\kappa^2+\frac{12\sin^2(z_j/2)}{h^2(2+\cos z_j)},\quad
+q_j=\frac{3\operatorname{sinc}^4(z_j/2)}{2+\cos z_j}.
+\]</span> Here <span class="math inline">\(\operatorname{sinc}(z)=\sin(z)/z\)</span>. In the
+basis <span class="math inline">\(s_j/\sqrt{c_j}\)</span>, the mass
+matrix is the identity, the shifted stiffness is diagonal with entries
+<span class="math inline">\(\lambda_{h,j}\)</span>, and the load is
+<span class="math inline">\(\sqrt{q_j}/j\)</span>. Only <span class="math inline">\(j=1,\ldots,J-1\)</span> have nonzero load. All
+other FEM coordinates remain zero for these data, so this is an exact
+algebraic restriction of P1 FEM. The rational update still uses the
+shifted sparse solves at every step. The isolated reference and its
+independent rational check stream their coordinates instead of
+allocating histories.</p>
+<p>For a nested reference mesh, write <span class="math inline">\(c_{r,j}\)</span> and <span class="math inline">\(q_{r,j}\)</span> for the same shape quantities.
+Its Gram matrix is <span class="math inline">\(\operatorname{diag}(c_{r,j})\)</span>; the cross
+product with an active coarse normalized mode is <span class="math inline">\(\sqrt{c_{r,j}q_j/q_{r,j}}\)</span>. The residual
+Gram entry is <span class="math inline">\(c_{r,j}(1-q_j/q_{r,j})\)</span> for active modes,
+and <span class="math inline">\(c_{r,j}\)</span> otherwise. These
+formulas reproduce nodal reference-mass quadrature, including its finite
+cutoff, without allocating the reference mesh. Small-argument residuals
+use a series to avoid subtractive cancellation. The full physical FEM
+spectrum is still included in the isolated rate diagnostics.</p>
+<pre class="r"><code># Exact algebraic restriction of the uniform P1 matrices to all forced sine modes.
+# These are coordinates of the existing FEM problem, not a continuum approximation.
+rough_p1_mode_data &lt;- function(theta) {
+    residual &lt;- 1-3*(sin(theta/2)/(theta/2))^4/(2+cos(theta))
+    small &lt;- abs(theta)&lt;.1
+    x &lt;- theta[small]^2
+    residual[small] &lt;- x^2*(1/720+x*(1/3024+x*(7/259200+x*(8.350702795147226e-7+
+        x*(-9.986163466652883e-8+x*(-1.826716236438457e-8+x*(-1.465654963502789e-9)))))))
+    list(mass=(2+cos(theta))/3, residual=residual, projection_norm=1-residual)
+}
+rough_invariant_mesh &lt;- function(J,kappa=4) {
+    stopifnot(length(J)==1L,is.finite(J),J==as.integer(J),J&gt;=3L,J&lt;=22L,
+              length(kappa)==1L,is.finite(kappa),kappa&gt;0)
+    h &lt;- 2^-J;j &lt;- seq_len(J-1L);theta &lt;- pi*2^j*h
+    shape &lt;- rough_p1_mode_data(theta)
+    lambda &lt;- kappa^2+12*sin(theta/2)^2/(h^2*(2+cos(theta)))
+    list(J=as.integer(J),h=h,kappa=kappa,j=j,
+         C=Matrix::Diagonal(length(j)),K=Matrix::Diagonal(x=lambda),
+         load=sqrt(shape$projection_norm)/j,lambda=lambda,
+         physical_dimension=as.integer(2^(J-1L)-1L),mode_mass=shape$mass)
+}
+rough_invariant_reference &lt;- function(reference_J,cutoff) {
+    stopifnot(length(reference_J)==1L,is.finite(reference_J),
+        reference_J==as.integer(reference_J),reference_J&gt;=cutoff+2L,reference_J&lt;=23L,
+        length(cutoff)==1L,is.finite(cutoff),cutoff==as.integer(cutoff),cutoff&gt;=1L)
+    list(J=as.integer(reference_J),cutoff=as.integer(cutoff),h=2^-reference_J,
+         physical_dimension=as.integer(2^(reference_J-1L)-1L))
+}
+rough_invariant_projection &lt;- function(mesh,reference) {
+    stopifnot(reference$J&gt;mesh$J,reference$cutoff&gt;=mesh$J-1L)
+    j &lt;- seq_len(reference$cutoff)
+    ref &lt;- rough_p1_mode_data(pi*2^j*reference$h)
+    coarse &lt;- rough_p1_mode_data(pi*2^mesh$j*mesh$h)
+    active &lt;- mesh$j
+    weights &lt;- sqrt(ref$mass[active]*coarse$projection_norm/ref$projection_norm[active])
+    P &lt;- matrix(0,length(active),length(j))
+    P[cbind(seq_along(active),active)] &lt;- weights
+    residual &lt;- ref$mass
+    residual[active] &lt;- ref$mass[active]*(coarse$residual-ref$residual[active])/
+        ref$projection_norm[active]
+    stopifnot(all(is.finite(residual)),all(residual&gt;=0))
+    list(metric=mesh$C,projection=P,residual_gram=diag(residual),
+         exact_gram=diag(ref$mass))
+}
+rough_compile_invariant_solver &lt;- function(cache_dir=tempdir()) {
+    target &lt;- environment(rough_compile_invariant_solver)
+    if(!exists(&#39;rough_isolated_invariant_cpp&#39;,envir=target,inherits=FALSE))
+        Rcpp::sourceCpp(code=r&quot;----(
+// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::plugins(cpp11)]]
+#include &lt;RcppEigen.h&gt;
+#include &lt;memory&gt;
+#include &lt;vector&gt;
+using Eigen::VectorXd;
+using Eigen::SparseMatrix;
+typedef Eigen::SimplicialLDLT&lt;SparseMatrix&lt;double&gt;&gt; InvariantFactor;
+static void invariant_add(double v,double &amp;sum,double &amp;comp) {
+  double adjusted=v-comp,updated=sum+adjusted;comp=(updated-sum)-adjusted;sum=updated;
+}
+// Sparse shifted FEM solves in an exact invariant coordinate system.
+// Independent exact-discrete and rational-product recurrences check the result.
+// [[Rcpp::export]]
+Rcpp::List rough_isolated_invariant_cpp(
+ const Eigen::MappedSparseMatrix&lt;double&gt;&amp; C_in,Rcpp::List matrices,
+ VectorXd residues,double remainder,VectorXd load,double tau,int n_steps,
+ VectorXd exact_mu,VectorXd rational_mu) {
+ SparseMatrix&lt;double&gt; C=C_in;
+ int n=C.rows();
+ if(n_steps&lt;1 || tau&lt;=0 || load.size()!=n || exact_mu.size()!=n ||
+    rational_mu.size()!=n || matrices.size()!=residues.size())Rcpp::stop(&quot;Invalid invariant dimensions&quot;);
+ InvariantFactor mass;mass.compute(C);
+ if(mass.info()!=Eigen::Success)Rcpp::stop(&quot;Mass factorization failed&quot;);
+ std::vector&lt;std::unique_ptr&lt;InvariantFactor&gt;&gt; factors;
+ for(int j=0;j&lt;matrices.size();++j){
+   SparseMatrix&lt;double&gt; A=Rcpp::as&lt;SparseMatrix&lt;double&gt;&gt;(matrices[j]);
+   factors.emplace_back(new InvariantFactor());factors.back()-&gt;compute(A);
+   if(factors.back()-&gt;info()!=Eigen::Success)Rcpp::stop(&quot;Shifted factorization failed&quot;);
+ }
+ VectorXd u=VectorXd::Zero(n),x=u,y=u,rhs(n),next(n);
+ double error=0,ec=0,product=0,pc=0,norm=0,nc=0;
+ for(int k=1;k&lt;=n_steps;++k){
+   if((k&amp;4095)==0)Rcpp::checkUserInterrupt();
+   rhs.noalias()=C*u;rhs.noalias()+=tau*load;
+   next=remainder*mass.solve(rhs);
+   for(int j=0;j&lt;residues.size();++j)next.noalias()+=residues[j]*factors[j]-&gt;solve(rhs);
+   u.swap(next);
+   x=exact_mu.array()*(x+tau*load).array();
+   y=rational_mu.array()*(y+tau*load).array();
+   invariant_add(tau*(u-x).squaredNorm(),error,ec);
+   invariant_add(tau*(y-x).squaredNorm(),product,pc);
+   invariant_add(tau*x.squaredNorm(),norm,nc);
+ }
+ return Rcpp::List::create(Rcpp::Named(&quot;error&quot;)=std::sqrt(error),
+   Rcpp::Named(&quot;product_error&quot;)=std::sqrt(product),
+   Rcpp::Named(&quot;reference_norm&quot;)=std::sqrt(norm),
+   Rcpp::Named(&quot;final_state_gap_C&quot;)=(u-y).norm());
+}
+)----&quot;,env=target,cacheDir=cache_dir,showOutput=FALSE,verbose=FALSE)
+    invisible(TRUE)
+}
+rough_invariant_isolated_error &lt;- function(mesh,alpha,tau,m,diffusion=1,T_final=1) {
+    stopifnot(length(alpha)==1L,is.finite(alpha),alpha&gt;0,alpha&lt;=2,
+              length(diffusion)==1L,is.finite(diffusion),diffusion&gt;0,
+              is.finite(tau),tau&gt;0,is.finite(T_final),T_final&gt;0)
+    N &lt;- round(T_final/tau)
+    stopifnot(N&gt;=1L,N&lt;=1e7,abs(T_final/tau-N)&lt;1e-7*max(1,N))
+    op &lt;- my.fractional.operators.frac(mesh$K,alpha/2,mesh$C,mesh$kappa^2,m,tau,diffusion)
+    if(alpha==2) op &lt;- list(partial_fraction_terms=list(mesh$C+tau*diffusion*mesh$K),
+                           residues=1,remainder=0)
+    rates &lt;- isolated_rational_rates(mesh$lambda,alpha,m,mesh$kappa,diffusion)
+    exact &lt;- diffusion*mesh$lambda^(alpha/2)
+    general &lt;- function(A) as(as(A,&#39;generalMatrix&#39;),&#39;CsparseMatrix&#39;)
+    started &lt;- proc.time()[[&#39;elapsed&#39;]]
+    v &lt;- rough_isolated_invariant_cpp(general(mesh$C),lapply(op$partial_fraction_terms,general),
+        op$residues,op$remainder,mesh$load,tau,as.integer(N),1/(1+tau*exact),1/(1+tau*rates))
+    # Every unforced FEM coordinate is exactly zero. Full-spectrum rate diagnostics
+    # include those coordinates; solution-error calculations need no stored history.
+    theta &lt;- pi*seq_len(mesh$physical_dimension)/2^(mesh$J-1L)
+    full_lambda &lt;- mesh$kappa^2+12*sin(theta/2)^2/(mesh$h^2*(2+cos(theta)))
+    full_relative &lt;- isolated_rational_rates(full_lambda,alpha,m,mesh$kappa,diffusion)/
+        (diffusion*full_lambda^(alpha/2))-1
+    bracket &lt;- if(alpha==2)list(exact=TRUE,lower=1,upper=1) else isolated_beta_bracket(m,alpha/2)
+    data.frame(alpha=alpha,diffusion=diffusion,m=m,error=v$error,product_error=v$product_error,
+        absolute_error_disagreement=abs(v$error-v$product_error),
+        relative_error_disagreement=abs(v$error-v$product_error)/max(v$product_error,.Machine$double.xmin),
+        final_state_gap_C=v$final_state_gap_C,max_relative_rate_error_full=max(abs(full_relative)),
+        max_relative_rate_error_excited=max(abs(rates/exact-1)),excited_numerical_modes=length(mesh$j),
+        coefficient_source=&#39;brasil&#39;,coefficient_beta_exact=bracket$exact,
+        beta_exact_in_package_table=bracket$exact,beta_table_lower=bracket$lower,
+        beta_table_upper=bracket$upper,elapsed_seconds=proc.time()[[&#39;elapsed&#39;]]-started,
+        reference_norm=v$reference_norm,relative_error=v$error/v$reference_norm)
+}</code></pre>
+</div>
 </div>
 
 
