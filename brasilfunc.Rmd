@@ -15,8 +15,11 @@ output:
 This file contains the theory and reusable coefficient, FEM, solver, and
 error-diagnostic functions. Each experiment notebook contains its own
 computation loops, regression calculations, plots, and file-saving steps.
-Every rational coefficient is read from the installed `rSPDE` BRASIL tables,
-including their constant term. Knitting this file defines functions only.
+The source inverse-power coefficients, including their constant term, are
+read from the installed `rSPDE` BRASIL tables or interpolated between
+tabulated exponents. The time-step poles, residues, and remainder are then
+computed from these source coefficients for the chosen $\tau$, $\nu$,
+$\kappa$, and $\beta$. Knitting this file defines functions only.
 The experiment notebooks load saved results. Their editable parameter chunks
 provide every experiment setting when the computation chunks are run manually.
 
@@ -29,14 +32,15 @@ equations on metric graphs of the form
 \tag{1}
 \left\{
 \begin{aligned}
-    \partial_t u(s,t)+(\kappa^2-\Delta_\Gamma)^{\alpha/2}u(s,t)
+    \partial_t u(s,t)+\nu(\kappa^2-\Delta_\Gamma)^{\alpha/2}u(s,t)
         &=f(s,t), && (s,t)\in\Gamma\times(0,T),\\
     u(s,0)&=u_0(s), && s\in\Gamma.
 \end{aligned}
 \right.
 \end{equation}
 Here $\Gamma=(\mathcal V,\mathcal E)$ is a compact connected metric graph,
-$\kappa>0$, $\alpha\in(0,2]$ is the fractional diffusion exponent, and
+$\kappa>0$, $\nu>0$ is a fixed diffusion coefficient,
+$\alpha\in(0,2]$ is the fractional diffusion exponent, and
 $f$ and $u_0$ are the right-hand side and initial condition, respectively.
 The Kirchhoff--Laplacian $\Delta_\Gamma$ acts edgewise and has domain
 \begin{equation}
@@ -51,6 +55,8 @@ The derivatives in the vertex condition are directed from the vertex into
 the incident edges, with each edge endpoint counted separately. We write
 $L=\kappa^2-\Delta_\Gamma$ and $\beta=\alpha/2$. Fractional powers of $L$
 are defined spectrally; the vertex conditions are incorporated through $L$.
+The evolution equation is therefore $u_t+\nu L^\beta u=f$. The coefficient
+$\nu$ multiplies the fractional operator after its power is taken.
 
 ## Numerical Scheme {#num_scheme}
 
@@ -69,7 +75,9 @@ Its fractional power induces the discrete bilinear form
     =(L_h^{\alpha/4}v_h,L_h^{\alpha/4}w_h)_{L_2(\Gamma)}.
 \]
 Thus, the spatial operator is discretized first and its fractional power
-is then taken on $V_h$.
+is then taken on $V_h$. We keep $L_h$ and $\mathfrak a_{h,\alpha}$ defined
+for the unscaled spatial operator; the diffusion term in the weak equation
+is $\nu\mathfrak a_{h,\alpha}$.
 
 Let $t_k=k\tau$, $k=0,\ldots,N$, with $\tau=T/N$. The scheme computes
 $U_h^\tau=\{U_h^k\}_{k=0}^{N}$, where $U_h^k\in V_h$ and
@@ -77,7 +85,7 @@ $U_h^\tau=\{U_h^k\}_{k=0}^{N}$, where $U_h^k\in V_h$ and
 \left\{
 \begin{aligned}
     \left(\delta U_h^{k+1},\phi\right)_{L_2(\Gamma)}
-      +\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
+      +\nu\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
       &=(f^{k+1},\phi)_{L_2(\Gamma)},\qquad \phi\in V_h,\\
     U_h^0&=P_hu_0,
 \end{aligned}
@@ -95,7 +103,7 @@ Equivalently,
 \left\{
 \begin{aligned}
     (U_h^{k+1},\phi)_{L_2(\Gamma)}
-      +\tau\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
+      +\tau\nu\mathfrak a_{h,\alpha}(U_h^{k+1},\phi)
       &=(U_h^k,\phi)_{L_2(\Gamma)}
         +\tau(f^{k+1},\phi)_{L_2(\Gamma)},\qquad\phi\in V_h,\\
     U_h^0&=P_hu_0.
@@ -114,11 +122,13 @@ Replacing \eqref{num_sol} into \eqref{system:fully_discrete_scheme} yields
 \[
     \sum_{j=1}^{N_h}u_j^{k+1}
     \left[(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
-          +\tau\mathfrak a_{h,\alpha}(\psi_h^j,\psi_h^i)\right]
+          +\tau\nu\mathfrak a_{h,\alpha}(\psi_h^j,\psi_h^i)\right]
     =\sum_{j=1}^{N_h}u_j^k(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
       +\tau(f^{k+1},\psi_h^i)_{L_2(\Gamma)},
 \]
 for $i=1,\ldots,N_h$.
+
+### Step 1: Represent the discrete operator in the finite element basis
 
 Introduce the mass and stiffness matrices
 \[
@@ -126,57 +136,216 @@ Introduce the mass and stiffness matrices
     \mathbf G_{i,j}=({\psi_h^i}',{\psi_h^j}')_{L_2(\Gamma)},\qquad
     \mathbf L=\kappa^2\mathbf C+\mathbf G.
 \]
-The coefficient matrix representing $L_h$ is
-$\mathbf B=\mathbf C^{-1}\mathbf L$. Consequently, the matrix of the
-fractional bilinear form is $\mathbf C\mathbf B^\beta$, and the scheme is
+The mass matrix $\mathbf C$ is symmetric positive definite, and the
+stiffness matrix $\mathbf G$ is symmetric positive semidefinite. Hence
+$\mathbf L$ is symmetric positive definite because $\kappa>0$.
+
+To find the matrix representing $L_h$, write a finite element function
+and its image as
+\[
+    v_h=\sum_{j=1}^{N_h}v_j\psi_h^j,
+    \qquad L_hv_h=\sum_{j=1}^{N_h}z_j\psi_h^j.
+\]
+Testing the definition of $L_h$ with $w_h=\psi_h^i$ gives
+\[
+    \sum_j C_{ij}z_j
+    =\sum_j(\kappa^2 C_{ij}+G_{ij})v_j,
+    \qquad i=1,\ldots,N_h.
+\]
+Collecting these equations and solving for the image coefficients yields
+\[
+    \mathbf C\mathbf z=\mathbf L\mathbf v,
+    \qquad
+    \mathbf z=\mathbf C^{-1}\mathbf L\mathbf v.
+\]
+Thus
+\[
+    \mathbf B=\mathbf C^{-1}\mathbf L
+\]
+maps the coefficient vector of $v_h$ to the coefficient vector of $L_hv_h$.
+This is what it means for $\mathbf B$ to represent $L_h$ in this basis.
+
+### Step 2: Represent the fractional bilinear form
+
+For coefficient vectors $\mathbf v$ and $\mathbf w$, expansion in the
+basis gives the inner-product identity
+\[
+    (v_h,w_h)_{L_2(\Gamma)}
+    =\sum_{i,j}w_i v_j(\psi_h^j,\psi_h^i)_{L_2(\Gamma)}
+    =\mathbf w^\top\mathbf C\mathbf v.
+\]
+The matrix $\mathbf B$ is similar to the symmetric positive definite
+matrix $\mathbf C^{-1/2}\mathbf L\mathbf C^{-1/2}$:
+\[
+    \mathbf B=\mathbf C^{-1/2}
+      (\mathbf C^{-1/2}\mathbf L\mathbf C^{-1/2})\mathbf C^{1/2}.
+\]
+It therefore has positive eigenvalues and a spectral fractional power.
+Applying the same spectral definition to $L_h$ shows that $L_h^\beta v_h$
+has coefficient vector $\mathbf B^\beta\mathbf v$. Consequently,
+\[
+\begin{aligned}
+    (L_h^\beta v_h,w_h)_{L_2(\Gamma)}
+    &=\sum_{i,j}w_i(\mathbf B^\beta\mathbf v)_j
+           (\psi_h^j,\psi_h^i)_{L_2(\Gamma)}\\
+    &=\mathbf w^\top\mathbf C\mathbf B^\beta\mathbf v.
+\end{aligned}
+\]
+Since $L_h$ is self-adjoint in the $L_2(\Gamma)$ inner product and
+$\alpha/4=\beta/2$,
+\[
+\begin{aligned}
+    \mathfrak a_{h,\alpha}(v_h,w_h)
+    &=(L_h^{\beta/2}v_h,L_h^{\beta/2}w_h)_{L_2(\Gamma)}\\
+    &=(L_h^\beta v_h,w_h)_{L_2(\Gamma)}
+      =\mathbf w^\top\mathbf C\mathbf B^\beta\mathbf v.
+\end{aligned}
+\]
+The matrix of the fractional bilinear form is therefore
+$\mathbf C\mathbf B^\beta$: the fractional power supplies the image
+coefficients, and the mass matrix supplies the inner products of the basis
+functions.
+Multiplying the fractional operator by $\nu$ therefore gives the diffusion
+bilinear-form matrix $\nu\mathbf C\mathbf B^\beta$.
+
+### Step 3: Assemble the time-stepping equation
+
+Let $\mathbf U^k$ have components $u_i^k$, and let $\mathbf F^{k+1}$
+have components $F_i^{k+1}=(f^{k+1},\psi_h^i)_{L_2(\Gamma)}$.
+Choosing $\phi=\psi_h^i$ in \eqref{system:fully_discrete_scheme} now gives
+\[
+    (\mathbf C\mathbf U^{k+1})_i
+    +\tau\nu(\mathbf C\mathbf B^\beta\mathbf U^{k+1})_i
+    =(\mathbf C\mathbf U^k)_i+\tau F_i^{k+1}.
+\]
+Since this holds for every $i$, it is the vector equation
 \begin{equation}
 \label{diff_eq_discrete}
 \tag{5}
-    (\mathbf C+\tau\mathbf C\mathbf B^\beta)\mathbf U^{k+1}
-    =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1},
+    (\mathbf C+\tau\nu\mathbf C\mathbf B^\beta)\mathbf U^{k+1}
+    =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1}.
 \end{equation}
-where $\mathbf U^k$ has components $u_i^k$ and $\mathbf F^k$ has components
-$(f^k,\psi_h^i)_{L_2(\Gamma)}$. In particular,
+In particular,
 $\mathbf C(\mathbf C^{-1}\mathbf L)^\beta$ generally differs from the
 ordinary matrix power $\mathbf L^\beta$.
 
-Introduce the normalized matrix
-$\mathbf A=\mathbf C^{-1}\mathbf L/\kappa^2$. Multiplying
-\eqref{diff_eq_discrete} first by $\mathbf C^{-1}$ and then by
-$\mathbf A^{-\beta}$ gives
+### Step 4: Remove the mass matrix and normalize the operator
+
+First multiply \eqref{diff_eq_discrete} on the left by $\mathbf C^{-1}$.
+Using $\mathbf C^{-1}\mathbf C=\mathbf I$ gives
+\[
+    (\mathbf I+\tau\nu\mathbf B^\beta)\mathbf U^{k+1}
+    =\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}.
+\]
+Next introduce
+\[
+    \mathbf A=\frac{\mathbf B}{\kappa^2}
+             =\frac{\mathbf C^{-1}\mathbf L}{\kappa^2}.
+\]
+The matrices $\mathbf L$, $\mathbf B$, and $\mathbf A$ describe $L_h$
+and its normalization; the scalar $\nu$ remains outside their fractional
+powers. In particular, neither their eigenvalues nor the approximation
+interval $J_h$ below depends on $\nu$.
+Because $\mathbf B=\kappa^2\mathbf A$ and $\kappa^2>0$, the spectral
+definition gives $\mathbf B^\beta=\kappa^{2\beta}\mathbf A^\beta$.
+Substitution yields
+\[
+    (\mathbf I+\tau\nu\kappa^{2\beta}\mathbf A^\beta)\mathbf U^{k+1}
+    =\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}.
+\]
+
+### Step 5: Rewrite the scheme using an inverse fractional power
+
+The eigenvalues of $\mathbf A$ are positive, so $\mathbf A^{-\beta}$
+exists. Multiply the previous equation on the left by this matrix:
+\[
+    \mathbf A^{-\beta}
+      (\mathbf I+\tau\nu\kappa^{2\beta}\mathbf A^\beta)\mathbf U^{k+1}
+    =\mathbf A^{-\beta}
+      (\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}).
+\]
+Using $\mathbf A^{-\beta}\mathbf A^\beta=\mathbf I$ gives
 \begin{equation}
 \label{eq:inverse_scheme}
 \tag{6}
-    (\mathbf A^{-\beta}+\tau\kappa^{2\beta}\mathbf I)\mathbf U^{k+1}
+    (\mathbf A^{-\beta}+\tau\nu\kappa^{2\beta}\mathbf I)\mathbf U^{k+1}
     =\mathbf A^{-\beta}
       (\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}).
 \end{equation}
 
+Every step up to this point is an exact rearrangement of the fully
+discrete fractional scheme. Equation \eqref{eq:inverse_scheme} prepares
+us to approximate the inverse power $\mathbf A^{-\beta}$.
+The diffusion coefficient enters through $\tau\nu\kappa^{2\beta}$.
+The forcing keeps its factor $\tau$, because $\nu$ multiplies only the
+diffusion operator in the original PDE.
+
 ### BRASIL rational approximation
+
+#### Step 6: Locate the eigenvalues to be approximated
 
 Let $0<\beta<1$, and let $\lambda_{1,h}$ and $\lambda_{N_h,h}$ be the
 smallest and largest eigenvalues of $L_h$. These are the generalized
-eigenvalues of $(\mathbf L,\mathbf C)$, with
-$\lambda_{1,h}=\kappa^2$. The interval
+eigenvalues of $(\mathbf L,\mathbf C)$:
+\[
+    \mathbf L\mathbf v_j=\lambda_{j,h}\mathbf C\mathbf v_j,
+    \qquad \mathbf B\mathbf v_j=\lambda_{j,h}\mathbf v_j.
+\]
+Since $\mathbf G$ is positive semidefinite, all $\lambda_{j,h}\ge\kappa^2$.
+Constant functions belong to $V_h$ and have zero derivative, so they give
+an eigenvalue $\lambda_{1,h}=\kappa^2$. Normalization and inversion give
+\[
+    \mathbf A\mathbf v_j
+      =\frac{\lambda_{j,h}}{\kappa^2}\mathbf v_j,
+    \qquad
+    \mathbf A^{-1}\mathbf v_j
+      =\frac{\kappa^2}{\lambda_{j,h}}\mathbf v_j.
+\]
+Taking reciprocals reverses the ordering of these positive eigenvalues.
+Thus the interval
 \[
     J_h=[\kappa^2\lambda_{N_h,h}^{-1},
          \kappa^2\lambda_{1,h}^{-1}]=[\delta_h,1]
 \]
 contains the spectrum of $\mathbf A^{-1}$.
 
-Using the BRASIL coefficients supplied by rSPDE at exponent $\beta$, let
+#### Step 7: Approximate the scalar power on a fixed interval
+
+For the theoretical construction, let $B_m$ be the best uniform rational
+approximation of type $(m,m)$ to $x^\beta$ on $[0,1]$:
 \[
     q_1(x)=\sum_{i=0}^{m}c_ix^i,\qquad
     q_2(x)=\sum_{j=0}^{m}b_jx^j,\qquad
     B_m(x)=\frac{q_1(x)}{q_2(x)}\approx x^\beta.
 \]
-Here the target is $x^\beta$ directly, and both polynomial degrees are at
-most $m$. A fixed approximation on $[0,1]$ covers every $J_h$ and allows
-the same coefficients to be used on different meshes. The numerical
-tabulation or interpolation of coefficients need not give an exact
-minimax approximation at every requested exponent.
+Type $(m,m)$ allows both polynomial degrees to be at most $m$; the best
+approximation in this setting actually has both degrees exactly $m$
+([Bolin, Mehandiratta, and Simas, 2025, Appendix B, Lemma 14](https://jmlr.org/papers/volume26/24-1779/24-1779.pdf#page=26)).
+The BRASIL algorithm computes this approximation numerically, and the
+implementation below obtains numerical coefficients from `rSPDE`.
 
-In the normalized operator variable $y=1/x$, define
+A fixed approximation on $[0,1]$ covers every $J_h$ and allows the same
+coefficients to be used on different meshes. The corresponding matrix
+approximation is
+\[
+    \mathbf A^{-\beta}=(\mathbf A^{-1})^\beta
+       \approx B_m(\mathbf A^{-1}).
+\]
+Indeed, on an eigenvector of $\mathbf A^{-1}$ with eigenvalue $x$, the
+exact operator multiplies by $x^\beta$, whereas the rational approximation
+multiplies by $B_m(x)$. This explains why approximating the scalar function
+on an interval containing the spectrum gives a matrix approximation.
+
+#### Step 8: Change to the normalized operator variable
+
+Set $y=1/x$, so that $x^\beta=y^{-\beta}$. Substituting into the rational
+function and multiplying its numerator and denominator by $y^m$ gives
+\[
+    B_m(y^{-1})
+      =\frac{q_1(y^{-1})}{q_2(y^{-1})}
+      =\frac{y^m q_1(y^{-1})}{y^m q_2(y^{-1})}.
+\]
+Define
 \begin{equation}
 \label{eq:inverse_rational}
 \tag{7}
@@ -186,29 +355,81 @@ In the normalized operator variable $y=1/x$, define
     p_r(y)=y^m q_1(y^{-1}),\quad
     p_\ell(y)=y^m q_2(y^{-1}).
 \end{equation}
-The supplied partial fraction coefficients represent this same function as
+The factors $y^m$ remove the negative powers, so $p_r$ and $p_\ell$ are
+polynomials. At the matrix level this is the same approximation written as
+\[
+    \mathbf A^{-\beta}\approx S_m(\mathbf A)
+       =p_\ell(\mathbf A)^{-1}p_r(\mathbf A).
+\]
+
+#### Step 9: Use the proved partial fraction structure
+
+Proposition 3 of
+[Bolin, Mehandiratta, and Simas (2025)](https://jmlr.org/papers/volume26/24-1779/24-1779.pdf#page=7)
+applies exactly to this transformed best approximation. In the notation
+of that proposition, $P_m=p_r$, $Q_m=p_\ell$, $k=d_m$, $c_j=\rho_j$,
+and $p_j=\eta_j$; its exponent $\alpha\in(0,1)$ is our $\beta$.
+It proves the representation
 \[
     S_m(y)=d_m+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j},
     \qquad
-    B_m(x)=d_m+\sum_{j=1}^{m}\frac{\rho_jx}{1-\eta_jx}.
+    B_m(x)=d_m+\sum_{j=1}^{m}\frac{\rho_jx}{1-\eta_jx},
 \]
+with positive residues and a positive constant, and with negative poles.
+Lemma 14 and the proof of Proposition 3 establish that the poles are
+simple and distinct. Ordering them, we therefore have
+\[
+    \eta_1<\cdots<\eta_m<0,\qquad
+    \rho_j>0,\qquad d_m>0.
+\]
+These properties are consequences of the best-approximation result.
 The source poles $\eta_j$, source residues $\rho_j$, and constant $d_m$
-belong to the inverse-power approximation $S_m$. They are distinct from
-the poles and residues of the time-step function derived below. Assuming
-$q_2(0)\ne0$, the constant is
+belong to $S_m$; the time-step function introduced below will have its
+own poles and residues.
+
+Each fraction $\rho_j/(y-\eta_j)$ tends to zero as $y\to\infty$.
+Because $1/y\to0$ and the best approximation has no pole at zero,
 \[
     d_m=B_m(0)=\lim_{y\to\infty}S_m(y)=\frac{c_0}{b_0}.
 \]
 
-For comparison with the root-product notation, if $q_1$ and $q_2$ both
-have degree $m$, with roots $\{r_{1i}\}_{i=1}^{m}$ and
-$\{r_{2j}\}_{j=1}^{m}$ counted with multiplicity, then
+Here the expression for $B_m(x)$ in partial fractions follows by
+substituting $y=1/x$ and simplifying
+$1/(x^{-1}-\eta_j)=x/(1-\eta_j x)$, with the value at $x=0$ defined
+by continuity.
+
+#### Step 10: Express the polynomials through their roots
+
+Write the degree-$m$ polynomials as
+\[
+    q_1(x)=c_m\prod_{i=1}^{m}(x-r_{1i}),\qquad
+    q_2(x)=b_m\prod_{j=1}^{m}(x-r_{2j}).
+\]
+Substituting $x=y^{-1}$ into the first product gives
+\[
+\begin{aligned}
+    p_r(y)&=y^m q_1(y^{-1})
+      =c_m y^m\prod_{i=1}^{m}(y^{-1}-r_{1i})\\
+      &=c_m\prod_{i=1}^{m}(1-r_{1i}y).
+\end{aligned}
+\]
+Each factor of $y$ cancels one factor of $y^{-1}$. The same calculation
+for the denominator gives
 \[
     p_r(y)=c_m\prod_{i=1}^{m}(1-r_{1i}y),\qquad
     p_\ell(y)=b_m\prod_{j=1}^{m}(1-r_{2j}y).
 \]
-Thus both products have $m$ factors, and the corresponding normalization
-is $\mathrm{factor}=c_m/b_m$. Define
+Thus, with $\mathrm{factor}=c_m/b_m$,
+\[
+    S_m(y)=\mathrm{factor}\,
+       \frac{\prod_{i=1}^{m}(1-r_{1i}y)}
+            {\prod_{j=1}^{m}(1-r_{2j}y)}.
+\]
+
+#### Step 11: Define the matrix products
+
+Replacing $y$ by $\mathbf A$ replaces each scalar factor $1-r y$ by
+$\mathbf I-r\mathbf A$. Define
 \begin{equation}
 \label{eq:PLPR}
 \tag{8}
@@ -217,72 +438,206 @@ is $\mathrm{factor}=c_m/b_m$. Define
     \mathbf P_\ell=\frac{\kappa^{2\beta}}{\mathrm{factor}}\,
       \mathbf C\prod_{j=1}^{m}(\mathbf I-r_{2j}\mathbf A).
 \end{equation}
+Using the preceding polynomial identities, these definitions are
+equivalently
+\[
+    \mathbf P_r=\frac{p_r(\mathbf A)}{c_m},\qquad
+    \mathbf P_\ell=\frac{\kappa^{2\beta}}{c_m}
+                     \mathbf C p_\ell(\mathbf A),
+\]
+because $\mathrm{factor}\,b_m=c_m$. In particular, $\mathbf P_\ell$
+includes the mass matrix and a scaling constant. These choices will give
+the compact form \eqref{eq:scheme}.
+Both products are defined independently of $\nu$; the product scheme
+therefore carries the diffusion factor explicitly as $\tau\nu\mathbf P_\ell$.
 This product representation is algebraic; the partial fraction
 coefficients allow the same derivation without forming polynomial products.
+
+### Derivation of the rational time-stepping scheme
+
+#### Step 12: Substitute the rational approximation
 
 Replacing $\mathbf A^{-\beta}$ in \eqref{eq:inverse_scheme} by
 $S_m(\mathbf A)$ gives the rational scheme
 \[
-    (S_m(\mathbf A)+\tau\kappa^{2\beta}\mathbf I)\mathbf U_m^{k+1}
+    (S_m(\mathbf A)+\tau\nu\kappa^{2\beta}\mathbf I)\mathbf U_m^{k+1}
     =S_m(\mathbf A)
       (\mathbf U_m^k+\tau\mathbf C^{-1}\mathbf F^{k+1}),
 \]
 where $\mathbf U_m^0$ is the coefficient vector of $P_hu_0$. The subscript
 $m$ distinguishes the rational approximation from the exact discrete
-fractional scheme. In the root-product notation, this is equivalently
+fractional scheme. This substitution introduces the rational approximation;
+the following transformations are algebraic rearrangements of that scheme.
+
+#### Step 13: Clear the rational denominator
+
+Multiply the rational scheme on the left by $p_\ell(\mathbf A)$.
+Since $p_\ell(\mathbf A)S_m(\mathbf A)=p_r(\mathbf A)$, this gives
+\[
+    (p_r(\mathbf A)+\tau\nu\kappa^{2\beta}p_\ell(\mathbf A))
+        \mathbf U_m^{k+1}
+    =p_r(\mathbf A)
+        (\mathbf U_m^k+\tau\mathbf C^{-1}\mathbf F^{k+1}).
+\]
+Next multiply on the left by $\mathbf C/c_m$. Using the definitions
+in \eqref{eq:PLPR}, we obtain
+\[
+    (\mathbf C\mathbf P_r+\tau\nu\mathbf P_\ell)\mathbf U_m^{k+1}
+    =\mathbf C\mathbf P_r
+        (\mathbf U_m^k+\tau\mathbf C^{-1}\mathbf F^{k+1}).
+\]
+
+#### Step 14: Explain the transposes in the product scheme
+
+Symmetry of $\mathbf C$ and $\mathbf L$ gives
+\[
+    \mathbf A^\top=\frac{\mathbf L\mathbf C^{-1}}{\kappa^2},
+    \qquad
+    \mathbf A^\top\mathbf C=\frac{\mathbf L}{\kappa^2}
+                           =\mathbf C\mathbf A.
+\]
+Repeated application yields
+$(\mathbf A^\top)^j\mathbf C=\mathbf C\mathbf A^j$.
+Therefore, for any polynomial $p$ with real coefficients,
+\[
+    p(\mathbf A)^\top\mathbf C=\mathbf C p(\mathbf A).
+\]
+It follows that
+\[
+    \mathbf C\mathbf P_r=\mathbf P_r^\top\mathbf C,
+    \qquad \mathbf P_\ell^\top=\mathbf P_\ell.
+\]
+For the second identity, $\mathbf P_\ell$ is a scalar multiple of
+$\mathbf C p_\ell(\mathbf A)$, whose transpose is
+$p_\ell(\mathbf A)^\top\mathbf C=\mathbf C p_\ell(\mathbf A)$.
+Substituting these identities into the previous equation and cancelling
+$\mathbf C\mathbf C^{-1}$ on its right-hand side gives
 \begin{equation}
 \label{eq:scheme}
 \tag{9}
-    (\mathbf P_r^\top\mathbf C+\tau\mathbf P_\ell^\top)
+    (\mathbf P_r^\top\mathbf C+\tau\nu\mathbf P_\ell^\top)
        \mathbf U_m^{k+1}
     =\mathbf P_r^\top(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
 \end{equation}
-Indeed, setting $\mathbf D=\mathbf L\mathbf C^{-1}/\kappa^2$, we have
-$\mathbf A^\top=\mathbf D$ and
-$p(\mathbf D)\mathbf C=\mathbf C p(\mathbf A)$ for any polynomial $p$.
 The factors that are polynomials in the same matrix commute; no commutation
 of $\mathbf L$ with $\mathbf C^{-1}$ is assumed.
 
-It follows that \eqref{eq:scheme} can be written as
+#### Step 15: Change to the transposed operator and isolate the solution
+
+Set
 \[
-    (p_r(\mathbf D)+\tau\kappa^{2\beta}p_\ell(\mathbf D))
-       \mathbf C\mathbf U_m^{k+1}
-    =p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}),
+    \mathbf D=\mathbf A^\top
+             =\frac{\mathbf L\mathbf C^{-1}}{\kappa^2}.
 \]
-and hence
+Transposing a polynomial replaces its matrix argument by the transposed
+matrix: if $p(\mathbf A)=\sum_j a_j\mathbf A^j$, then
+\[
+    p(\mathbf A)^\top
+       =\sum_j a_j(\mathbf A^\top)^j=p(\mathbf D).
+\]
+Transposing a product also reverses the order of its factors. Thus
+\[
+\begin{aligned}
+    \mathbf P_r^\top
+      &=\frac{p_r(\mathbf A)^\top}{c_m}
+        =\frac{p_r(\mathbf D)}{c_m},\\
+    \mathbf P_\ell^\top
+      &=\frac{\kappa^{2\beta}}{c_m}
+          (\mathbf C p_\ell(\mathbf A))^\top\\
+      &=\frac{\kappa^{2\beta}}{c_m}
+          p_\ell(\mathbf A)^\top\mathbf C^\top
+        =\frac{\kappa^{2\beta}}{c_m}p_\ell(\mathbf D)\mathbf C.
+\end{aligned}
+\]
+Substituting into \eqref{eq:scheme} and cancelling $1/c_m$ gives
+\[
+    (p_r(\mathbf D)+\tau\nu\kappa^{2\beta}p_\ell(\mathbf D))
+       \mathbf C\mathbf U_m^{k+1}
+    =p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\]
+First multiply on the left by
+$(p_r(\mathbf D)+\tau\nu\kappa^{2\beta}p_\ell(\mathbf D))^{-1}$,
+and then on the left by $\mathbf C^{-1}$. The result is
 \begin{equation}
 \label{eq:final_scheme}
 \tag{10}
     \mathbf U_m^{k+1}=\mathbf C^{-1}
-       (p_r(\mathbf D)+\tau\kappa^{2\beta}p_\ell(\mathbf D))^{-1}
+       (p_r(\mathbf D)+\tau\nu\kappa^{2\beta}p_\ell(\mathbf D))^{-1}
        p_r(\mathbf D)(\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
 \end{equation}
-These inverses are well-defined if $S_m$ is finite and positive on the
-spectrum of $\mathbf A$ and its reduced denominator has no zeros there.
+The order of these factors matters: $\mathbf C^{-1}$ stays to the left
+of the polynomial inverse. The proved coefficient structure ensures that
+$p_\ell$ has only negative zeros and $S_m(y)>0$ for $y\ge1$.
+Consequently $p_r(y)+\tau\nu\kappa^{2\beta}p_\ell(y)
+=p_\ell(y)(S_m(y)+\tau\nu\kappa^{2\beta})$ is nonzero on the spectra of
+$\mathbf A$ and $\mathbf D$, so these inverses are well-defined.
 
 ### Partial fraction decomposition
 
-Consider the scalar time-step function
+#### Step 16: Introduce the scalar time-step function
+
+Collect the polynomial ratio in \eqref{eq:final_scheme} into the scalar
+function
+\[
+    H_m(y)=\frac{p_r(y)}{p_r(y)+\tau\nu\kappa^{2\beta}p_\ell(y)}.
+\]
+Dividing numerator and denominator by $p_\ell(y)$ shows that
+\[
+    H_m(y)=\frac{S_m(y)}{S_m(y)+\tau\nu\kappa^{2\beta}}.
+\]
+At the matrix argument $\mathbf D$, its meaning is
+\[
+    H_m(\mathbf D)
+      =(p_r(\mathbf D)+\tau\nu\kappa^{2\beta}p_\ell(\mathbf D))^{-1}
+        p_r(\mathbf D).
+\]
+The polynomial factors commute because they are functions of the same
+matrix. Thus \eqref{eq:final_scheme} becomes
+\[
+    \mathbf U_m^{k+1}=\mathbf C^{-1}H_m(\mathbf D)
+           (\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
+\]
+
+#### Step 17: Decompose the time-step function and find its constant term
+
+The partial fraction representation is
 \begin{equation}
 \label{eq:partial_fraction}
 \tag{11}
-    H_m(y)=\frac{S_m(y)}{S_m(y)+\tau\kappa^{2\beta}}
-          =\frac{p_r(y)}{p_r(y)+\tau\kappa^{2\beta}p_\ell(y)}
+    H_m(y)=\frac{S_m(y)}{S_m(y)+\tau\nu\kappa^{2\beta}}
+          =\frac{p_r(y)}{p_r(y)+\tau\nu\kappa^{2\beta}p_\ell(y)}
           =\sum_{n=1}^{m}\frac{a_n}{y-z_n}+r_\tau.
 \end{equation}
-The last equality assumes a reduced denominator of degree $m$ with simple
-roots $z_n$ and $d_m+\tau\kappa^{2\beta}\ne0$. Lower degrees reduce the
-number of terms; repeated poles require additional powers
-$(y-z_n)^{-\ell}$ up to their multiplicity.
+Here $z_n$ are the time-step poles and $a_n$ are their residues. The
+argument below proves that there are exactly $m$ simple negative poles,
+using the coefficient properties established by Proposition 3. Thus the
+simple-pole expansion follows from the best-approximation structure.
 
-Unlike a strictly proper rational function, $H_m$ generally has a nonzero
-constant term. Taking its limit at infinity yields
+The function $H_m$ has a nonzero constant term because its numerator and
+denominator have the same degree. Every fraction in its decomposition
+vanishes at infinity, so
+\[
+    r_\tau=\lim_{y\to\infty}H_m(y)
+      =\lim_{y\to\infty}
+         \frac{S_m(y)}{S_m(y)+\tau\nu\kappa^{2\beta}}.
+\]
+Since $S_m(y)\to d_m$, we obtain
 \begin{equation}
 \label{eq:remainder}
 \tag{12}
-    r_\tau=\frac{d_m}{d_m+\tau\kappa^{2\beta}}.
+    r_\tau=\frac{d_m}{d_m+\tau\nu\kappa^{2\beta}}.
 \end{equation}
 This time-step remainder is not the source constant $d_m$ itself.
+For the exact best approximation, $d_m>0$ and $\tau\nu\kappa^{2\beta}>0$,
+so $0<r_\tau<1$.
+
+#### Step 18: Evaluate the partial fractions at the matrix argument
+
+Each scalar fraction $1/(y-z_n)$ becomes a shifted matrix inverse:
+\[
+    H_m(\mathbf D)=r_\tau\mathbf I
+       +\sum_{n=1}^{m}a_n(\mathbf D-z_n\mathbf I)^{-1}.
+\]
 
 Substituting \eqref{eq:partial_fraction} into \eqref{eq:final_scheme} gives
 \begin{equation}
@@ -294,12 +649,23 @@ Substituting \eqref{eq:partial_fraction} into \eqref{eq:final_scheme} gives
       +r_\tau\mathbf I\right)
       (\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}).
 \end{equation}
-Since
+#### Step 19: Simplify the shifted solves
+
+Factor each shifted matrix as
+\[
+    \mathbf L\mathbf C^{-1}/\kappa^2-z_n\mathbf I
+      =(\mathbf L/\kappa^2-z_n\mathbf C)\mathbf C^{-1}.
+\]
+Inverting a product reverses the order of its factors:
+$(\mathbf X\mathbf Y)^{-1}=\mathbf Y^{-1}\mathbf X^{-1}$.
+Consequently,
 \[
     (\mathbf L\mathbf C^{-1}/\kappa^2-z_n\mathbf I)^{-1}
-    =\mathbf C(\mathbf L/\kappa^2-z_n\mathbf C)^{-1},
+    =\mathbf C(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}.
 \]
-we can rewrite \eqref{eq:final_scheme2} as
+The outer $\mathbf C^{-1}$ in \eqref{eq:final_scheme2} cancels this
+factor $\mathbf C$ in each shifted term, whereas the constant term becomes
+$r_\tau\mathbf C^{-1}$. We obtain
 \begin{equation}
 \label{eq:final_scheme3}
 \tag{14}
@@ -311,48 +677,148 @@ we can rewrite \eqref{eq:final_scheme2} as
 \end{equation}
 Only sparse solves are required: one mass-matrix solve for the constant
 term when $r_\tau\ne0$, and one shifted solve for each pole. For fixed
-$h$, $\tau$, $\kappa$, $\beta$, and $m$, the matrices are unchanged between
+$h$, $\tau$, $\nu$, $\kappa$, $\beta$, and $m$, the matrices are unchanged between
 time steps, so their factorizations can be reused.
+In practical terms, form
+$\mathbf b=\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}$, solve
+\[
+    \mathbf C\mathbf x_0=\mathbf b,\qquad
+    (\mathbf L/\kappa^2-z_n\mathbf C)\mathbf x_n=\mathbf b,
+\]
+and combine the solutions as
+\[
+    \mathbf U_m^{k+1}=r_\tau\mathbf x_0+\sum_{n=1}^{m}a_n\mathbf x_n.
+\]
+This applies the inverses without forming dense inverse matrices.
 
 ### Poles and residues of the time-step function
 
+#### Step 20: Identify the scalar equations for the time-step poles
+
 To derive the poles directly from the source partial fractions, set
-$s=\tau\kappa^{2\beta}>0$ and define
+$s=\tau\nu\kappa^{2\beta}>0$ and define
 \[
     F_m(y)=S_m(y)+s
           =d_m+s+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j}.
 \]
-The time-step poles $z_n$ solve $F_m(z_n)=0$. They are precisely the
-zeros of the reduced combined denominator $p_r+s p_\ell$; the source
-poles $\eta_j$ are removable singularities of $H_m$.
+Rewrite the time-step function as
+\[
+    H_m(y)=\frac{S_m(y)}{S_m(y)+s}
+          =1-\frac{s}{F_m(y)}.
+\]
+The time-step poles $z_n$ therefore solve
+\[
+    F_m(z_n)=d_m+s+\sum_{j=1}^{m}
+                \frac{\rho_j}{z_n-\eta_j}=0.
+\]
+Indeed, $F_m(z_n)=S_m(z_n)+s=0$ implies
+\[
+    S_m(z_n)=-s<0.
+\]
+The numerator of $S_m/F_m$ is nonzero at such a point, because $s>0$;
+the zero denominator is not cancelled. At a simple zero, locally
+\[
+    F_m(y)=F_m'(z_n)(y-z_n)+o(y-z_n),\qquad
+    H_m(y)=1-\frac{s}{F_m'(z_n)(y-z_n)+o(y-z_n)},
+\]
+which exhibits a simple pole. These zeros are exactly the zeros of
+$p_r+s p_\ell$: at a source pole $\eta_j$, the polynomials $p_r$ and
+$p_\ell$ have no common zero, so
+$(p_r+s p_\ell)(\eta_j)=p_r(\eta_j)\ne0$.
+Furthermore, as $y\to\eta_j$, $S_m(y)$ becomes unbounded and
+$H_m(y)=1-s/(S_m(y)+s)\to1$. Thus the source poles are removable
+singularities of $H_m$ rather than time-step poles.
 
-Suppose the source poles are distinct and ordered, and satisfy
+#### Step 21: Prove monotonicity between the source poles
+
+By Proposition 3 and its proof, the ordered source coefficients satisfy
 \[
     \eta_1<\cdots<\eta_m<0,\qquad
-    \rho_j>0,\qquad d_m\ge0.
+    \rho_j>0,\qquad d_m>0.
 \]
-These are assumptions on the selected coefficients, not a guarantee for
-every numerically tabulated or interpolated BRASIL approximation. On each
-real interval between the source poles,
+Differentiate $F_m$ on each real interval away from the source poles:
 \[
     F_m'(y)=-\sum_{j=1}^{m}\frac{\rho_j}{(y-\eta_j)^2}<0.
 \]
-Moreover, $F_m(y)\to d_m+s>0$ as $y\to-\infty$,
-$F_m(y)\to-\infty$ as $y\uparrow\eta_j$, and
-$F_m(y)\to+\infty$ as $y\downarrow\eta_j$. Thus there is exactly one
-simple zero in each of
+Each squared denominator is positive and each residue $\rho_j$ is
+positive. Hence $F_m$ is strictly decreasing on every such interval and
+has at most one zero there. Its derivative is nonzero at every zero,
+so each zero is simple.
+
+#### Step 22: Locate all the zeros by their endpoint limits
+
+Consider a gap $(\eta_j,\eta_{j+1})$. As $y\to\eta_j^+$,
+$\rho_j/(y-\eta_j)\to+\infty$; as $y\to\eta_{j+1}^-$,
+$\rho_{j+1}/(y-\eta_{j+1})\to-\infty$. The other terms have finite
+limits at the respective endpoints. Therefore
+\[
+    \lim_{y\to\eta_j^+}F_m(y)=+\infty,\qquad
+    \lim_{y\to\eta_{j+1}^-}F_m(y)=-\infty.
+\]
+Continuity and strict decrease give exactly one zero in each gap.
+
+On the leftmost interval,
+\[
+    \lim_{y\to-\infty}F_m(y)=d_m+s>0,\qquad
+    \lim_{y\to\eta_1^-}F_m(y)=-\infty.
+\]
+There is exactly one zero there as well. On the rightmost interval
+$y>\eta_m$, all the denominators $y-\eta_j$ are positive, so
+\[
+    F_m(y)=d_m+s+\sum_j\frac{\rho_j}{y-\eta_j}>0.
+\]
+There are no zeros to the right of $\eta_m$. We have therefore found
+exactly one simple zero in each of
 \[
     (-\infty,\eta_1),\quad(\eta_1,\eta_2),\quad\ldots,
     \quad(\eta_{m-1},\eta_m),
 \]
-and no zero to the right of $\eta_m$. In particular,
+and hence
 \[
     z_1<\eta_1<z_2<\eta_2<\cdots<z_m<\eta_m<0.
 \]
 These roots can therefore be characterized by real scalar bracketing
 without expanding the combined denominator into polynomial coefficients.
+Here *real scalar bracketing* means enclosing a zero of the real-valued
+function $F_m$ between two real numbers $a<b$ with
+\[
+    F_m(a)>0,\qquad F_m(b)<0.
+\]
+The function is continuous and strictly decreasing inside the corresponding
+source-pole interval, so these signs enclose exactly one zero. For example,
+bisection evaluates $c=(a+b)/2$ and replaces $a$ by $c$ if $F_m(c)>0$,
+or $b$ by $c$ if $F_m(c)<0$; if $F_m(c)=0$, the root has been found.
+Repeatedly narrowing the bracket gives the root to the desired tolerance.
+The source poles themselves are excluded because $F_m$ is undefined there;
+their one-sided limits provide the endpoint signs.
 
-At a simple pole, $S_m(z_n)=-s$, so the residue is
+For the leftmost root, a finite left endpoint is found by starting at
+$2\eta_1$ and repeatedly doubling it until $F_m$ is positive there.
+This search terminates because $F_m(y)\to d_m+s>0$ as $y\to-\infty$.
+The helper `brasil_partial_fractions()` maps each search interval to
+$t\in[0,1]$, calls `stats::uniroot()`, and maps the result back to $y$.
+At source-pole endpoints it supplies finite values with the signs of the
+one-sided infinite limits, so the function is not evaluated at a pole.
+
+The polynomial $p_r+s p_\ell$ has degree $m$: its leading coefficient
+is $c_0+s b_0=b_0(d_m+s)\ne0$. Since we have found $m$ distinct real
+zeros, these exhaust its zeros and justify the expansion in
+\eqref{eq:partial_fraction}.
+
+#### Step 23: Derive the time-step residues
+
+By the definition of a residue at a simple pole,
+\[
+    a_n=\lim_{y\to z_n}(y-z_n)H_m(y)
+       =\lim_{y\to z_n}
+          \frac{(y-z_n)S_m(y)}{F_m(y)}.
+\]
+Since $F_m(z_n)=0$ and
+\[
+    \lim_{y\to z_n}\frac{F_m(y)}{y-z_n}=F_m'(z_n)=S_m'(z_n),
+\]
+the limit is $S_m(z_n)/S_m'(z_n)$. Substituting $S_m(z_n)=-s$ and
+$S_m'(z_n)=-\sum_j\rho_j/(z_n-\eta_j)^2$ gives
 \begin{equation}
 \label{eq:residues}
 \tag{15}
@@ -361,34 +827,277 @@ At a simple pole, $S_m(z_n)=-s$, so the residue is
         =\frac{s}{\displaystyle\sum_{j=1}^{m}
                      \rho_j/(z_n-\eta_j)^2}>0.
 \end{equation}
-Consequently, $0\le r_\tau<1$, and every shifted matrix
-$\mathbf L/\kappa^2-z_n\mathbf C$ is real symmetric positive definite.
-The mass matrix is also positive definite, so all the solves in
-\eqref{eq:final_scheme3} admit sparse Cholesky factorizations. In addition,
-$S_m(y)>0$ for $y\ge1$, and hence $0<H_m(y)<1$ on the discrete spectrum.
+The numerator $s$ is positive, and the denominator is a sum of positive
+terms, proving $a_n>0$.
 
-The implementation rejects coefficient rows that fail these sign assumptions.
+#### Step 24: Prove positive definiteness of the shifted matrices
 
-### Integer power and a fixed diffusion coefficient
+Using $\mathbf L=\kappa^2\mathbf C+\mathbf G$, write
+\[
+    \mathbf M_n=\mathbf L/\kappa^2-z_n\mathbf C
+               =(1-z_n)\mathbf C+\mathbf G/\kappa^2.
+\]
+For any nonzero real vector $\mathbf v$,
+\[
+    \mathbf v^\top\mathbf M_n\mathbf v
+      =(1-z_n)\mathbf v^\top\mathbf C\mathbf v
+         +\kappa^{-2}\mathbf v^\top\mathbf G\mathbf v>0.
+\]
+The strict inequality follows because $z_n<0$, $\mathbf C$ is positive
+definite, and $\mathbf G$ is positive semidefinite. Thus every shifted
+matrix is real symmetric positive definite. The mass matrix is also
+positive definite, so all the solves in \eqref{eq:final_scheme3} admit
+sparse Cholesky factorizations, reusable at subsequent time steps.
+
+#### Step 25: Check the decay of each unforced eigenmode
+
+For $y\ge1$, every denominator $y-\eta_j$ is positive. Consequently
+\[
+    S_m(y)=d_m+\sum_j\frac{\rho_j}{y-\eta_j}>0,\qquad
+    0<H_m(y)=\frac{S_m(y)}{S_m(y)+s}<1.
+\]
+With zero forcing, the rational scheme is
+\[
+    \mathbf U_m^{k+1}=H_m(\mathbf A)\mathbf U_m^k.
+\]
+If $\mathbf A\mathbf v_j=y_j\mathbf v_j$, where $y_j\ge1$, then
+$H_m(\mathbf A)\mathbf v_j=H_m(y_j)\mathbf v_j$.
+Each modal coefficient is multiplied at each step by a positive number
+strictly smaller than one. Every unforced eigenmode therefore decays
+without changing the sign of its coefficient.
+
+The theoretical coefficient signs above follow from the best-approximation
+theorem. In the implementation, coefficients are stored numerically and
+may be interpolated in $\beta$. The code checks the signs, distinctness,
+and finiteness of these numerical coefficients and verifies reconstruction
+of the time-step partial fractions. These are numerical validation checks;
+interpolated coefficients need not give the exact minimax approximation
+at the requested exponent. The numerical check accepts a nonnegative
+stored constant, whereas the exact theorem gives $d_m>0$.
+
+### Integer power
+
+#### Step 26: Recover ordinary backward Euler when the power is integer
 
 For $\alpha=2$, we have $\beta=1$ and use the exact inverse $S(y)=y^{-1}$.
 Then
 \[
-    H(y)=\frac{1}{1+\tau\kappa^2y}
-        =\frac{1}{\tau\kappa^2}
-          \left(y+\frac{1}{\tau\kappa^2}\right)^{-1},
+    H(y)=\frac{1}{1+\tau\nu\kappa^2y}
+        =\frac{1}{\tau\nu\kappa^2}
+          \left(y+\frac{1}{\tau\nu\kappa^2}\right)^{-1}.
 \]
-so the remainder is zero and the scheme reduces to ordinary backward Euler,
+Here the single pole is $-1/(\tau\nu\kappa^2)$, its residue is
+$1/(\tau\nu\kappa^2)$, and the remainder is zero. The normalized scheme is
 \[
-    (\mathbf C+\tau\mathbf L)\mathbf U^{k+1}
+    (\mathbf I+\tau\nu\kappa^2\mathbf A)\mathbf U^{k+1}
+       =\mathbf U^k+\tau\mathbf C^{-1}\mathbf F^{k+1}.
+\]
+Multiplying by $\mathbf C$ and using
+$\kappa^2\mathbf C\mathbf A=\mathbf L$ yields ordinary backward Euler,
+\[
+    (\mathbf C+\tau\nu\mathbf L)\mathbf U^{k+1}
     =\mathbf C\mathbf U^k+\tau\mathbf F^{k+1}.
 \]
-If the physical equation instead contains a fixed diffusion coefficient
-$\nu>0$, namely $u_t+\nu L^\beta u=f$, the same derivation replaces
-$\tau\kappa^{2\beta}$ by $\tau\nu\kappa^{2\beta}$ in the time-step function,
-its poles, residues, and remainder. The right-hand side remains
-$\mathbf C\mathbf U_m^k+\tau\mathbf F^{k+1}$, and the integer-power matrix
-is $\mathbf C+\tau\nu\mathbf L$.
+
+### From rSPDE tables to the matrix solver
+
+The examples below illustrate the functions defined in the Implementation
+section. They are displayed as R code and are not executed when this
+theory is knitted. Run them after loading the function definitions.
+
+#### Step 27: Locate the source-coefficient table
+
+The installed `rSPDE` namespace contains internal tables named
+`m_brasil1t`, `m_brasil2t`, and so on. Each table fixes the rational
+approximation order $m$ and stores coefficients at a grid of exponents.
+The helper `brasil_supported_orders()` discovers the available orders
+from these names, so availability is determined by the installed package.
+For example, to inspect the order-three table:
+
+```r
+brasil_supported_orders()
+m <- 3L
+tab <- get(paste0("m_brasil", m, "t"), envir = asNamespace("rSPDE"))
+names(tab)
+```
+
+The table columns are interpreted as follows:
+
+| Table column | Meaning in this derivation |
+|:-------------|:---------------------------|
+| `alpha` | Approximation exponent $\beta=\alpha_{\mathrm{PDE}}/2$ |
+| `p1`, ..., `pm` | Source poles $\eta_1,\ldots,\eta_m$ of $S_m$ |
+| `r1`, ..., `rm` | Corresponding source residues $\rho_1,\ldots,\rho_m$ |
+| `k` | Source constant $d_m$ |
+
+The name `alpha` inside the table refers to the power being approximated;
+our PDE exponent must first be divided by two. These tables provide the
+partial fraction coefficients of $S_m$ directly. We therefore do not
+need to construct $q_1,q_2,p_r,p_\ell$ or compute their roots in order
+to use the solver.
+
+#### Step 28: Select the exponent and extract paired coefficients
+
+For a PDE exponent $\alpha=1$, the approximation exponent is $\beta=0.5$:
+
+```r
+alpha <- 1
+beta <- alpha / 2
+coeff <- brasil_coefficients(m = m, beta = beta)
+
+coeff$poles       # source poles eta_j
+coeff$residues    # paired source residues rho_j
+coeff$constant    # source constant d_m
+```
+
+The helper reads the table for the chosen $m$ and looks for a row whose
+`alpha` matches $\beta$ within a floating-point tolerance. If a matching
+row is found, it reads the values directly. Otherwise, it calls
+`stats::approx()` on each coefficient column to interpolate linearly
+between the neighboring tabulated exponents. In scalar notation, for
+$\beta_a<\beta<\beta_b$ and any coefficient column $g$,
+\[
+    g(\beta)\approx(1-\theta)g(\beta_a)+\theta g(\beta_b),
+    \qquad \theta=\frac{\beta-\beta_a}{\beta_b-\beta_a}.
+\]
+The requested exponent must be covered by the table for interpolation to
+return finite values. The helper checks finiteness, negative distinct
+poles, positive residues, and a nonnegative numerical constant. It then
+sorts the poles increasingly and reorders the residues with the same
+permutation, preserving each pole-residue pair.
+
+The table selection depends only on $m$ and $\beta$. Its source
+coefficients can be reused when $h$, $\tau$, $\nu$, or $\kappa$ changes.
+The mathematical sign properties of the exact best approximation are
+proved by Proposition 3; the checks here validate the numerical data
+being used, including any interpolated values.
+
+#### Step 29: Form and evaluate the inverse-power approximation
+
+With the extracted coefficients, evaluate
+\[
+    S_m(y)=d_m+\sum_{j=1}^{m}\frac{\rho_j}{y-\eta_j},
+\]
+using `coeff$constant` for $d_m$, `coeff$residues` for the $\rho_j$,
+and `coeff$poles` for the $\eta_j$.
+The R helpers `brasil_inverse(y, coeff)` and `brasil_power(x, coeff)`
+evaluate $S_m(y)$ and $B_m(x)$, respectively:
+
+```r
+brasil_inverse(c(1, 10, 100), coeff)
+brasil_power(c(0, 0.1, 1), coeff)
+```
+
+For example, the installed order-three table at $\beta=0.5$ gives,
+to the displayed precision,
+\[
+    S_3(y)\approx0.008386084
+      +\frac{25.09759}{y+400.8274}
+      +\frac{3.573695}{y+13.41284}
+      +\frac{0.9982498}{y+0.4681283}.
+\]
+This displays the source approximation before the diffusion coefficient
+or time step enters the calculation. The solver uses the full stored
+precision, rather than the rounded values displayed here.
+
+#### Step 30: Convert source coefficients into time-step coefficients
+
+Choose $\tau$, $\nu$, and $\kappa$, and compute
+\[
+    s=\tau\nu\kappa^{2\beta}.
+\]
+For example, take $\tau=0.01$, $\nu=2$, and $\kappa=4$, with
+$\beta=0.5$ and $m=3$ as above. Then $s=0.08$:
+
+```r
+tau <- 0.01
+nu <- 2
+kappa <- 4
+transfer <- brasil_partial_fractions(
+    coefficients = coeff,
+    time_step = tau,
+    scaling = nu * kappa^(2 * beta)
+)
+
+transfer$p       # time-step poles z_n
+transfer$r       # time-step residues a_n
+transfer$k       # time-step remainder r_tau
+```
+
+Inside this helper, `strength = time_step * scaling` is precisely $s$.
+The function brackets and solves
+\[
+    d_m+s+\sum_j\frac{\rho_j}{z_n-\eta_j}=0
+\]
+for each $z_n$, and then evaluates
+\[
+    a_n=\frac{s}{\sum_j\rho_j/(z_n-\eta_j)^2},\qquad
+    r_\tau=\frac{d_m}{d_m+s}.
+\]
+For this example, the computed values are approximately
+
+| $n$ | $z_n$ | $a_n$ |
+|:----|------:|------:|
+| 1 | $-707.546917489$ | $289.654414217$ |
+| 2 | $-40.295926445$ | $13.871268382$ |
+| 3 | $-2.546597602$ | $0.305928594$ |
+
+with $r_\tau\approx0.09488013631$. The source constant `coeff$constant`
+is $d_m$, while the returned constant `transfer$k` is $r_\tau$.
+Likewise, `coeff$poles` contains $\eta_j$, while `transfer$p` contains
+$z_n$; the two sets of coefficients describe different rational functions.
+
+Finally, the helper compares
+\[
+    \frac{S_m(y)}{S_m(y)+s}
+    \quad\text{and}\quad
+    r_\tau+\sum_n\frac{a_n}{y-z_n}
+\]
+on a logarithmic grid of 257 points from $1$ to $10^{12}$ and rejects
+a reconstruction discrepancy greater than $2\times10^{-12}$.
+This validates agreement between two representations of $H_m$; it does
+not measure the approximation error between $S_m(y)$ and $y^{-\beta}$.
+Changing $\tau$, $\nu$, or $\kappa$ changes $s$, so the time-step
+coefficients are recomputed for the new strength.
+
+#### Step 31: Build the shifted matrices and advance one time step
+
+The operator-building function performs the preceding coefficient steps
+and constructs the matrices in \eqref{eq:final_scheme3}:
+
+```r
+op <- my.fractional.operators.frac(
+    L = L, beta = beta, C = C,
+    scale.factor = kappa^2,
+    m = m, time_step = tau, diffusion = nu
+)
+
+rhs <- C %*% U_k + tau * F_next
+U_next <- my.solver.frac(op, rhs)
+```
+
+Here `L` and `C` are the assembled matrices $\mathbf L$ and $\mathbf C$,
+`U_k` is $\mathbf U_m^k$, and `F_next` is $\mathbf F^{k+1}$.
+The argument `diffusion` is $\nu$. The builder divides its input `L`
+by `scale.factor`, so each stored shifted matrix is
+$\mathbf L/\kappa^2-z_n\mathbf C$, and its scalar `scaling` is
+$\nu(\kappa^2)^\beta=\nu\kappa^{2\beta}$.
+The solver combines a mass-matrix solve with the shifted solves, weighted
+by $r_\tau$ and $a_n$, to produce $\mathbf U_m^{k+1}$.
+The forcing is multiplied by $\tau$ once in `rhs`; $\nu$ enters through
+the time-step coefficients. With fixed parameters the operator object
+and its Cholesky factorizations are reused at every time step.
+For $\beta=1$, the builder uses the exact matrix
+$\mathbf C+\tau\nu\mathbf L$ directly and does not read a BRASIL table.
+
+### Reference
+
+Bolin, D., Mehandiratta, V., and Simas, A. B. (2025).
+[Linear cost and exponentially convergent approximation of Gaussian Matérn
+processes on intervals](https://jmlr.org/papers/volume26/24-1779/24-1779.pdf).
+*Journal of Machine Learning Research*, **26**, 1–34. See Proposition 3
+(page 7) and Appendix B, Lemma 14 and the proof of Proposition 3
+(pages 26–28), for the coefficient structure used here.
 
 # Implementation
 
