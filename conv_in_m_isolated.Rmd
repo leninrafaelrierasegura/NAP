@@ -55,6 +55,7 @@ provides a control without rational approximation.
 
 ## Parameters for the next run
 
+
 ```{r parameters, eval=FALSE}
 h <- 0.02
 tau <- 0.005
