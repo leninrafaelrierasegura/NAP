@@ -58,12 +58,12 @@ provides a control without rational approximation.
 
 ```{r parameters, eval=FALSE}
 h <- 0.02
-tau <- 0.005
+tau <- 1e-5
 m_max <- 8L
 alpha_vector <- seq(0.5,1.9,0.2)
 T_final <- 1
 kappa <- 4
-diffusion <- 1
+diffusion <- 1e-3
 initial_amplitude <- 10
 forcing_amplitude <- 10
 AAA <- 1

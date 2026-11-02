@@ -12,13 +12,15 @@ changes saved results, or contacts a messaging service. No credentials are neede
 
 | Data | Notebook | Current settings |
 | --- | --- | --- |
-| Smooth, space | `cov_in_h_mat.Rmd` | m=8; h=2^(-7:-3); tau=2e-5; diffusion=0.001 |
-| Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.001; N=200,80,32,13,6,2; diffusion=0.001 |
-| Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:14; h=0.02; tau=0.005; diffusion=1 |
+| Smooth, space | `cov_in_h_mat.Rmd` | m=8; h=1/N; tau=1e-5; diffusion=0.001 |
+| Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.02; tau=1/N; diffusion=0.001 |
+| Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:8; h=0.02; tau=1e-5; diffusion=0.001 |
 | Rough, space | `conv_in_h_rough.Rmd` | m=14; J=5:9; alpha-specific time steps; diffusion=1 |
 | Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=5:9; reference cutoff=16; reference h=2^-18 |
 | Rough, time | `conv_in_tau_rough.Rmd` | m=20 for alpha=0.5, otherwise 14; N=5,10,20,40,80,160 |
 | Rough, rational order | `conv_in_m_isolated_rough.Rmd` | m=1:9; h=1/256; tau=0.02; diffusion=0.25 |
+
+The smooth h/tau studies use the same eight counts `N=200,104,54,28,14,7,4,2`, giving h/tau values from 0.005 to 0.5. The isolated m study uses their fixed h and tau.
 
 All studies use alpha=0.5,0.7,...,1.9, kappa=4 and T=1. The rough temporal
 study keeps its alpha-specific mesh and diffusion. Each notebook lists them.

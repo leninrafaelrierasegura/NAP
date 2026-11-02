@@ -63,10 +63,11 @@ kappa <- 4
 diffusion <- 1e-3
 alpha_vector <- seq(0.5,1.9,0.2)
 m_fixed <- 8L
-h_vector <- 2^seq(-7,-3)
-time_step <- 2e-5
+# Same eight h/tau targets: two decades, with integer mesh/step counts.
+h_vector <- 1 / round(10^seq(log10(200), log10(2), length.out = 8))
+time_step <- 1e-5
 overkill_h <- 1e-5
-overkill_time_step <- 1e-5
+overkill_time_step <- 1e-6
 N_finite <- 4L
 initial_amplitude <- 10
 forcing_amplitude <- 10
