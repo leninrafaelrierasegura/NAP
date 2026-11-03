@@ -1749,6 +1749,88 @@ run_reference_cases <- function(cases, FUN, workers = 1L) {
 
 ## Discrete references and error diagnostics
 
+### Backward Euler reference in the eigenvector basis
+
+For the isolated studies in rational order, the reference uses the fractional
+power of the assembled FEM operator. Set
+$$
+\mathbf B=\mathbf C^{-1}\mathbf L,\qquad \beta=\alpha/2.
+$$
+Its backward Euler equation is
+$$
+\mathbf C\frac{\mathbf U_h^{k+1}-\mathbf U_h^k}{\tau}
++\nu\mathbf C\mathbf B^\beta\mathbf U_h^{k+1}
+=\mathbf F^{k+1},
+$$
+where $\mathbf F^{k+1}$ is the load vector for the interval-averaged forcing.
+We compute the complete generalized eigensystem
+$$
+\mathbf L\mathbf V=\mathbf C\mathbf V\boldsymbol\Lambda,
+\qquad \mathbf V^\top\mathbf C\mathbf V=\mathbf I,
+\qquad \boldsymbol\Lambda=\operatorname{diag}(\lambda_{j,h}).
+$$
+
+Write the solution in the eigenvector basis:
+$$
+\mathbf U_h^k=\mathbf V\mathbf x^k.
+$$
+Multiplying by $\mathbf V^\top\mathbf C$ recovers its coefficients:
+$$
+\mathbf x^k=\mathbf V^\top\mathbf C\mathbf U_h^k.
+$$
+Also, the generalized eigenvalue equation gives
+$$
+\mathbf B\mathbf V=\mathbf V\boldsymbol\Lambda
+\quad\Longrightarrow\quad
+\mathbf B^\beta\mathbf V=\mathbf V\boldsymbol\Lambda^\beta.
+$$
+Substitute $\mathbf U_h^k=\mathbf V\mathbf x^k$ into backward Euler:
+$$
+\mathbf C\mathbf V\frac{\mathbf x^{k+1}-\mathbf x^k}{\tau}
++\nu\mathbf C\mathbf V\boldsymbol\Lambda^\beta\mathbf x^{k+1}
+=\mathbf F^{k+1}.
+$$
+Now multiply on the left by $\mathbf V^\top$. Since
+$\mathbf V^\top\mathbf C\mathbf V=\mathbf I$, this becomes
+$$
+\frac{\mathbf x^{k+1}-\mathbf x^k}{\tau}
++\nu\boldsymbol\Lambda^\beta\mathbf x^{k+1}
+=\mathbf V^\top\mathbf F^{k+1}.
+$$
+Rearranging gives
+$$
+\mathbf x^{k+1}
+=(\mathbf I+\tau\nu\boldsymbol\Lambda^\beta)^{-1}
+\left(\mathbf x^k+\tau\mathbf V^\top\mathbf F^{k+1}\right).
+$$
+The inverse is diagonal, so each coefficient is updated independently:
+$$
+x_j^{k+1}
+=\frac{x_j^k+\tau(\mathbf V^\top\mathbf F^{k+1})_j}
+{1+\tau\nu\lambda_{j,h}^\beta}.
+$$
+Finally, substitute $\mathbf x^k=\mathbf V^\top\mathbf C\mathbf U_h^k$
+and reconstruct $\mathbf U_h^{k+1}=\mathbf V\mathbf x^{k+1}$:
+$$
+\boxed{
+\mathbf U_h^{k+1}
+=\mathbf V(\mathbf I+\tau\nu\boldsymbol\Lambda^\beta)^{-1}
+\mathbf V^\top(\mathbf C\mathbf U_h^k+\tau\mathbf F^{k+1}).
+}
+$$
+
+In `isolated_exact_be_reference()` below, `rates` contains
+$\nu\lambda_{j,h}^\beta$, `mu` contains
+$(1+\tau\nu\lambda_{j,h}^\beta)^{-1}$, and `y` contains the current
+modal coefficients. For the separable load, `f * g[k + 1L]` is
+$\mathbf V^\top\mathbf F^{k+1}$. The update
+`y <- mu * (y + dt * f * g[k + 1L])` therefore implements the scalar
+formula for every mode, and `V %*% y` reconstructs the FEM coefficients.
+The rough reference uses the same update with constant forcing and zero
+initial data. Every numerical eigenmode is retained. Here "exact" refers
+to the discrete fractional power, up to eigendecomposition and arithmetic
+errors; the reference still uses backward Euler in time.
+
 ```{r brasil-functions-3, eval=TRUE}
 
 

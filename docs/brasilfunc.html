@@ -2261,6 +2261,82 @@ run_reference_cases &lt;- function(cases, FUN, workers = 1L) {
 <div id="discrete-references-and-error-diagnostics"
 class="section level2">
 <h2>Discrete references and error diagnostics</h2>
+<div id="backward-euler-reference-in-the-eigenvector-basis"
+class="section level3">
+<h3>Backward Euler reference in the eigenvector basis</h3>
+<p>For the isolated studies in rational order, the reference uses the
+fractional power of the assembled FEM operator. Set <span
+class="math display">\[
+\mathbf B=\mathbf C^{-1}\mathbf L,\qquad \beta=\alpha/2.
+\]</span> Its backward Euler equation is <span class="math display">\[
+\mathbf C\frac{\mathbf U_h^{k+1}-\mathbf U_h^k}{\tau}
++\nu\mathbf C\mathbf B^\beta\mathbf U_h^{k+1}
+=\mathbf F^{k+1},
+\]</span> where <span class="math inline">\(\mathbf F^{k+1}\)</span> is
+the load vector for the interval-averaged forcing. We compute the
+complete generalized eigensystem <span class="math display">\[
+\mathbf L\mathbf V=\mathbf C\mathbf V\boldsymbol\Lambda,
+\qquad \mathbf V^\top\mathbf C\mathbf V=\mathbf I,
+\qquad \boldsymbol\Lambda=\operatorname{diag}(\lambda_{j,h}).
+\]</span></p>
+<p>Write the solution in the eigenvector basis: <span
+class="math display">\[
+\mathbf U_h^k=\mathbf V\mathbf x^k.
+\]</span> Multiplying by <span class="math inline">\(\mathbf
+V^\top\mathbf C\)</span> recovers its coefficients: <span
+class="math display">\[
+\mathbf x^k=\mathbf V^\top\mathbf C\mathbf U_h^k.
+\]</span> Also, the generalized eigenvalue equation gives <span
+class="math display">\[
+\mathbf B\mathbf V=\mathbf V\boldsymbol\Lambda
+\quad\Longrightarrow\quad
+\mathbf B^\beta\mathbf V=\mathbf V\boldsymbol\Lambda^\beta.
+\]</span> Substitute <span class="math inline">\(\mathbf U_h^k=\mathbf
+V\mathbf x^k\)</span> into backward Euler: <span class="math display">\[
+\mathbf C\mathbf V\frac{\mathbf x^{k+1}-\mathbf x^k}{\tau}
++\nu\mathbf C\mathbf V\boldsymbol\Lambda^\beta\mathbf x^{k+1}
+=\mathbf F^{k+1}.
+\]</span> Now multiply on the left by <span
+class="math inline">\(\mathbf V^\top\)</span>. Since <span
+class="math inline">\(\mathbf V^\top\mathbf C\mathbf V=\mathbf
+I\)</span>, this becomes <span class="math display">\[
+\frac{\mathbf x^{k+1}-\mathbf x^k}{\tau}
++\nu\boldsymbol\Lambda^\beta\mathbf x^{k+1}
+=\mathbf V^\top\mathbf F^{k+1}.
+\]</span> Rearranging gives <span class="math display">\[
+\mathbf x^{k+1}
+=(\mathbf I+\tau\nu\boldsymbol\Lambda^\beta)^{-1}
+\left(\mathbf x^k+\tau\mathbf V^\top\mathbf F^{k+1}\right).
+\]</span> The inverse is diagonal, so each coefficient is updated
+independently: <span class="math display">\[
+x_j^{k+1}
+=\frac{x_j^k+\tau(\mathbf V^\top\mathbf F^{k+1})_j}
+{1+\tau\nu\lambda_{j,h}^\beta}.
+\]</span> Finally, substitute <span class="math inline">\(\mathbf
+x^k=\mathbf V^\top\mathbf C\mathbf U_h^k\)</span> and reconstruct <span
+class="math inline">\(\mathbf U_h^{k+1}=\mathbf V\mathbf
+x^{k+1}\)</span>: <span class="math display">\[
+\boxed{
+\mathbf U_h^{k+1}
+=\mathbf V(\mathbf I+\tau\nu\boldsymbol\Lambda^\beta)^{-1}
+\mathbf V^\top(\mathbf C\mathbf U_h^k+\tau\mathbf F^{k+1}).
+}
+\]</span></p>
+<p>In <code>isolated_exact_be_reference()</code> below,
+<code>rates</code> contains <span
+class="math inline">\(\nu\lambda_{j,h}^\beta\)</span>, <code>mu</code>
+contains <span
+class="math inline">\((1+\tau\nu\lambda_{j,h}^\beta)^{-1}\)</span>, and
+<code>y</code> contains the current modal coefficients. For the
+separable load, <code>f * g[k + 1L]</code> is <span
+class="math inline">\(\mathbf V^\top\mathbf F^{k+1}\)</span>. The update
+<code>y &lt;- mu * (y + dt * f * g[k + 1L])</code> therefore implements
+the scalar formula for every mode, and <code>V %*% y</code> reconstructs
+the FEM coefficients. The rough reference uses the same update with
+constant forcing and zero initial data. Every numerical eigenmode is
+retained. Here “exact” refers to the discrete fractional power, up to
+eigendecomposition and arithmetic errors; the reference still uses
+backward Euler in time.</p>
 <pre class="r"><code>isolated_discrete_spectrum &lt;- function(C, L, max_dimension = 1200L, max_dense_mib = 1024, residual_tolerance = 1e-08,
     orthogonality_tolerance = 1e-10) {
     n &lt;- nrow(C)
@@ -2418,6 +2494,7 @@ isolated_rational_error &lt;- function(data,spectrum,reference,m,excitation_tole
         beta_exact_in_package_table = bracket$exact, beta_table_lower = bracket$lower, beta_table_upper = bracket$upper, elapsed_seconds = proc.time()[[&quot;elapsed&quot;]] -
             started)
 }</code></pre>
+</div>
 </div>
 <div id="rough-data-assembly-and-individual-matrix-solves"
 class="section level2">
