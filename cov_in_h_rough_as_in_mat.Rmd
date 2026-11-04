@@ -32,7 +32,7 @@ stopifnot(identical(r$coefficient_source,"rSPDE BRASIL"),
 ## The experiment
 
 This notebook applies the reference-mesh workflow of `cov_in_h_mat.Rmd`
-to the infinite rough forcing of `conv_in_h_rough.Rmd`. On the tadpole with
+to infinite rough forcing. On the tadpole with
 stem length 1 and loop length 2,
 $$
 u_t+\nu L^{\alpha/2}u=g,\qquad u(0)=0,\qquad
@@ -330,5 +330,4 @@ notebook's direct and compressed routines and with full-graph mass integration.
 
 The selected parameters keep those discrepancies below the documented
 diagnostic thresholds. They do not turn the sampled norm into an exact
-continuum norm. The original `conv_in_h_rough.Rmd` remains the alternative
-that accounts directly for the infinite tail and time-integrated error.
+continuum norm.

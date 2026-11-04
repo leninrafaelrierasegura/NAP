@@ -45,38 +45,21 @@ for(alpha in c(.5,2/3,1.9,2)) {
   }
 }
 
-# Preserved saved settings and errors are checked before any reproduction.
-h <- readRDS('data_files/rough_h_results.rds')
-t <- readRDS('data_files/rough_tau_results.rds')
+# Check the saved results retained for publication.
+h <- readRDS('data_files/rough_h_as_in_mat_results.rds')
 iso <- readRDS('data_files/isolated_m_results.rds')
-stopifnot(nrow(iso$results)==112L,all(h$parameters$alpha==t$parameters$alpha))
-# Reproduce a cheap original spatial case using the embedded matrix kernel.
-e$rough_compile_solver()
-J <- h$parameters$J[1]; alpha <- h$parameters$alpha[1]
-mesh <- e$rough_mesh(J)
-value <- e$rough_solve(mesh,alpha,h$parameters$time_steps[1],order=h$parameters$rational_order)
-stopifnot(abs(value$error/h$errors[1,1]-1)<1e-9)
-# Full and invariant-subspace matrix evolution must agree.
-full <- e$rough_solve(mesh,alpha,.1,order=4L,symmetry_reduction=FALSE,return_states=TRUE)
-reduced <- e$rough_solve(mesh,alpha,.1,order=4L,return_states=TRUE)
-stopifnot(abs(full$error-reduced$error)<1e-11)
-# Quarter-loop temporal solver uses the same shifted matrix update.
-quarter <- e$rough_tau_mesh(J)
-projection <- e$rough_tau_projection(quarter)
-value <- e$rough_tau_solve(quarter,alpha,10L,4L,1,return_states=TRUE)
-op <- e$rough_operator(quarter,alpha,.1,4L,1)
-u <- rep(0,nrow(quarter$C))
-for(k in 1:10) {
-  u <- e$rough_matrix_step(op,as.numeric(quarter$C%*%u+.1*quarter$load))
-  stopifnot(max(abs(u-value$states[,k+1L]))<1e-11)
-}
+stopifnot(nrow(iso$results)==iso$parameters$m_max*length(iso$parameters$alpha_vector),
+  identical(h$parameters$study,"rough_h_sampled_reference"),
+  identical(dim(h$errors),c(length(h$parameters$J),length(h$parameters$alpha))),
+  all(is.finite(h$errors)),all(h$errors>0),
+  all(h$max_tail_squared_fraction<=h$parameters$max_tail_squared_fraction))
 # P1 interpolation maps reproduce nodal values and constants.
 graph <- e$gets.graph.tadpole(.1);graph$compute_fem()
 if(!'edges'%in%names(formals(MetricGraph::metric_graph$public_methods$initialize))) {
   B <- graph$fem_basis(graph$get_mesh_locations())
   stopifnot(max(abs(B-Matrix::Diagonal(nrow(B))))<1e-13)
 }
-cat('Time histories, preserved parameters, rough baseline and symmetry checks pass.\n')
+cat('Time histories, saved publication results and interpolation checks pass.\n')
 
 # Exercise the actual notebook chunks with edited settings. All output paths are
 # redirected to a temporary directory; committed results must stay byte-identical.
@@ -129,16 +112,13 @@ stopifnot(x$result$parameters$h==.25,x$result$parameters$tau==.05,
   x$result$parameters$m_max==2L,x$result$parameters$T_final==.1,
   x$result$parameters$AAA==.7,x$result$parameters$OMEGA==2,
   identical(dim(x$result$errors),c(2L,2L)),max(x$result$results$absolute_error_disagreement)<1e-10)
-x <- manual_run("conv_in_h_rough.Rmd",list(alpha_vector=c(.5,.9),J_vector=3:4,
+x <- manual_run("cov_in_h_rough_as_in_mat.Rmd",list(alpha_vector=c(.5,.9),J_vector=3:4,
   time_steps=c(.05,.025),m_fixed=2L,diffusion=.2,T_final=.1,kappa=3,fit_J=3:4,
-  projection_quadrature=8L,tail_tolerance=1e-8),"rough-h")
-stopifnot(identical(x$result$parameters$J,3:4),x$result$parameters$rational_order==2L,
+  reference_cutoff=10L,reference_J=12L,reference_time_step=.0125,
+  max_tail_squared_fraction=1),"rough-h-sampled")
+stopifnot(identical(x$result$parameters$J,3:4),x$result$parameters$m==2L,
   x$result$parameters$T_final==.1,x$result$parameters$diffusion==.2,
-  identical(dim(x$result$errors),c(2L,2L)))
-x <- manual_run("conv_in_tau_rough.Rmd",list(alpha_vector=c(.5,.9),J_vector=c(4L,5L),
-  N_vector=c(2L,4L),m_fixed=c(2L,2L),diffusion=c(.2,.3),T_final=.1,kappa=3,
-  fit_indices=1:2,projection_quadrature=8L,tail_tolerance=1e-8),"rough-tau")
-stopifnot(identical(x$result$parameters$N,c(2L,4L)),identical(x$result$parameters$diffusion,c(.2,.3)),
-  identical(x$result$tau,c(.05,.025)),identical(dim(x$result$errors),c(2L,2L)),
+  x$result$parameters$reference_cutoff==10L,x$result$parameters$reference_J==12L,
+  identical(dim(x$result$errors),c(2L,2L)),
   identical(original_hashes,tools::md5sum(original_files)))
-cat("All five actual notebook workflows honor edited parameters and save data/figures; committed results unchanged.\n")
+cat("All four actual notebook workflows honor edited parameters and save data/figures; committed results unchanged.\n")
