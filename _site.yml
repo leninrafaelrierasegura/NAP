@@ -1,6 +1,6 @@
 name: "BRASIL matrix experiments"
 output_dir: "docs"
-exclude: ["README.md", "test_brasil.R", "keys.R", "notes", "renv", "purl_log.txt", "NAP.Rproj"]
+exclude: ["brasilfunc.R", "README.md", "test_brasil.R", "keys.R", "notes", "renv", "purl_log.txt", "NAP.Rproj"]
 navbar:
   title: "BRASIL"
   left:

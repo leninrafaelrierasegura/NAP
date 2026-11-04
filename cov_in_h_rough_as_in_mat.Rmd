@@ -12,21 +12,24 @@ output:
 
 [Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
-Knit displays the saved selected results. To recompute, edit **Parameters
-for the next run**, then run setup, parameters, and recompute manually in
-that order. Parameters and recompute have `eval=FALSE`. Recompute overwrites
-only this experiment's results and figures.
+Knit loads the saved results and redraws the plots. The heavy computation
+chunk has `eval=FALSE` and runs only when you execute it manually.
+Run the chunks from top to bottom to generate new results. Keep the parameters
+below consistent with the errors you load.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(engine="R",message=FALSE,warning=FALSE,error=FALSE,cache=FALSE)
-helper <- tempfile(fileext=".R")
-knitr::purl("brasilfunc.Rmd",output=helper,quiet=TRUE)
-sys.source(helper,envir=environment())
-unlink(helper)
-r <- readRDS("data_files/rough_h_as_in_mat_results.rds")
-p <- r$parameters
-stopifnot(identical(r$coefficient_source,"rSPDE BRASIL"),
-          identical(p$study,"rough_h_sampled_reference"))
+```{r setup}
+# Initialize the R engine before purl() for interactive sessions.
+knitr::opts_chunk$set(engine="R")
+knitr::purl("brasilfunc.Rmd", output="brasilfunc.R", quiet=TRUE)
+source("brasilfunc.R")
+```
+
+```{r chunk-options}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
 ```
 
 ## The experiment
@@ -127,9 +130,9 @@ requires `reference_J >= reference_cutoff + 2`, giving at least eight
 elements per shortest wavelength. This prevents the cutoff modes from
 vanishing or aliasing on an inadequately resolved dyadic reference mesh.
 
-## Parameters for the next run
+## Parameters
 
-```{r parameters, eval=FALSE}
+```{r parameters}
 T_final <- 1
 kappa <- 4
 diffusion <- 1
@@ -145,9 +148,10 @@ workers <- 1L
 max_tail_squared_fraction <- 0.002
 ```
 
+## Computation
+
 ```{r recompute, eval=FALSE}
 output_file <- "data_files/rough_h_as_in_mat_results.rds"
-figure_dir <- "data_files/rough_h_as_in_mat"
 stopifnot(length(alpha_vector)>0L,!anyDuplicated(alpha_vector),
     all(is.finite(alpha_vector)),all(alpha_vector>0 & alpha_vector<2),
     length(time_steps)==length(alpha_vector),all(is.finite(time_steps)),
@@ -227,6 +231,41 @@ result <- list(parameters=list(study="rough_h_sampled_reference",
     source_hashes=tools::md5sum(c("brasilfunc.Rmd","cov_in_h_rough_as_in_mat.Rmd")),
     generated_at=format(Sys.time(),"%Y-%m-%d %H:%M:%S %Z",tz="Asia/Riyadh"))
 
+dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
+saveRDS(result,output_file)
+```
+
+## Results
+
+```{r load-results}
+r <- readRDS("data_files/rough_h_as_in_mat_results.rds")
+errors <- r$errors
+corrected <- errors * J_vector
+axis <- 2^-J_vector
+fit <- which(J_vector %in% fit_J)
+slope <- function(e) unname(coef(lm(log10(e[fit]) ~ log10(axis[fit])))[2L])
+rates <- data.frame(alpha=alpha_vector, reference=alpha_vector,
+    raw=apply(errors, 2L, slope), corrected=apply(corrected, 2L, slope))
+figure_dir <- "data_files/rough_h_as_in_mat"
+```
+
+```{r settings}
+knitr::kable(data.frame(T=T_final, kappa=kappa, diffusion=diffusion, m=m_fixed,
+    cutoff=reference_cutoff, reference_J=reference_J,
+    reference_h=2^-reference_J, reference_tau=reference_time_step))
+knitr::kable(data.frame(alpha=alpha_vector,
+    tau=formatC(time_steps, format="e", digits=6),
+    omitted_squared_bound=formatC(r$cutoff_squared_bound, format="e", digits=6),
+    max_omitted_squared_fraction=formatC(r$max_tail_squared_fraction, format="e", digits=6)))
+```
+
+The solver meshes are $h=2^{-J}$ for
+$J\in$ `r paste(J_vector,collapse=", ")`. Each alpha uses a fixed rational order
+and time step along its spatial curve.
+
+## Convergence plots, axes, and reference curves
+
+```{r plot-results}
 dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
 for (use_correction in c(FALSE,TRUE)) {
     plotted <- if(use_correction) corrected else errors
@@ -259,34 +298,10 @@ for (use_correction in c(FALSE,TRUE)) {
         ggplot2::ggsave(file.path(figure_dir,paste0(name,".",extension)),plot,
             width=7,height=5,dpi=180,bg="white")
 }
-dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
-saveRDS(result,output_file)
-r <- result
-p <- r$parameters
 ```
 
-## Saved settings
-
-```{r common-settings, echo=FALSE}
-knitr::kable(data.frame(T=p$T_final,kappa=p$kappa,diffusion=p$diffusion,m=p$m,
-    cutoff=p$reference_cutoff,reference_J=p$reference_J,
-    reference_h=p$reference_h,reference_tau=p$reference_tau,
-    reference_nodes=p$reference_nodes))
-knitr::kable(data.frame(alpha=p$alpha,
-    tau=formatC(p$time_steps,format="e",digits=6),
-    omitted_squared_bound=formatC(r$cutoff_squared_bound,format="e",digits=6),
-    max_omitted_squared_fraction=formatC(r$max_tail_squared_fraction,format="e",digits=6)))
-```
-
-The solver meshes are $h=2^{-J}$ for
-$J\in$ `r paste(p$J,collapse=", ")`. Each alpha uses a fixed rational order
-and time step along its spatial curve. The same reference mesh, cutoff,
-and reference-time step are used throughout the saved spatial study.
-
-## Convergence plots, axes, and reference curves
-
-```{r raw-figure, echo=FALSE, out.width="800px"}
-knitr::include_graphics("data_files/rough_h_as_in_mat/raw.png")
+```{r raw-figure, fig.width=7, fig.height=5, out.width="800px"}
+knitr::include_graphics(file.path(figure_dir, "raw.png"))
 ```
 
 Both axes use base-10 logarithmic scales, with ticks labelled by h and
@@ -294,27 +309,27 @@ the error itself. Solid lines and markers show the sampled errors.
 Dashed curves are $C_\alpha h^\alpha/J$, not $C h^2$:
 changing the error-evaluation workflow does not make the rough data smooth.
 The constants are geometric means of $E_h/(h^\alpha/J)$ over
-$J\in$ `r paste(p$fit_J,collapse=", ")`; the rate model is prescribed.
+$J\in$ `r paste(fit_J,collapse=", ")`; the rate model is prescribed.
 
-```{r corrected-figure, echo=FALSE, out.width="800px"}
-knitr::include_graphics("data_files/rough_h_as_in_mat/corrected.png")
+```{r corrected-figure, fig.width=7, fig.height=5, out.width="800px"}
+knitr::include_graphics(file.path(figure_dir, "corrected.png"))
 ```
 
 The second plot has the same h axis and uses $J E_h$ on the logarithmic
 vertical axis. Its dashed lines are $C_\alpha h^\alpha$. Multiplying by
 $J=\log_2(1/h)$ removes the model's leading logarithmic factor.
 Regressions freely estimate slopes of $\log_{10}E_h$ and
-$\log_{10}(J E_h)$ against $\log_{10}h$ on the saved fit meshes.
+$\log_{10}(J E_h)$ against $\log_{10}h$ on the fit meshes.
 The dashed curves are comparison guides, not certified upper bounds.
 
-```{r rates, echo=FALSE}
-knitr::kable(r$rates,digits=6)
+```{r rates}
+knitr::kable(rates, digits=6)
 ```
 
-```{r errors, echo=FALSE}
-knitr::kable(data.frame(h=p$h,r$errors,check.names=FALSE),
-    col.names=c("h",paste0("alpha=",p$alpha)),
-    format.args=list(scientific=TRUE,digits=6))
+```{r errors}
+knitr::kable(data.frame(h=axis, errors, check.names=FALSE),
+    col.names=c("h", paste0("alpha=", alpha_vector)),
+    format.args=list(scientific=TRUE, digits=6))
 ```
 
 ## What was checked before selecting these parameters

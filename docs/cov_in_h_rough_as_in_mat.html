@@ -357,11 +357,18 @@ sampled reference mesh</h1>
 
 <p><a href="index.html">Experiments</a> · <a
 href="brasilfunc.html">Theory and functions</a></p>
-<p>Knit displays the saved selected results. To recompute, edit
-<strong>Parameters for the next run</strong>, then run setup,
-parameters, and recompute manually in that order. Parameters and
-recompute have <code>eval=FALSE</code>. Recompute overwrites only this
-experiment’s results and figures.</p>
+<p>Knit loads the saved results and redraws the plots. The heavy
+computation chunk has <code>eval=FALSE</code> and runs only when you
+execute it manually. Run the chunks from top to bottom to generate new
+results. Keep the parameters below consistent with the errors you
+load.</p>
+<pre class="r"><code># Initialize the R engine before purl() for interactive sessions.
+knitr::opts_chunk$set(engine=&quot;R&quot;)
+knitr::purl(&quot;brasilfunc.Rmd&quot;, output=&quot;brasilfunc.R&quot;, quiet=TRUE)</code></pre>
+<pre><code>## [1] &quot;brasilfunc.R&quot;</code></pre>
+<pre class="r"><code>source(&quot;brasilfunc.R&quot;)</code></pre>
+<pre class="r"><code>knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)</code></pre>
+<pre class="r"><code>library(ggplot2)</code></pre>
 <div id="the-experiment" class="section level2">
 <h2>The experiment</h2>
 <p>This notebook applies the reference-mesh workflow of
@@ -465,8 +472,8 @@ the cutoff modes from vanishing or aliasing on an inadequately resolved
 dyadic reference mesh.</p>
 </div>
 </div>
-<div id="parameters-for-the-next-run" class="section level2">
-<h2>Parameters for the next run</h2>
+<div id="parameters" class="section level2">
+<h2>Parameters</h2>
 <pre class="r"><code>T_final &lt;- 1
 kappa &lt;- 4
 diffusion &lt;- 1
@@ -480,8 +487,10 @@ reference_time_step &lt;- 1e-5
 fit_J &lt;- 7:9
 workers &lt;- 1L
 max_tail_squared_fraction &lt;- 0.002</code></pre>
+</div>
+<div id="computation" class="section level2">
+<h2>Computation</h2>
 <pre class="r"><code>output_file &lt;- &quot;data_files/rough_h_as_in_mat_results.rds&quot;
-figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;
 stopifnot(length(alpha_vector)&gt;0L,!anyDuplicated(alpha_vector),
     all(is.finite(alpha_vector)),all(alpha_vector&gt;0 &amp; alpha_vector&lt;2),
     length(time_steps)==length(alpha_vector),all(is.finite(time_steps)),
@@ -561,56 +570,33 @@ result &lt;- list(parameters=list(study=&quot;rough_h_sampled_reference&quot;,
     source_hashes=tools::md5sum(c(&quot;brasilfunc.Rmd&quot;,&quot;cov_in_h_rough_as_in_mat.Rmd&quot;)),
     generated_at=format(Sys.time(),&quot;%Y-%m-%d %H:%M:%S %Z&quot;,tz=&quot;Asia/Riyadh&quot;))
 
-dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
-for (use_correction in c(FALSE,TRUE)) {
-    plotted &lt;- if(use_correction) corrected else errors
-    frame &lt;- expand.grid(row=seq_along(axis),column=seq_along(alpha_vector))
-    frame$h &lt;- axis[frame$row]
-    frame$error &lt;- as.vector(plotted)
-    frame$alpha &lt;- factor(alpha_vector[frame$column],levels=alpha_vector)
-    guide &lt;- frame
-    for(a in seq_along(alpha_vector)) {
-        model &lt;- axis^alpha_vector[a]
-        if(!use_correction) model &lt;- model/J_vector
-        constant &lt;- exp(mean(log(plotted[fit,a]/model[fit])))
-        guide$error[guide$column==a] &lt;- constant*model
-    }
-    plot &lt;- ggplot2::ggplot(frame,ggplot2::aes(h,error,color=alpha,group=alpha)) +
-        ggplot2::geom_line(data=guide,linetype=&quot;dashed&quot;) +
-        ggplot2::geom_line()+ggplot2::geom_point() +
-        ggplot2::scale_x_log10(breaks=axis,
-            labels=function(x) paste0(&quot;1/&quot;,round(1/x)))+
-        ggplot2::scale_y_log10()+
-        ggplot2::scale_color_viridis_d()+
-        ggplot2::labs(x=&quot;h (log scale)&quot;,
-          y=if(use_correction) &quot;J times sampled space-time L2 error&quot; else
-            &quot;Sampled space-time L2 error&quot;,color=&quot;alpha&quot;,
-          title=if(use_correction) &quot;Rough forcing: logarithmic correction&quot; else
-            &quot;Rough forcing: sampled reference mesh&quot;)+
-        ggplot2::theme_bw()+ggplot2::theme(legend.position=&quot;bottom&quot;)
-    name &lt;- if(use_correction) &quot;corrected&quot; else &quot;raw&quot;
-    for(extension in c(&quot;png&quot;,&quot;pdf&quot;))
-        ggplot2::ggsave(file.path(figure_dir,paste0(name,&quot;.&quot;,extension)),plot,
-            width=7,height=5,dpi=180,bg=&quot;white&quot;)
-}
 dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
-saveRDS(result,output_file)
-r &lt;- result
-p &lt;- r$parameters</code></pre>
+saveRDS(result,output_file)</code></pre>
 </div>
-<div id="saved-settings" class="section level2">
-<h2>Saved settings</h2>
+<div id="results" class="section level2">
+<h2>Results</h2>
+<pre class="r"><code>r &lt;- readRDS(&quot;data_files/rough_h_as_in_mat_results.rds&quot;)
+errors &lt;- r$errors
+corrected &lt;- errors * J_vector
+axis &lt;- 2^-J_vector
+fit &lt;- which(J_vector %in% fit_J)
+slope &lt;- function(e) unname(coef(lm(log10(e[fit]) ~ log10(axis[fit])))[2L])
+rates &lt;- data.frame(alpha=alpha_vector, reference=alpha_vector,
+    raw=apply(errors, 2L, slope), corrected=apply(corrected, 2L, slope))
+figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
+<pre class="r"><code>knitr::kable(data.frame(T=T_final, kappa=kappa, diffusion=diffusion, m=m_fixed,
+    cutoff=reference_cutoff, reference_J=reference_J,
+    reference_h=2^-reference_J, reference_tau=reference_time_step))</code></pre>
 <table>
 <colgroup>
-<col width="3%" />
-<col width="7%" />
-<col width="12%" />
-<col width="3%" />
+<col width="4%" />
 <col width="8%" />
 <col width="14%" />
-<col width="14%" />
-<col width="16%" />
-<col width="19%" />
+<col width="4%" />
+<col width="10%" />
+<col width="17%" />
+<col width="17%" />
+<col width="20%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -622,7 +608,6 @@ p &lt;- r$parameters</code></pre>
 <th align="right">reference_J</th>
 <th align="right">reference_h</th>
 <th align="right">reference_tau</th>
-<th align="right">reference_nodes</th>
 </tr>
 </thead>
 <tbody>
@@ -635,10 +620,13 @@ p &lt;- r$parameters</code></pre>
 <td align="right">18</td>
 <td align="right">3.8e-06</td>
 <td align="right">1e-05</td>
-<td align="right">131071</td>
 </tr>
 </tbody>
 </table>
+<pre class="r"><code>knitr::kable(data.frame(alpha=alpha_vector,
+    tau=formatC(time_steps, format=&quot;e&quot;, digits=6),
+    omitted_squared_bound=formatC(r$cutoff_squared_bound, format=&quot;e&quot;, digits=6),
+    max_omitted_squared_fraction=formatC(r$max_tail_squared_fraction, format=&quot;e&quot;, digits=6)))</code></pre>
 <table>
 <colgroup>
 <col width="8%" />
@@ -707,13 +695,44 @@ p &lt;- r$parameters</code></pre>
 </table>
 <p>The solver meshes are <span class="math inline">\(h=2^{-J}\)</span>
 for <span class="math inline">\(J\in\)</span> 5, 6, 7, 8, 9. Each alpha
-uses a fixed rational order and time step along its spatial curve. The
-same reference mesh, cutoff, and reference-time step are used throughout
-the saved spatial study.</p>
+uses a fixed rational order and time step along its spatial curve.</p>
 </div>
 <div id="convergence-plots-axes-and-reference-curves"
 class="section level2">
 <h2>Convergence plots, axes, and reference curves</h2>
+<pre class="r"><code>dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
+for (use_correction in c(FALSE,TRUE)) {
+    plotted &lt;- if(use_correction) corrected else errors
+    frame &lt;- expand.grid(row=seq_along(axis),column=seq_along(alpha_vector))
+    frame$h &lt;- axis[frame$row]
+    frame$error &lt;- as.vector(plotted)
+    frame$alpha &lt;- factor(alpha_vector[frame$column],levels=alpha_vector)
+    guide &lt;- frame
+    for(a in seq_along(alpha_vector)) {
+        model &lt;- axis^alpha_vector[a]
+        if(!use_correction) model &lt;- model/J_vector
+        constant &lt;- exp(mean(log(plotted[fit,a]/model[fit])))
+        guide$error[guide$column==a] &lt;- constant*model
+    }
+    plot &lt;- ggplot2::ggplot(frame,ggplot2::aes(h,error,color=alpha,group=alpha)) +
+        ggplot2::geom_line(data=guide,linetype=&quot;dashed&quot;) +
+        ggplot2::geom_line()+ggplot2::geom_point() +
+        ggplot2::scale_x_log10(breaks=axis,
+            labels=function(x) paste0(&quot;1/&quot;,round(1/x)))+
+        ggplot2::scale_y_log10()+
+        ggplot2::scale_color_viridis_d()+
+        ggplot2::labs(x=&quot;h (log scale)&quot;,
+          y=if(use_correction) &quot;J times sampled space-time L2 error&quot; else
+            &quot;Sampled space-time L2 error&quot;,color=&quot;alpha&quot;,
+          title=if(use_correction) &quot;Rough forcing: logarithmic correction&quot; else
+            &quot;Rough forcing: sampled reference mesh&quot;)+
+        ggplot2::theme_bw()+ggplot2::theme(legend.position=&quot;bottom&quot;)
+    name &lt;- if(use_correction) &quot;corrected&quot; else &quot;raw&quot;
+    for(extension in c(&quot;png&quot;,&quot;pdf&quot;))
+        ggplot2::ggsave(file.path(figure_dir,paste0(name,&quot;.&quot;,extension)),plot,
+            width=7,height=5,dpi=180,bg=&quot;white&quot;)
+}</code></pre>
+<pre class="r"><code>knitr::include_graphics(file.path(figure_dir, &quot;raw.png&quot;))</code></pre>
 <p><img src="data_files/rough_h_as_in_mat/raw.png" alt="" width="800px" /></p>
 <p>Both axes use base-10 logarithmic scales, with ticks labelled by h
 and the error itself. Solid lines and markers show the sampled errors.
@@ -724,6 +743,7 @@ smooth. The constants are geometric means of <span
 class="math inline">\(E_h/(h^\alpha/J)\)</span> over <span
 class="math inline">\(J\in\)</span> 7, 8, 9; the rate model is
 prescribed.</p>
+<pre class="r"><code>knitr::include_graphics(file.path(figure_dir, &quot;corrected.png&quot;))</code></pre>
 <p><img src="data_files/rough_h_as_in_mat/corrected.png" alt="" width="800px" /></p>
 <p>The second plot has the same h axis and uses <span
 class="math inline">\(J E_h\)</span> on the logarithmic vertical axis.
@@ -733,8 +753,9 @@ class="math inline">\(J=\log_2(1/h)\)</span> removes the model’s leading
 logarithmic factor. Regressions freely estimate slopes of <span
 class="math inline">\(\log_{10}E_h\)</span> and <span
 class="math inline">\(\log_{10}(J E_h)\)</span> against <span
-class="math inline">\(\log_{10}h\)</span> on the saved fit meshes. The
-dashed curves are comparison guides, not certified upper bounds.</p>
+class="math inline">\(\log_{10}h\)</span> on the fit meshes. The dashed
+curves are comparison guides, not certified upper bounds.</p>
+<pre class="r"><code>knitr::kable(rates, digits=6)</code></pre>
 <table>
 <thead>
 <tr class="header">
@@ -795,6 +816,9 @@ dashed curves are comparison guides, not certified upper bounds.</p>
 </tr>
 </tbody>
 </table>
+<pre class="r"><code>knitr::kable(data.frame(h=axis, errors, check.names=FALSE),
+    col.names=c(&quot;h&quot;, paste0(&quot;alpha=&quot;, alpha_vector)),
+    format.args=list(scientific=TRUE, digits=6))</code></pre>
 <table style="width:100%;">
 <colgroup>
 <col width="11%" />

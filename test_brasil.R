@@ -100,20 +100,28 @@ chunk_code <- function(file,label) {
 manual_run <- function(file,changes,kind) {
   output <- tempfile("brasil-workflow-");dir.create(output)
   env <- new.env(parent=e)
+  eval(parse(text=chunk_code(file,"libraries")),env)
   eval(parse(text=chunk_code(file,"parameters")),env)
   for(name in names(changes))assign(name,changes[[name]],env)
-  # Evaluate the actual visible notebook code; only route its literal paths
-  # into a temporary directory. No experiment runner is substituted.
+  # Run the actual computation, load, and plotting chunks. Redirect their output
+  # paths so checks never overwrite committed experiment results or figures.
   stopifnot(any(grepl("^```\\{r recompute, eval=FALSE}",readLines(file,warn=FALSE))))
-  code <- chunk_code(file,"recompute")
-  code <- gsub('"data_files/',paste0('"',output,'/data_files/'),code,fixed=TRUE)
-  eval(parse(text=code),env)
-  stopifnot(file.exists(env$output_file),
-    length(list.files(output,pattern="\\.png$",recursive=TRUE))>=1L)
+  run_chunk <- function(label) {
+    code <- gsub('"data_files/',paste0('"',output,'/data_files/'),chunk_code(file,label),fixed=TRUE)
+    eval(parse(text=code),env)
+  }
+  run_chunk("recompute")
+  stopifnot(file.exists(env$output_file))
   if(grepl("smooth",kind)) {
     saved <- new.env();load(env$output_file,saved)
     result <- list(parameters=attr(saved$errors_projected,"parameters"),errors=saved$errors_projected)
   } else result <- readRDS(env$output_file)
+  lines <- readLines(file,warn=FALSE)
+  first <- grep("^```\\{r load-results[,}]",lines)
+  headers <- grep("^```\\{r ",lines)
+  labels <- sub("^```\\{r ([^,}]+).*","\\1",lines[headers[headers>=first]])
+  for(label in labels)run_chunk(label)
+  stopifnot(length(list.files(output,pattern="\\.png$",recursive=TRUE))>=1L)
   list(result=result,environment=env)
 }
 original_files <- list.files("data_files",recursive=TRUE,full.names=TRUE)
@@ -148,4 +156,4 @@ stopifnot(identical(x$result$parameters$J,3:4),x$result$parameters$m==2L,
   x$result$parameters$reference_cutoff==10L,x$result$parameters$reference_J==12L,
   identical(dim(x$result$errors),c(2L,2L)),
   identical(original_hashes,tools::md5sum(original_files)))
-cat("All four actual notebook workflows honor edited parameters and save data/figures; committed results unchanged.\n")
+cat("All four notebook workflows compute, load, and plot with edited parameters; committed results unchanged.\n")

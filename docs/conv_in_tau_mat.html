@@ -356,14 +356,18 @@ div.tocify {
 
 <p><a href="index.html">Experiments</a> · <a
 href="brasilfunc.html">Theory and functions</a></p>
-<p>Knit displays the saved results. To run a new experiment, edit the
-<strong>Parameters for the next run</strong> chunk, then run the setup,
-parameters, and recompute chunks manually in that order. The computation
-loops, error calculations, plotting, and saving steps are written
-directly below. The recompute chunk overwrites the saved results and
-figures. Knit again to display them. Parameter and recompute chunks are
-skipped when knitting; the displayed settings always describe the saved
-results.</p>
+<p>Knit loads the saved results and redraws the plots. The heavy
+computation chunk has <code>eval=FALSE</code> and runs only when you
+execute it manually. Run the chunks from top to bottom to generate new
+results. Keep the parameters below consistent with the errors you
+load.</p>
+<pre class="r"><code># Initialize the R engine before purl() for interactive sessions.
+knitr::opts_chunk$set(engine=&quot;R&quot;)
+knitr::purl(&quot;brasilfunc.Rmd&quot;, output=&quot;brasilfunc.R&quot;, quiet=TRUE)</code></pre>
+<pre><code>## [1] &quot;brasilfunc.R&quot;</code></pre>
+<pre class="r"><code>source(&quot;brasilfunc.R&quot;)</code></pre>
+<pre class="r"><code>knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)</code></pre>
+<pre class="r"><code>library(ggplot2)</code></pre>
 <div id="problem-and-matrix-method" class="section level2">
 <h2>Problem and matrix method</h2>
 <p>On the tadpole with stem length 1 and loop length 2, solve <span
@@ -385,8 +389,8 @@ evaluated on the saved reference mesh and time grid. Centered
 coefficient moments accumulate this norm without changing the FEM time
 evolution. The reference modes evaluate the continuum solution only.</p>
 </div>
-<div id="parameters-for-the-next-run" class="section level2">
-<h2>Parameters for the next run</h2>
+<div id="parameters" class="section level2">
+<h2>Parameters</h2>
 <pre class="r"><code>T_final &lt;- 1
 kappa &lt;- 4
 diffusion &lt;- 1e-3
@@ -403,9 +407,11 @@ AAA &lt;- 1
 OMEGA &lt;- pi
 workers &lt;- 1L
 error_verbose &lt;- FALSE</code></pre>
+</div>
+<div id="computation" class="section level2">
+<h2>Computation</h2>
 <pre class="r"><code># Saved files overwritten by this computation.
 output_file &lt;- &quot;data_files/errors_projected_tau_mat.RData&quot;
-figure_file &lt;- &quot;data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png&quot;
 
 # Assemble FEM matrices and advance every backward Euler step.
 stopifnot(N_finite &gt;= 4, N_finite%%2 == 0, length(alpha_vector) &gt; 0, all(is.finite(alpha_vector)),
@@ -449,7 +455,6 @@ exact_initial &lt;- coeff_U_0[active_modes]
 exact_forcing &lt;- coeff_FF[active_modes]
 spatial_load &lt;- coeff_FF[7] * assemble_e7_load_tadpole(graph)
 error_projection &lt;- prepare_reference_error(Psi, overkill_C, exact_basis)
-m_values &lt;- c()
 # Loop over the refinement values and fractional exponents.
 errors_projected &lt;- matrix(NA_real_, length(tau_vector), length(alpha_vector))
 for (j in seq_along(alpha_vector)) {
@@ -479,9 +484,14 @@ attr(errors_projected, &quot;parameters&quot;) &lt;- list(study = &quot;tau&quot
     N_finite = N_finite, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
     AAA = AAA, OMEGA = OMEGA, fixed = list(h = h_fixed))
 dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
-save(errors_projected, file = output_file)
-
-
+save(errors_projected, file = output_file)</code></pre>
+</div>
+<div id="results" class="section level2">
+<h2>Results</h2>
+<pre class="r"><code>load(&quot;data_files/errors_projected_tau_mat.RData&quot;)</code></pre>
+<p>The reference temporal rate is one; the spatial mesh and rational
+order remain fixed throughout each refinement curve.</p>
+<pre class="r"><code>figure_file &lt;- &quot;data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png&quot;
 # Fit reference guides, draw the curves, and overwrite the saved figure.
 errors &lt;- errors_projected
 axis &lt;- tau_vector
@@ -492,8 +502,7 @@ frame$x &lt;- axis[frame$row]
 frame$error &lt;- as.vector(errors)
 frame$alpha &lt;- factor(alpha[frame$column], levels = alpha)
 guide &lt;- frame
-rate &lt;- if (study == &quot;h&quot;)
-    2 else 1
+rate &lt;- 1
 for (j in seq_along(alpha)) {
     ids &lt;- frame$column == j
     constant &lt;- exp(mean(log(errors[, j]/axis^rate)))
@@ -504,58 +513,13 @@ plot &lt;- ggplot2::ggplot(frame, ggplot2::aes(x, error, color = alpha, group = 
     ggplot2::scale_y_log10() + ggplot2::labs(x = study, y = &quot;Space-time L2 error&quot;, color = &quot;alpha&quot;) +
     ggplot2::theme_bw() + ggplot2::theme(legend.position = &quot;bottom&quot;)
 dir.create(dirname(figure_file), recursive = TRUE, showWarnings = FALSE)
-ggplot2::ggsave(figure_file, plot, width = 4, height = 5, dpi = 300, bg = &quot;white&quot;)</code></pre>
-</div>
-<div id="saved-parameters" class="section level2">
-<h2>Saved parameters</h2>
-<table>
-<thead>
-<tr class="header">
-<th align="right">T</th>
-<th align="right">kappa</th>
-<th align="right">diffusion</th>
-<th align="right">m</th>
-<th align="right">reference_h</th>
-<th align="right">reference_tau</th>
-<th align="right">fixed_h</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">1</td>
-<td align="right">4</td>
-<td align="right">0.001</td>
-<td align="right">8</td>
-<td align="right">1e-05</td>
-<td align="right">1e-05</td>
-<td align="right">0.001</td>
-</tr>
-</tbody>
-</table>
-<table>
-<thead>
-<tr class="header">
-<th align="right">initial_amplitude</th>
-<th align="right">forcing_amplitude</th>
-<th align="right">AAA</th>
-<th align="right">OMEGA</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">10</td>
-<td align="right">10</td>
-<td align="right">1</td>
-<td align="right">3.141593</td>
-</tr>
-</tbody>
-</table>
-<p>The reference temporal rate is one; the spatial mesh and rational
-order remain fixed throughout each refinement curve.</p>
-</div>
-<div id="saved-results" class="section level2">
-<h2>Saved results</h2>
+ggplot2::ggsave(figure_file, plot, width = 4, height = 5, dpi = 300, bg = &quot;white&quot;)
+
+knitr::include_graphics(figure_file)</code></pre>
 <p><img src="data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png" alt="" width="650px" /></p>
+<pre class="r"><code>observed &lt;- apply(errors_projected, 2, function(e)
+    unname(coef(lm(log10(e) ~ log10(tau_vector)))[2]))
+knitr::kable(data.frame(alpha=alpha_vector, reference=1, observed=observed), digits=5)</code></pre>
 <table>
 <thead>
 <tr class="header">
@@ -607,6 +571,9 @@ order remain fixed throughout each refinement curve.</p>
 </tr>
 </tbody>
 </table>
+<pre class="r"><code>knitr::kable(data.frame(tau=tau_vector, errors_projected, check.names=FALSE),
+    col.names=c(&quot;tau&quot;, paste(&quot;alpha =&quot;, alpha_vector)),
+    format.args=list(scientific=TRUE, digits=5))</code></pre>
 <table>
 <colgroup>
 <col width="10%" />

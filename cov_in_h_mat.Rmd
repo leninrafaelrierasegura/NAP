@@ -12,25 +12,24 @@ output:
 
 [Experiments](index.html) · [Theory and functions](brasilfunc.html)
 
-Knit displays the saved results. To run a new experiment, edit the **Parameters
-for the next run** chunk, then run the setup, parameters, and recompute chunks
-manually in that order. The computation loops, error calculations, plotting,
-and saving steps are written directly below. The recompute chunk overwrites the saved results and
-figures. Knit again to display them. Parameter and recompute chunks are skipped
-when knitting; the displayed settings always describe the saved results.
+Knit loads the saved results and redraws the plots. The heavy computation
+chunk has `eval=FALSE` and runs only when you execute it manually.
+Run the chunks from top to bottom to generate new results. Keep the parameters
+below consistent with the errors you load.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(message=FALSE,warning=FALSE,error=FALSE,cache=FALSE)
-helper <- tempfile(fileext = ".R")
-knitr::purl("brasilfunc.Rmd", output = helper, quiet = TRUE)
-sys.source(helper, envir = environment())
-unlink(helper)
-saved <- new.env()
-load("data_files/errors_projected_h_mat.RData", envir=saved)
-errors_projected <- saved$errors_projected
-p <- attr(errors_projected,"parameters")
-stopifnot(identical(attr(errors_projected,"coefficient_source"),"rSPDE BRASIL"),
-          identical(p$study,"h"))
+```{r setup}
+# Initialize the R engine before purl() for interactive sessions.
+knitr::opts_chunk$set(engine="R")
+knitr::purl("brasilfunc.Rmd", output="brasilfunc.R", quiet=TRUE)
+source("brasilfunc.R")
+```
+
+```{r chunk-options}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)
+```
+
+```{r libraries}
+library(ggplot2)
 ```
 
 ## Problem and matrix method
@@ -54,10 +53,9 @@ continuum solution, evaluated on the saved reference mesh and time grid.
 Centered coefficient moments accumulate this norm without changing the FEM
 time evolution. The reference modes evaluate the continuum solution only.
 
-## Parameters for the next run
+## Parameters
 
-
-```{r parameters, eval=FALSE}
+```{r parameters}
 T_final <- 1
 kappa <- 4
 diffusion <- 1e-3
@@ -76,10 +74,11 @@ workers <- 1L
 error_verbose <- FALSE
 ```
 
+## Computation
+
 ```{r recompute, eval=FALSE}
 # Saved files overwritten by this computation.
 output_file <- "data_files/errors_projected_h_mat.RData"
-figure_file <- "data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png"
 
 # Assemble FEM matrices and advance every backward Euler step.
 stopifnot(N_finite >= 4, N_finite%%2 == 0, length(alpha_vector) > 0, all(is.finite(alpha_vector)),
@@ -111,7 +110,6 @@ active_modes <- which(coeff_U_0 != 0 | coeff_FF != 0)
 exact_basis <- auxE[, active_modes, drop = FALSE]
 exact_initial <- coeff_U_0[active_modes]
 exact_forcing <- coeff_FF[active_modes]
-m_values <- c()
 # Loop over the refinement values and fractional exponents.
 errors_projected <- matrix(NA_real_, length(h_vector), length(alpha_vector))
 for (i in seq_along(h_vector)) {
@@ -146,8 +144,19 @@ attr(errors_projected, "parameters") <- list(study = "h", axis = h_vector, alpha
     AAA = AAA, OMEGA = OMEGA, fixed = list(tau = time_step))
 dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
 save(errors_projected, file = output_file)
+```
 
+## Results
 
+```{r load-results}
+load("data_files/errors_projected_h_mat.RData")
+```
+
+For smooth finite-mode data, the spatial reference slope is two. Temporal
+and rational error floors can mask this rate.
+
+```{r plot-results, fig.width=4, fig.height=5, out.width="650px"}
+figure_file <- "data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png"
 # Fit reference guides, draw the curves, and overwrite the saved figure.
 errors <- errors_projected
 axis <- h_vector
@@ -158,8 +167,7 @@ frame$x <- axis[frame$row]
 frame$error <- as.vector(errors)
 frame$alpha <- factor(alpha[frame$column], levels = alpha)
 guide <- frame
-rate <- if (study == "h")
-    2 else 1
+rate <- 2
 for (j in seq_along(alpha)) {
     ids <- frame$column == j
     constant <- exp(mean(log(errors[, j]/axis^rate)))
@@ -171,47 +179,18 @@ plot <- ggplot2::ggplot(frame, ggplot2::aes(x, error, color = alpha, group = alp
     ggplot2::theme_bw() + ggplot2::theme(legend.position = "bottom")
 dir.create(dirname(figure_file), recursive = TRUE, showWarnings = FALSE)
 ggplot2::ggsave(figure_file, plot, width = 4, height = 5, dpi = 300, bg = "white")
+
+knitr::include_graphics(figure_file)
 ```
 
-## Saved parameters
-
-```{r load-results, include=FALSE}
-load("data_files/errors_projected_h_mat.RData", envir=saved)
-errors_projected <- saved$errors_projected
-p <- attr(errors_projected,"parameters")
+```{r rates}
+observed <- apply(errors_projected, 2, function(e)
+    unname(coef(lm(log10(e) ~ log10(h_vector)))[2]))
+knitr::kable(data.frame(alpha=alpha_vector, reference=2, observed=observed), digits=5)
 ```
 
-```{r saved-parameters, echo=FALSE}
-knitr::kable(data.frame(T=p$T,kappa=p$kappa,diffusion=p$diffusion,m=p$m,
-  reference_h=p$reference_h,reference_tau=p$reference_tau,
-  fixed_tau=p$fixed$tau))
-# Original saved runs used these amplitudes and sine settings.
-# New runs record the values explicitly in their metadata.
-a0 <- if(is.null(p$initial_amplitude)) 10 else p$initial_amplitude
-af <- if(is.null(p$forcing_amplitude)) 10 else p$forcing_amplitude
-A <- if(is.null(p$AAA)) 1 else p$AAA
-omega <- if(is.null(p$OMEGA)) pi else p$OMEGA
-knitr::kable(data.frame(initial_amplitude=a0,forcing_amplitude=af,AAA=A,OMEGA=omega))
-```
-
-For smooth finite-mode data, the spatial reference slope is two. General low-regularity spatial bounds allow the slower rate
-$h^{\alpha-\epsilon}$. Temporal and rational error floors can mask either rate.
-The saved curves use the second-order reference slope.
-
-## Saved results
-
-```{r saved-figure, echo=FALSE, out.width="650px"}
-knitr::include_graphics("data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png")
-```
-
-```{r saved-rates, echo=FALSE}
-observed <- apply(errors_projected,2,function(e)
-  unname(coef(lm(log10(e)~log10(p$axis)))[2]))
-knitr::kable(data.frame(alpha=p$alpha,reference=2,observed=observed),digits=5)
-```
-
-```{r saved-errors, echo=FALSE}
-knitr::kable(data.frame(h=p$axis,errors_projected,check.names=FALSE),
-  col.names=c("h",paste("alpha =",p$alpha)),
-  format.args=list(scientific=TRUE,digits=5))
+```{r errors}
+knitr::kable(data.frame(h=h_vector, errors_projected, check.names=FALSE),
+    col.names=c("h", paste("alpha =", alpha_vector)),
+    format.args=list(scientific=TRUE, digits=5))
 ```

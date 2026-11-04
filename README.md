@@ -5,10 +5,14 @@ coefficient tables. Reusable coefficient, assembly, matrix-solver and error-diag
 are in `brasilfunc.Rmd`, including the sparse matrix time-stepping kernel.
 Each notebook contains its own computation loops, regressions, plots and saves.
 
-Open `NAP.Rproj`, then click Knit on any experiment. Knitting reads the
-committed results and images; it never starts an experiment, compiles C++,
-changes saved results, or contacts a messaging service. No credentials are needed.
-`docs/index.html` is the rendered entry point.
+Open `NAP.Rproj`, then click Knit on any experiment. Each notebook follows
+this order: purl and source the functions, chunk options, libraries, parameters,
+heavy computation (`eval=FALSE`), load the errors, and plot. Knitting skips the
+heavy computation and redraws the figures from saved results. No credentials
+are needed. `docs/index.html` is the rendered entry point.
+
+`purl()` regenerates `brasilfunc.R` from `brasilfunc.Rmd` before `source()` loads
+it. Both files are kept in the project; edit the R Markdown source.
 
 | Data | Notebook | Current settings |
 | --- | --- | --- |
@@ -22,8 +26,8 @@ the settings used for its saved results.
 
 ## Rendering
 
-R packages `rmarkdown` and `knitr`, plus Pandoc, are sufficient to display
-saved results. From the project root:
+Rendering needs `rmarkdown`, `knitr`, `ggplot2`, and Pandoc. The isolated-order
+scalar plots also use `rSPDE` and `scales`. From the project root:
 
 ```r
 rmarkdown::render("conv_in_m_isolated.Rmd", output_dir="docs")
@@ -33,18 +37,18 @@ rmarkdown::render_site()
 
 ## Explicit recomputation
 
-In each notebook, edit **Parameters for the next run**, then manually run the
-`setup`, `parameters`, and `recompute` chunks in order. The `recompute` chunk contains the full experiment computation directly: mesh
-assembly, refinement loops, error evaluation, regression, plotting, and saving.
-It uses the notebook variables and overwrites its saved data and figures.
-Knit afterward to refresh the report.
+Edit the **Parameters** chunk, then run the notebook chunks from top to bottom.
+Execute `recompute` manually when you want to run the experiment. It contains
+the mesh assembly, refinement loops, error evaluation, and data saving.
+The following chunks load the saved errors, calculate rates, draw plots, and
+save the figures. Knitting runs those plotting chunks without rerunning the PDE.
 
-The parameter and recompute chunks have `eval=FALSE`: Knit skips both and
-shows the existing saved results, even after you edit settings for a future
-run. Displayed parameter tables are read from the saved result metadata.
-No experiment parameter changes are needed in `brasilfunc.Rmd`.
+Plots and tables use the variables in the parameter chunk directly. Keep those
+parameters consistent with the saved errors when knitting. No settings are
+extracted from saved metadata. No experiment parameter changes are needed in
+`brasilfunc.Rmd`.
 
-Recomputation needs Matrix, MetricGraph, rSPDE, ggplot2 and sp;
+Recomputation needs Matrix, MetricGraph, rSPDE and ggplot2;
 the rough matrix kernel additionally needs Rcpp, RcppEigen and a C++ compiler.
 The installed rSPDE must provide the requested `m_brasil<m>t` tables.
 Invalid signed coefficient rows are rejected, not altered. The shared graph
