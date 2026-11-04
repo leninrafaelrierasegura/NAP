@@ -385,16 +385,17 @@ the mass-matrix factor for the constant contribution. Analytic sine–hat
 loads and interval-averaged forcing are used.</p>
 <p>The reported error is the right-constant space–time <span
 class="math inline">\(L_2\)</span> error against the continuum solution,
-evaluated on the saved reference mesh and time grid. Centered
-coefficient moments accumulate this norm without changing the FEM time
-evolution. The reference modes evaluate the continuum solution only.</p>
+evaluated on the saved reference mesh and time grid. A compiled C++ loop
+advances every FEM time step and accumulates the same norm using
+centered coefficient moments. The reference modes evaluate the continuum
+solution only.</p>
 </div>
 <div id="parameters" class="section level2">
 <h2>Parameters</h2>
 <pre class="r"><code>T_final &lt;- 1
 kappa &lt;- 4
 diffusion &lt;- 1e-3
-alpha_vector &lt;- seq(0.5,1.9,0.2)
+alpha_vector &lt;- seq(0.9,1.7,0.1)
 m_fixed &lt;- 8L
 h_vector &lt;- 2^seq(-7,-3)
 time_step &lt;- 2e-5
@@ -405,7 +406,7 @@ initial_amplitude &lt;- 10
 forcing_amplitude &lt;- 10
 AAA &lt;- 1
 OMEGA &lt;- pi
-workers &lt;- 1L
+workers &lt;- 9L
 error_verbose &lt;- FALSE</code></pre>
 </div>
 <div id="computation" class="section level2">
@@ -417,6 +418,8 @@ output_file &lt;- &quot;data_files/errors_projected_h_mat.RData&quot;
 stopifnot(N_finite &gt;= 4, N_finite%%2 == 0, length(alpha_vector) &gt; 0, all(is.finite(alpha_vector)),
     all(alpha_vector &gt; 0 &amp; alpha_vector &lt;= 2), length(m_fixed) == 1, m_fixed == floor(m_fixed))
 for (alpha in alpha_vector[alpha_vector != 2]) brasil_coefficients(m_fixed, alpha/2)
+# Compile once in the parent session before any parallel cases start.
+smooth_compile_solver()
 adjusted_N_finite &lt;- N_finite + N_finite/2 + 1
 coeff_U_0 &lt;- numeric(adjusted_N_finite)
 coeff_U_0[5] &lt;- initial_amplitude
@@ -484,7 +487,7 @@ save(errors_projected, file = output_file)</code></pre>
 <p>For smooth finite-mode data, the spatial reference slope is two.
 Temporal and rational error floors can mask this rate.</p>
 <pre class="r"><code>figure_file &lt;- &quot;data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png&quot;
-# Fit reference guides, draw the curves, and overwrite the saved figure.
+# Average reference curves anchored at every error point, keeping the prescribed slope.
 errors &lt;- errors_projected
 axis &lt;- h_vector
 alpha &lt;- alpha_vector
@@ -497,7 +500,7 @@ guide &lt;- frame
 rate &lt;- 2
 for (j in seq_along(alpha)) {
     ids &lt;- frame$column == j
-    constant &lt;- exp(mean(log(errors[, j]/axis^rate)))
+    constant &lt;- mean(errors[, j]/axis^rate)
     guide$error[ids] &lt;- constant * guide$x[ids]^rate
 }
 plot &lt;- ggplot2::ggplot(frame, ggplot2::aes(x, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,
@@ -522,24 +525,24 @@ knitr::kable(data.frame(alpha=alpha_vector, reference=2, observed=observed), dig
 </thead>
 <tbody>
 <tr class="odd">
-<td align="right">0.5</td>
-<td align="right">2</td>
-<td align="right">2.01544</td>
-</tr>
-<tr class="even">
-<td align="right">0.7</td>
-<td align="right">2</td>
-<td align="right">2.01544</td>
-</tr>
-<tr class="odd">
 <td align="right">0.9</td>
 <td align="right">2</td>
 <td align="right">2.01545</td>
 </tr>
 <tr class="even">
+<td align="right">1.0</td>
+<td align="right">2</td>
+<td align="right">2.01546</td>
+</tr>
+<tr class="odd">
 <td align="right">1.1</td>
 <td align="right">2</td>
 <td align="right">2.01546</td>
+</tr>
+<tr class="even">
+<td align="right">1.2</td>
+<td align="right">2</td>
+<td align="right">2.01547</td>
 </tr>
 <tr class="odd">
 <td align="right">1.3</td>
@@ -547,105 +550,117 @@ knitr::kable(data.frame(alpha=alpha_vector, reference=2, observed=observed), dig
 <td align="right">2.01548</td>
 </tr>
 <tr class="even">
+<td align="right">1.4</td>
+<td align="right">2</td>
+<td align="right">2.01549</td>
+</tr>
+<tr class="odd">
 <td align="right">1.5</td>
 <td align="right">2</td>
 <td align="right">2.01550</td>
+</tr>
+<tr class="even">
+<td align="right">1.6</td>
+<td align="right">2</td>
+<td align="right">2.01551</td>
 </tr>
 <tr class="odd">
 <td align="right">1.7</td>
 <td align="right">2</td>
 <td align="right">2.01553</td>
 </tr>
-<tr class="even">
-<td align="right">1.9</td>
-<td align="right">2</td>
-<td align="right">2.01558</td>
-</tr>
 </tbody>
 </table>
 <pre class="r"><code>knitr::kable(data.frame(h=h_vector, errors_projected, check.names=FALSE),
     col.names=c(&quot;h&quot;, paste(&quot;alpha =&quot;, alpha_vector)),
     format.args=list(scientific=TRUE, digits=5))</code></pre>
-<table>
+<table style="width:100%;">
 <colgroup>
+<col width="9%" />
 <col width="10%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
+<col width="9%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
+<col width="10%" />
 </colgroup>
 <thead>
 <tr class="header">
 <th align="right">h</th>
-<th align="right">alpha = 0.5</th>
-<th align="right">alpha = 0.7</th>
 <th align="right">alpha = 0.9</th>
+<th align="right">alpha = 1</th>
 <th align="right">alpha = 1.1</th>
+<th align="right">alpha = 1.2</th>
 <th align="right">alpha = 1.3</th>
+<th align="right">alpha = 1.4</th>
 <th align="right">alpha = 1.5</th>
+<th align="right">alpha = 1.6</th>
 <th align="right">alpha = 1.7</th>
-<th align="right">alpha = 1.9</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="right">7.8125e-03</td>
-<td align="right">6.1600e-04</td>
-<td align="right">6.1570e-04</td>
 <td align="right">6.1520e-04</td>
+<td align="right">6.1490e-04</td>
 <td align="right">6.1450e-04</td>
+<td align="right">6.1410e-04</td>
 <td align="right">6.1350e-04</td>
+<td align="right">6.1290e-04</td>
 <td align="right">6.1210e-04</td>
+<td align="right">6.1120e-04</td>
 <td align="right">6.1000e-04</td>
-<td align="right">6.0710e-04</td>
 </tr>
 <tr class="even">
 <td align="right">1.5625e-02</td>
-<td align="right">2.4580e-03</td>
-<td align="right">2.4567e-03</td>
 <td align="right">2.4549e-03</td>
+<td align="right">2.4537e-03</td>
 <td align="right">2.4522e-03</td>
+<td align="right">2.4505e-03</td>
 <td align="right">2.4483e-03</td>
+<td align="right">2.4458e-03</td>
 <td align="right">2.4427e-03</td>
+<td align="right">2.4391e-03</td>
 <td align="right">2.4347e-03</td>
-<td align="right">2.4232e-03</td>
 </tr>
 <tr class="odd">
 <td align="right">3.1250e-02</td>
-<td align="right">9.8540e-03</td>
-<td align="right">9.8489e-03</td>
 <td align="right">9.8416e-03</td>
+<td align="right">9.8367e-03</td>
 <td align="right">9.8309e-03</td>
+<td align="right">9.8239e-03</td>
 <td align="right">9.8154e-03</td>
+<td align="right">9.8052e-03</td>
 <td align="right">9.7930e-03</td>
+<td align="right">9.7784e-03</td>
 <td align="right">9.7608e-03</td>
-<td align="right">9.7149e-03</td>
 </tr>
 <tr class="even">
 <td align="right">6.2500e-02</td>
-<td align="right">3.9798e-02</td>
-<td align="right">3.9778e-02</td>
 <td align="right">3.9748e-02</td>
+<td align="right">3.9728e-02</td>
 <td align="right">3.9705e-02</td>
+<td align="right">3.9677e-02</td>
 <td align="right">3.9642e-02</td>
+<td align="right">3.9601e-02</td>
 <td align="right">3.9552e-02</td>
+<td align="right">3.9493e-02</td>
 <td align="right">3.9422e-02</td>
-<td align="right">3.9237e-02</td>
 </tr>
 <tr class="odd">
 <td align="right">1.2500e-01</td>
-<td align="right">1.6539e-01</td>
-<td align="right">1.6530e-01</td>
 <td align="right">1.6518e-01</td>
+<td align="right">1.6510e-01</td>
 <td align="right">1.6500e-01</td>
+<td align="right">1.6488e-01</td>
 <td align="right">1.6474e-01</td>
+<td align="right">1.6457e-01</td>
 <td align="right">1.6436e-01</td>
+<td align="right">1.6412e-01</td>
 <td align="right">1.6382e-01</td>
-<td align="right">1.6305e-01</td>
 </tr>
 </tbody>
 </table>

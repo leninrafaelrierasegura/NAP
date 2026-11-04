@@ -17,7 +17,7 @@ it. Both files are kept in the project; edit the R Markdown source.
 | Data | Notebook | Current settings |
 | --- | --- | --- |
 | Smooth, space | `cov_in_h_mat.Rmd` | m=8; h=2^(-7:-3); tau=2e-5; diffusion=0.001 |
-| Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.001; N=200,80,32,13,6,2; diffusion=0.001 |
+| Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.001; N=200,63,20,6,2; diffusion=0.001 |
 | Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:8; h=0.02; tau=0.005; diffusion=1 |
 | Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=5:9; reference cutoff=16; reference h=2^-18 |
 
@@ -49,7 +49,16 @@ extracted from saved metadata. No experiment parameter changes are needed in
 `brasilfunc.Rmd`.
 
 Recomputation needs Matrix, MetricGraph, rSPDE and ggplot2;
-the rough matrix kernel additionally needs Rcpp, RcppEigen and a C++ compiler.
+the smooth and rough matrix kernels additionally need Rcpp, RcppEigen and a C++
+compiler.
+The smooth notebooks compile their time-stepping/error kernel once in the
+parent session before launching cases. Both smooth notebooks use nine workers,
+one per alpha. In the spatial study each worker handles the current mesh; in
+the temporal study each worker handles all five time grids. Each worker advances
+every time step in C++ and uses the same centered reference-error formula. The R implementation remains
+available for numerical regression checks. Changing `workers` affects the next
+run; knitting only loads and plots saved results.
+
 The installed rSPDE must provide the requested `m_brasil<m>t` tables.
 Invalid signed coefficient rows are rejected, not altered. The shared graph
 helper supports both current and older MetricGraph APIs.

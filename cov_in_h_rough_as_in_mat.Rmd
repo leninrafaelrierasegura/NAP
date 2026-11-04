@@ -154,8 +154,8 @@ m_fixed <- 14L
 reference_cutoff <- 16L
 reference_J <- 18L
 reference_time_step <- 1e-5
-fit_J <- 7:9
-workers <- 1L
+fit_J <- 5:9
+workers <- 9L
 max_tail_squared_fraction <- 0.002
 ```
 
@@ -297,7 +297,7 @@ for (use_correction in c(FALSE,TRUE)) {
     for(a in seq_along(alpha_vector)) {
         model <- axis^alpha_vector[a]
         if(!use_correction) model <- model/J_vector
-        constant <- exp(mean(log(plotted[fit,a]/model[fit])))
+        constant <- mean(plotted[,a]/model)
         guide$error[guide$column==a] <- constant*model
     }
     plot <- ggplot2::ggplot(frame,ggplot2::aes(h,error,color=alpha,group=alpha)) +
@@ -328,8 +328,9 @@ Both axes use base-10 logarithmic scales, with ticks labelled by h and
 the error itself. Solid lines and markers show the sampled errors.
 Dashed curves are $C_\alpha h^\alpha/J$, not $C h^2$:
 changing the error-evaluation workflow does not make the rough data smooth.
-The constants are geometric means of $E_h/(h^\alpha/J)$ over
-$J\in$ `r paste(fit_J,collapse=", ")`; the rate model is prescribed.
+Each dashed curve averages the prescribed reference curves anchored at all
+plotted errors, so $C_\alpha$ is the arithmetic mean of
+$E_h/(h^\alpha/J)$ over all plotted meshes. The rate model is prescribed.
 
 ```{r corrected-figure, fig.width=7, fig.height=5, out.width="800px"}
 knitr::include_graphics(file.path(figure_dir, "corrected.png"))

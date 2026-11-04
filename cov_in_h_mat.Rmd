@@ -50,8 +50,8 @@ loads and interval-averaged forcing are used.
 
 The reported error is the right-constant space–time $L_2$ error against the
 continuum solution, evaluated on the saved reference mesh and time grid.
-Centered coefficient moments accumulate this norm without changing the FEM
-time evolution. The reference modes evaluate the continuum solution only.
+A compiled C++ loop advances every FEM time step and accumulates the same norm
+using centered coefficient moments. The reference modes evaluate the continuum solution only.
 
 ## Parameters
 
@@ -70,7 +70,7 @@ initial_amplitude <- 10
 forcing_amplitude <- 10
 AAA <- 1
 OMEGA <- pi
-workers <- 1L
+workers <- 9L
 error_verbose <- FALSE
 ```
 
@@ -84,6 +84,8 @@ output_file <- "data_files/errors_projected_h_mat.RData"
 stopifnot(N_finite >= 4, N_finite%%2 == 0, length(alpha_vector) > 0, all(is.finite(alpha_vector)),
     all(alpha_vector > 0 & alpha_vector <= 2), length(m_fixed) == 1, m_fixed == floor(m_fixed))
 for (alpha in alpha_vector[alpha_vector != 2]) brasil_coefficients(m_fixed, alpha/2)
+# Compile once in the parent session before any parallel cases start.
+smooth_compile_solver()
 adjusted_N_finite <- N_finite + N_finite/2 + 1
 coeff_U_0 <- numeric(adjusted_N_finite)
 coeff_U_0[5] <- initial_amplitude
@@ -157,7 +159,7 @@ and rational error floors can mask this rate.
 
 ```{r plot-results, fig.width=4, fig.height=5, out.width="650px"}
 figure_file <- "data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png"
-# Fit reference guides, draw the curves, and overwrite the saved figure.
+# Average reference curves anchored at every error point, keeping the prescribed slope.
 errors <- errors_projected
 axis <- h_vector
 alpha <- alpha_vector
@@ -170,7 +172,7 @@ guide <- frame
 rate <- 2
 for (j in seq_along(alpha)) {
     ids <- frame$column == j
-    constant <- exp(mean(log(errors[, j]/axis^rate)))
+    constant <- mean(errors[, j]/axis^rate)
     guide$error[ids] <- constant * guide$x[ids]^rate
 }
 plot <- ggplot2::ggplot(frame, ggplot2::aes(x, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,

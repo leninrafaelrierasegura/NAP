@@ -615,8 +615,9 @@ plot_data$alpha_label &lt;- factor(plot_data$alpha, levels = alpha_vector)
 guides &lt;- plot_data
 for (alpha in alpha_vector) {
     index &lt;- which(guides$alpha == alpha)
-    guides$error[index] &lt;- guides$error[index[1]] * exp(-2 * pi * sqrt(alpha/2) * (sqrt(guides$m[index]) -
-        1))
+    model &lt;- exp(-2 * pi * sqrt(alpha/2) * sqrt(guides$m[index]))
+    constant &lt;- mean(plot_data$error[index]/model)
+    guides$error[index] &lt;- constant * model
 }
 p_m_isolated &lt;- ggplot(plot_data, aes(sqrt(m), error, colour = alpha_label, group = alpha_label)) +
     geom_line() + geom_point(aes(shape = resolved), size = 2) + geom_line(data = guides, linetype = &quot;dashed&quot;) +
@@ -632,10 +633,11 @@ knitr::include_graphics(file.path(figure_dir, &quot;plot.png&quot;))</code></pre
 <p><img src="data_files/isolated_m/plot.png" alt="" width="750px" /></p>
 <p>Dashed lines have benchmark exponent <span
 class="math inline">\(-2\pi\sqrt{\alpha/2}\)</span> against <span
-class="math inline">\(\sqrt m\)</span>, anchored at the first order.
-Open circles are below an empirical numerical-resolution indicator and
-are excluded from resolved-only fits. These are reference slopes, not
-certified error bounds.</p>
+class="math inline">\(\sqrt m\)</span>. Each guide averages the
+benchmark curves anchored at all plotted orders. Open circles are below
+an empirical numerical-resolution indicator and are excluded from
+resolved-only fits. These are reference slopes, not certified error
+bounds.</p>
 <pre class="r"><code>fit_slope &lt;- function(d) {
     d &lt;- d[is.finite(d$error) &amp; d$error &gt; 0, ]
     if (nrow(d) &lt; 2)
@@ -742,9 +744,9 @@ if (!is.null(unit_max_errors)) {
     unit_guides &lt;- unit_max_errors
     for (unit_alpha in unit_alpha_vector) {
         unit_index &lt;- which(unit_guides$alpha == unit_alpha)
-        unit_anchor &lt;- unit_index[unit_guides$m[unit_index] == 1L]
-        unit_guides$absolute_error[unit_index] &lt;- unit_max_errors$absolute_error[unit_anchor] * exp(-2 *
-            pi * sqrt(unit_alpha/2) * (sqrt(unit_guides$m[unit_index]) - 1))
+        model &lt;- exp(-2 * pi * sqrt(unit_alpha/2) * sqrt(unit_guides$m[unit_index]))
+        constant &lt;- mean(unit_max_errors$absolute_error[unit_index]/model)
+        unit_guides$absolute_error[unit_index] &lt;- constant * model
     }
     p_unit_error_m &lt;- ggplot(unit_max_errors, aes(sqrt(m), absolute_error, colour = alpha_label,
         group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = unit_guides,

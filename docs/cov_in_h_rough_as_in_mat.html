@@ -495,8 +495,8 @@ m_fixed &lt;- 14L
 reference_cutoff &lt;- 16L
 reference_J &lt;- 18L
 reference_time_step &lt;- 1e-5
-fit_J &lt;- 7:9
-workers &lt;- 1L
+fit_J &lt;- 5:9
+workers &lt;- 9L
 max_tail_squared_fraction &lt;- 0.002</code></pre>
 <p>The original time steps were selected by finest-mesh refinement
 tests: the errors changed by less than 0.3% relative to the original
@@ -748,7 +748,7 @@ for (use_correction in c(FALSE,TRUE)) {
     for(a in seq_along(alpha_vector)) {
         model &lt;- axis^alpha_vector[a]
         if(!use_correction) model &lt;- model/J_vector
-        constant &lt;- exp(mean(log(plotted[fit,a]/model[fit])))
+        constant &lt;- mean(plotted[,a]/model)
         guide$error[guide$column==a] &lt;- constant*model
     }
     plot &lt;- ggplot2::ggplot(frame,ggplot2::aes(h,error,color=alpha,group=alpha)) +
@@ -776,10 +776,11 @@ and the error itself. Solid lines and markers show the sampled errors.
 Dashed curves are <span class="math inline">\(C_\alpha
 h^\alpha/J\)</span>, not <span class="math inline">\(C h^2\)</span>:
 changing the error-evaluation workflow does not make the rough data
-smooth. The constants are geometric means of <span
-class="math inline">\(E_h/(h^\alpha/J)\)</span> over <span
-class="math inline">\(J\in\)</span> 7, 8, 9; the rate model is
-prescribed.</p>
+smooth. Each dashed curve averages the prescribed reference curves
+anchored at all plotted errors, so <span
+class="math inline">\(C_\alpha\)</span> is the arithmetic mean of <span
+class="math inline">\(E_h/(h^\alpha/J)\)</span> over all plotted meshes.
+The rate model is prescribed.</p>
 <pre class="r"><code>knitr::include_graphics(file.path(figure_dir, &quot;corrected.png&quot;))</code></pre>
 <p><img src="data_files/rough_h_as_in_mat/corrected.png" alt="" width="800px" /></p>
 <p>The second plot has the same h axis and uses <span
@@ -806,56 +807,56 @@ curves are comparison guides, not certified upper bounds.</p>
 <tr class="odd">
 <td align="right">0.9</td>
 <td align="right">0.9</td>
-<td align="right">1.076883</td>
-<td align="right">0.895598</td>
+<td align="right">1.105138</td>
+<td align="right">0.894035</td>
 </tr>
 <tr class="even">
 <td align="right">1.0</td>
 <td align="right">1.0</td>
-<td align="right">1.181027</td>
-<td align="right">0.999742</td>
+<td align="right">1.210143</td>
+<td align="right">0.999040</td>
 </tr>
 <tr class="odd">
 <td align="right">1.1</td>
 <td align="right">1.1</td>
-<td align="right">1.284305</td>
-<td align="right">1.103020</td>
+<td align="right">1.314727</td>
+<td align="right">1.103624</td>
 </tr>
 <tr class="even">
 <td align="right">1.2</td>
 <td align="right">1.2</td>
-<td align="right">1.389582</td>
-<td align="right">1.208297</td>
+<td align="right">1.420220</td>
+<td align="right">1.209117</td>
 </tr>
 <tr class="odd">
 <td align="right">1.3</td>
 <td align="right">1.3</td>
-<td align="right">1.494887</td>
-<td align="right">1.313602</td>
+<td align="right">1.525236</td>
+<td align="right">1.314132</td>
 </tr>
 <tr class="even">
 <td align="right">1.4</td>
 <td align="right">1.4</td>
-<td align="right">1.602468</td>
-<td align="right">1.421183</td>
+<td align="right">1.629583</td>
+<td align="right">1.418480</td>
 </tr>
 <tr class="odd">
 <td align="right">1.5</td>
 <td align="right">1.5</td>
-<td align="right">1.705939</td>
-<td align="right">1.524654</td>
+<td align="right">1.728018</td>
+<td align="right">1.516915</td>
 </tr>
 <tr class="even">
 <td align="right">1.6</td>
 <td align="right">1.6</td>
-<td align="right">1.805576</td>
-<td align="right">1.624291</td>
+<td align="right">1.817354</td>
+<td align="right">1.606251</td>
 </tr>
 <tr class="odd">
 <td align="right">1.7</td>
 <td align="right">1.7</td>
-<td align="right">1.883250</td>
-<td align="right">1.701965</td>
+<td align="right">1.886963</td>
+<td align="right">1.675860</td>
 </tr>
 </tbody>
 </table>

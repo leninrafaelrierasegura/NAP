@@ -50,8 +50,8 @@ loads and interval-averaged forcing are used.
 
 The reported error is the right-constant space–time $L_2$ error against the
 continuum solution, evaluated on the saved reference mesh and time grid.
-Centered coefficient moments accumulate this norm without changing the FEM
-time evolution. The reference modes evaluate the continuum solution only.
+A compiled C++ loop advances every FEM time step and accumulates the same norm
+using centered coefficient moments. The reference modes evaluate the continuum solution only.
 
 ## Parameters
 
@@ -59,9 +59,9 @@ time evolution. The reference modes evaluate the continuum solution only.
 T_final <- 1
 kappa <- 4
 diffusion <- 1e-3
-alpha_vector <- seq(0.5,1.9,0.2)
+alpha_vector <- seq(0.9,1.7,0.1)
 m_fixed <- 8L
-tau_vector <- T_final/c(200L,80L,32L,13L,6L,2L)
+tau_vector <- T_final/c(200L,63L,20L,6L,2L)
 h_fixed <- 1e-3
 overkill_h <- 1e-5
 overkill_time_step <- 1e-5
@@ -70,7 +70,7 @@ initial_amplitude <- 10
 forcing_amplitude <- 10
 AAA <- 1
 OMEGA <- pi
-workers <- 1L
+workers <- 9L
 error_verbose <- FALSE
 ```
 
@@ -84,6 +84,8 @@ output_file <- "data_files/errors_projected_tau_mat.RData"
 stopifnot(N_finite >= 4, N_finite%%2 == 0, length(alpha_vector) > 0, all(is.finite(alpha_vector)),
     all(alpha_vector > 0 & alpha_vector <= 2), length(m_fixed) == 1, m_fixed == floor(m_fixed))
 for (alpha in alpha_vector[alpha_vector != 2]) brasil_coefficients(m_fixed, alpha/2)
+# Compile once in the parent session before any parallel cases start.
+smooth_compile_solver()
 adjusted_N_finite <- N_finite + N_finite/2 + 1
 coeff_U_0 <- numeric(adjusted_N_finite)
 coeff_U_0[5] <- initial_amplitude
@@ -122,28 +124,25 @@ exact_initial <- coeff_U_0[active_modes]
 exact_forcing <- coeff_FF[active_modes]
 spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
 error_projection <- prepare_reference_error(Psi, overkill_C, exact_basis)
-# Loop over the refinement values and fractional exponents.
-errors_projected <- matrix(NA_real_, length(tau_vector), length(alpha_vector))
-for (j in seq_along(alpha_vector)) {
+# Each worker computes all five time grids for one fractional exponent.
+cases <- run_reference_cases(seq_along(alpha_vector), function(j) {
     alpha <- alpha_vector[j]
     beta <- alpha/2
     exact_rates <- diffusion * reference_eigenvalues[active_modes]^beta
     coefficients_at_time <- function(t) exact_modal_coefficients(t, exact_rates, exact_initial, exact_forcing,
         A = AAA, omega = OMEGA)
-
-    cases <- run_reference_cases(seq_along(tau_vector), function(i) {
+    vapply(seq_along(tau_vector), function(i) {
         time_grid <- time_grids[[i]]
         time_step <- time_grid$time_step
         time_seq <- time_grid$time_seq
         g_average <- g_averages[[i]]
-        m <- m_fixed
         my_op_frac <- my.fractional.operators.frac(L = L, beta = beta, C = C, scale.factor = kappa^2,
-            m = m, time_step = time_step, diffusion = diffusion)
+            m = m_fixed, time_step = time_step, diffusion = diffusion)
         solve_fractional_evolution_error(my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
             overkill_time_seq, coefficients_at_time, error_projection, verbose = error_verbose)
-    }, workers = workers)
-    errors_projected[, j] <- vapply(cases, base::identity, numeric(1))
-}
+    }, numeric(1))
+}, workers = workers)
+errors_projected <- do.call(cbind, cases)
 # Save the errors together with the settings used for this run.
 attr(errors_projected, "coefficient_source") <- "rSPDE BRASIL"
 attr(errors_projected, "parameters") <- list(study = "tau", axis = tau_vector, alpha = alpha_vector,
@@ -165,7 +164,7 @@ remain fixed throughout each refinement curve.
 
 ```{r plot-results, fig.width=4, fig.height=5, out.width="650px"}
 figure_file <- "data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png"
-# Fit reference guides, draw the curves, and overwrite the saved figure.
+# Average reference curves anchored at every error point, keeping the prescribed slope.
 errors <- errors_projected
 axis <- tau_vector
 alpha <- alpha_vector
@@ -178,7 +177,7 @@ guide <- frame
 rate <- 1
 for (j in seq_along(alpha)) {
     ids <- frame$column == j
-    constant <- exp(mean(log(errors[, j]/axis^rate)))
+    constant <- mean(errors[, j]/axis^rate)
     guide$error[ids] <- constant * guide$x[ids]^rate
 }
 plot <- ggplot2::ggplot(frame, ggplot2::aes(x, error, color = alpha, group = alpha)) + ggplot2::geom_line(data = guide,

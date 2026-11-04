@@ -55,22 +55,65 @@ reference_basis <- rbind(c(1,0),c(0,1),c(0,.5))
 projection <- e$prepare_reference_error(Psi,reference_C,reference_basis)
 solver_times <- c(0,.1,.2,.3)
 initial <- c(.3,-.1);load <- c(.2,-.1);forcing <- c(0,1,.7,.5)
-op <- e$my.fractional.operators.frac(coarse_L,.35,coarse_C,4,4L,.1,.2)
-coefficients <- function(t) rbind(exp(-t),sin(2*t))
-history <- matrix(0,2L,length(solver_times));history[,1L] <- initial
-for(k in seq_len(length(solver_times)-1L))
-  history[,k+1L] <- as.numeric(e$my.solver.frac(op,
-    coarse_C%*%history[,k]+.1*load*forcing[k+1L]))
-for(reference_times in list(c(0,.02,.07,.1,.18,.2,.24,.3),c(0,.05,.3),c(0,.3))) {
-  times <- reference_times[-1L]
-  steps <- vapply(times,function(t)which(solver_times[-1L]>=t)[1L],integer(1))
-  difference <- reference_basis%*%coefficients(times)-Psi%*%history[,steps+1L,drop=FALSE]
-  expected <- sqrt(sum(diff(reference_times)*Matrix::colSums(difference*(reference_C%*%difference))))
-  actual <- e$solve_fractional_evolution_error(op,.1,solver_times,initial,load,forcing,
-    reference_times,coefficients,projection)
-  stopifnot(abs(actual-expected)<1e-12*max(1,expected))
+for(beta in c(.35,1)) {
+  op <- e$my.fractional.operators.frac(coarse_L,beta,coarse_C,4,4L,.1,.2)
+  coefficients <- function(t) rbind(exp(-t),sin(2*t))
+  history <- matrix(0,2L,length(solver_times));history[,1L] <- initial
+  for(k in seq_len(length(solver_times)-1L))
+    history[,k+1L] <- as.numeric(e$my.solver.frac(op,
+      coarse_C%*%history[,k]+.1*load*forcing[k+1L]))
+  for(reference_times in list(c(0,.02,.07,.1,.18,.2,.24,.3),c(0,.05,.3),
+      c(0,.3),seq(0,.3,length.out=3001L))) {
+    times <- reference_times[-1L]
+    steps <- vapply(times,function(t)which(solver_times[-1L]>=t)[1L],integer(1))
+    difference <- reference_basis%*%coefficients(times)-Psi%*%history[,steps+1L,drop=FALSE]
+    expected <- sqrt(sum(diff(reference_times)*Matrix::colSums(difference*(reference_C%*%difference))))
+    actual <- e$solve_fractional_evolution_error(op,.1,solver_times,initial,load,forcing,
+      reference_times,coefficients,projection)
+    reference_error <- e$solve_fractional_evolution_error_R(op,.1,solver_times,initial,load,forcing,
+      reference_times,coefficients,projection)
+    stopifnot(abs(actual-expected)<1e-12*max(1,expected),
+      abs(actual-reference_error)<1e-12*max(1,reference_error))
+  }
 }
 cat('Reference-grid errors agree with independent direct integration.\n')
+
+# Compile in the parent, then verify nine forked workers inherit the kernel.
+# Compare the complete sampled error against the original R implementation.
+e$smooth_compile_solver()
+mesh <- e$gets.graph.tadpole(1/128);mesh$compute_fem()
+reference_mesh <- e$gets.graph.tadpole(1/512);reference_mesh$compute_fem()
+C <- mesh$mesh$C;L <- 16*C+mesh$mesh$G
+Psi <- mesh$fem_basis(reference_mesh$get_mesh_locations())
+eigen_data <- e$gets.eigen.params(4L,4,.5,reference_mesh)
+projection <- e$prepare_reference_error(Psi,reference_mesh$mesh$C,eigen_data$EIGENFUN[,c(5,7)])
+initial <- e$project_u0_tadpole(mesh,10)
+load <- 10*e$assemble_e7_load_tadpole(mesh)
+solver_times <- seq(0,.1,length.out=21L)
+reference_times <- seq(0,.1,length.out=41L)
+forcing <- e$average_sine_forcing(solver_times)
+smooth_case <- function(alpha) {
+  stopifnot(exists("smooth_reference_evolve_cpp",envir=e,inherits=FALSE))
+  op <- e$my.fractional.operators.frac(L,alpha/2,C,16,8L,.005,.001)
+  coefficients <- function(t)e$exact_modal_coefficients(t,
+    .001*eigen_data$EIGENVAL[c(5,7)]^(alpha/2),c(10,0),c(0,10))
+  value <- e$solve_fractional_evolution_error(op,.005,solver_times,initial,load,forcing,
+    reference_times,coefficients,projection)
+  expected <- e$solve_fractional_evolution_error_R(op,.005,solver_times,initial,load,forcing,
+    reference_times,coefficients,projection)
+  stopifnot(abs(value-expected)<1e-11)
+  list(error=value,pid=Sys.getpid())
+}
+alphas <- seq(.9,1.7,.1)
+serial <- lapply(alphas,smooth_case)
+if(.Platform$OS.type=="unix") {
+  concurrent <- e$run_reference_cases(alphas,smooth_case,workers=9L)
+  stopifnot(identical(vapply(serial,`[[`,numeric(1),"error"),
+    vapply(concurrent,`[[`,numeric(1),"error")),
+    length(unique(vapply(concurrent,`[[`,integer(1),"pid")))==9L,
+    all(vapply(concurrent,`[[`,integer(1),"pid")!=Sys.getpid()))
+}
+cat('C++ agrees with the R reference; nine precompiled fork workers reproduce serial errors.\n')
 
 # Check the saved results retained for publication.
 h <- readRDS('data_files/rough_h_as_in_mat_results.rds')

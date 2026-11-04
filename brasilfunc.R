@@ -164,7 +164,8 @@ reference_interval_error <- function(u, moments, projection) {
     max(0, value)
 }
 
-solve_fractional_evolution_error <- function(my_op_frac, time_step, time_seq, val_at_0, spatial_load, g_average,
+# R reference retained for numerical regression checks.
+solve_fractional_evolution_error_R <- function(my_op_frac, time_step, time_seq, val_at_0, spatial_load, g_average,
     reference_times, coefficients_at_time, error_projection, verbose = FALSE) {
     stopifnot(length(time_step) == 1L, is.finite(time_step), time_step > 0,
         length(time_seq) >= 2L, length(reference_times) >= 2L,
@@ -214,6 +215,177 @@ solve_fractional_evolution_error <- function(my_op_frac, time_step, time_seq, va
         message(sprintf("Reference error: %s time samples, %s solver steps, %.2f s elapsed",
             length(times), solver_step, proc.time()[["elapsed"]] - started))
     sqrt(total)
+}
+
+# Compile once in the parent session; forked workers inherit the loaded kernel.
+smooth_compile_solver <- function(cache_dir=tempdir()) {
+    target <- environment(smooth_compile_solver)
+    if (!exists("smooth_reference_evolve_cpp", envir=target, inherits=FALSE))
+        Rcpp::sourceCpp(code=r"----(
+// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::plugins(cpp11)]]
+#include <RcppEigen.h>
+#include <memory>
+#include <vector>
+#include <cmath>
+#include <limits>
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
+using Eigen::SparseMatrix;
+typedef Eigen::SimplicialLLT<SparseMatrix<double> > SmoothFactor;
+
+// Backward Euler/BRASIL updates and the same centered sampled-error identity
+// as the R reference implementation. Every solver step is advanced.
+// [[Rcpp::export]]
+Rcpp::List smooth_reference_evolve_cpp(
+    const Eigen::MappedSparseMatrix<double>& C_in,
+    Rcpp::List matrices, VectorXd residues, double remainder,
+    VectorXd initial, VectorXd load, VectorXd forcing,
+    MatrixXd projection,
+    const Eigen::MappedSparseMatrix<double>& metric_in,
+    MatrixXd residual_gram, MatrixXd exact_gram, MatrixXd coefficients,
+    Rcpp::IntegerVector target_steps, VectorXd weights,
+    double tau, int n_steps) {
+    Eigen::setNbThreads(1);
+    SparseMatrix<double> C=C_in, metric=metric_in;
+    const int n=C.rows(), modes=projection.cols();
+    const int samples=target_steps.size(), m=residues.size();
+    if (n_steps<1 || !std::isfinite(tau) || tau<=0 || samples<1 ||
+        C.cols()!=n || matrices.size()!=m || initial.size()!=n || load.size()!=n ||
+        forcing.size()!=n_steps+1 || projection.rows()!=n || modes<1 ||
+        coefficients.rows()!=modes || coefficients.cols()!=samples ||
+        weights.size()!=samples || metric.rows()!=n || metric.cols()!=n ||
+        residual_gram.rows()!=modes || residual_gram.cols()!=modes ||
+        exact_gram.rows()!=modes || exact_gram.cols()!=modes)
+        Rcpp::stop("Invalid smooth-reference dimensions or time grid.");
+    SmoothFactor mass_factor;
+    if (remainder!=0) {
+        mass_factor.compute(C);
+        if (mass_factor.info()!=Eigen::Success)
+            Rcpp::stop("Mass factorization failed.");
+    }
+    std::vector<std::unique_ptr<SmoothFactor> > factors;
+    for (int i=0;i<m;++i) {
+        SparseMatrix<double> A=Rcpp::as<SparseMatrix<double> >(matrices[i]);
+        if (A.rows()!=n || A.cols()!=n)
+            Rcpp::stop("Invalid shifted matrix dimensions.");
+        factors.emplace_back(new SmoothFactor());
+        factors.back()->compute(A);
+        if (factors.back()->info()!=Eigen::Success)
+            Rcpp::stop("Shifted factorization failed.");
+    }
+    VectorXd u=initial, rhs(n), next(n), delta(n), metric_product(n);
+    VectorXd anchor(modes), shift(modes), mean(modes), centered(modes);
+    VectorXd deviation(modes), residual_product(modes);
+    MatrixXd scatter(modes,modes);
+    int step=0, first=0;
+    double total=0, compensation=0;
+    while (first<samples) {
+        Rcpp::checkUserInterrupt();
+        const int goal=target_steps[first];
+        if (goal<1 || goal<step || goal>n_steps)
+            Rcpp::stop("Invalid reference time-to-step mapping.");
+        while (step<goal) {
+            if ((step & 4095)==0) Rcpp::checkUserInterrupt();
+            ++step;
+            rhs.noalias()=C*u;
+            rhs.noalias()+=tau*load*forcing[step];
+            if (remainder!=0) next=remainder*mass_factor.solve(rhs);
+            else next.setZero();
+            for (int i=0;i<m;++i)
+                next.noalias()+=residues[i]*factors[i]->solve(rhs);
+            u.swap(next);
+        }
+        int last=first+1;
+        while (last<samples && target_steps[last]==goal) ++last;
+        long double weight_sum=0;
+        for (int q=first;q<last;++q) {
+            if (!std::isfinite(weights[q]) || weights[q]<=0)
+                Rcpp::stop("Reference weights must be positive and finite.");
+            weight_sum+=weights[q];
+        }
+        const double weight=static_cast<double>(weight_sum);
+        anchor=coefficients.col(first);
+        shift.setZero();
+        for (int q=first;q<last;++q) {
+            if ((q & 4095)==0) Rcpp::checkUserInterrupt();
+            centered=coefficients.col(q)-anchor;
+            shift.noalias()+=(weights[q]/weight)*centered;
+        }
+        mean=anchor+shift;
+        scatter.setZero();
+        for (int q=first;q<last;++q) {
+            centered=coefficients.col(q)-anchor;
+            deviation=std::sqrt(weights[q])*(centered-shift);
+            scatter.noalias()+=deviation*deviation.transpose();
+        }
+        delta.noalias()=u-projection*mean;
+        metric_product.noalias()=metric*delta;
+        residual_product.noalias()=residual_gram*mean;
+        const double variance=exact_gram.cwiseProduct(scatter).sum();
+        double value=weight*(delta.dot(metric_product)+mean.dot(residual_product))+variance;
+        const double scale=weight*(delta.cwiseProduct(metric_product).cwiseAbs().sum()+
+            mean.cwiseProduct(residual_product).cwiseAbs().sum())+
+            exact_gram.cwiseProduct(scatter).cwiseAbs().sum();
+        if (!std::isfinite(value) || value < -128*std::numeric_limits<double>::epsilon()*scale)
+            Rcpp::stop("Invalid reference-grid squared error.");
+        value=std::max(0.0,value);
+        const double adjusted=value-compensation;
+        const double updated=total+adjusted;
+        compensation=(updated-total)-adjusted;
+        total=updated;
+        first=last;
+    }
+    if (step!=n_steps) Rcpp::stop("Reference grid did not reach the final solver step.");
+    return Rcpp::List::create(Rcpp::Named("error")=std::sqrt(total),
+        Rcpp::Named("final_state")=u, Rcpp::Named("solver_steps")=step);
+}
+)----", env=target, cacheDir=cache_dir, showOutput=FALSE, verbose=FALSE)
+    invisible(TRUE)
+}
+
+solve_fractional_evolution_error <- function(my_op_frac, time_step, time_seq, val_at_0, spatial_load, g_average,
+    reference_times, coefficients_at_time, error_projection, verbose = FALSE) {
+    stopifnot(length(time_step) == 1L, is.finite(time_step), time_step > 0,
+        length(time_seq) >= 2L, length(reference_times) >= 2L,
+        all(is.finite(time_seq)), all(is.finite(reference_times)),
+        all(diff(time_seq) > 0), all(diff(reference_times) > 0),
+        reference_times[1] == time_seq[1], tail(reference_times, 1) == tail(time_seq, 1),
+        length(g_average) == length(time_seq), length(val_at_0) == nrow(my_op_frac$C),
+        length(spatial_load) == length(val_at_0), is.function(coefficients_at_time),
+        is.logical(verbose), length(verbose) == 1L, !is.na(verbose),
+        nrow(error_projection$metric) == length(val_at_0),
+        ncol(error_projection$metric) == length(val_at_0),
+        nrow(error_projection$projection) == length(val_at_0))
+    n_modes <- ncol(error_projection$projection)
+    stopifnot(identical(dim(error_projection$exact_gram), c(n_modes, n_modes)),
+        identical(dim(error_projection$residual_gram), c(n_modes, n_modes)))
+    times <- reference_times[-1L]
+    coefficients <- as.matrix(coefficients_at_time(times))
+    stopifnot(nrow(coefficients) == n_modes, ncol(coefficients) == length(times),
+        all(is.finite(coefficients)))
+    smooth_compile_solver()
+    if (my_op_frac$beta == 1) {
+        matrices <- list(my_op_frac$LHS)
+        residues <- 1
+        remainder <- 0
+    } else {
+        matrices <- my_op_frac$partial_fraction_terms
+        residues <- my_op_frac$residues
+        remainder <- my_op_frac$remainder
+    }
+    general <- function(A) as(as(A, "generalMatrix"), "CsparseMatrix")
+    started <- proc.time()[["elapsed"]]
+    result <- smooth_reference_evolve_cpp(general(my_op_frac$C), lapply(matrices, general),
+        residues, remainder, as.numeric(val_at_0), as.numeric(spatial_load), as.numeric(g_average),
+        error_projection$projection, general(error_projection$metric),
+        error_projection$residual_gram, error_projection$exact_gram, coefficients,
+        as.integer(findInterval(times, time_seq, left.open=TRUE)), diff(reference_times),
+        time_step, length(time_seq)-1L)
+    if (verbose)
+        message(sprintf("Reference error (C++): %s time samples, %s solver steps, %.2f s elapsed",
+            length(times), result$solver_steps, proc.time()[["elapsed"]]-started))
+    result$error
 }
 
 make_time_grid <- function(T_final, target_step) {

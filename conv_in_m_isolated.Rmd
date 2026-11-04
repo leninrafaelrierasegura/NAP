@@ -172,8 +172,9 @@ plot_data$alpha_label <- factor(plot_data$alpha, levels = alpha_vector)
 guides <- plot_data
 for (alpha in alpha_vector) {
     index <- which(guides$alpha == alpha)
-    guides$error[index] <- guides$error[index[1]] * exp(-2 * pi * sqrt(alpha/2) * (sqrt(guides$m[index]) -
-        1))
+    model <- exp(-2 * pi * sqrt(alpha/2) * sqrt(guides$m[index]))
+    constant <- mean(plot_data$error[index]/model)
+    guides$error[index] <- constant * model
 }
 p_m_isolated <- ggplot(plot_data, aes(sqrt(m), error, colour = alpha_label, group = alpha_label)) +
     geom_line() + geom_point(aes(shape = resolved), size = 2) + geom_line(data = guides, linetype = "dashed") +
@@ -189,7 +190,8 @@ knitr::include_graphics(file.path(figure_dir, "plot.png"))
 ```
 
 Dashed lines have benchmark exponent $-2\pi\sqrt{\alpha/2}$ against
-$\sqrt m$, anchored at the first order. Open circles are below an empirical
+$\sqrt m$. Each guide averages the benchmark curves anchored at all plotted
+orders. Open circles are below an empirical
 numerical-resolution indicator and are excluded from resolved-only fits.
 These are reference slopes, not certified error bounds.
 
@@ -219,9 +221,9 @@ if (!is.null(unit_max_errors)) {
     unit_guides <- unit_max_errors
     for (unit_alpha in unit_alpha_vector) {
         unit_index <- which(unit_guides$alpha == unit_alpha)
-        unit_anchor <- unit_index[unit_guides$m[unit_index] == 1L]
-        unit_guides$absolute_error[unit_index] <- unit_max_errors$absolute_error[unit_anchor] * exp(-2 *
-            pi * sqrt(unit_alpha/2) * (sqrt(unit_guides$m[unit_index]) - 1))
+        model <- exp(-2 * pi * sqrt(unit_alpha/2) * sqrt(unit_guides$m[unit_index]))
+        constant <- mean(unit_max_errors$absolute_error[unit_index]/model)
+        unit_guides$absolute_error[unit_index] <- constant * model
     }
     p_unit_error_m <- ggplot(unit_max_errors, aes(sqrt(m), absolute_error, colour = alpha_label,
         group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = unit_guides,
