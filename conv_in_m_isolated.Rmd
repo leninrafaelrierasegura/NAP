@@ -32,28 +32,291 @@ knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)
 library(ggplot2)
 ```
 
-## Matrix experiment
+## Problem and common matrix discretization
 
-The smooth data are $u_0=a_0e_5$ and $f(t)=a_f A\sin(\omega t)e_7$ on the
-length-(1,2) tadpole. Both evolutions use the **same assembled consistent P1
-FEM matrices**, analytic loads, and interval-averaged forcing.
-For $LV=CV\Lambda$ with $V^\top CV=I$, the reference is
+The smooth data on the length-$(1,2)$ tadpole are
 $$
-U_h^{k+1}=V\operatorname{diag}\!\left(
-  \frac{1}{1+\tau\nu\lambda_j^{\alpha/2}}\right)
-  V^\top(CU_h^k+\tau F^{k+1}).
+u_t+\nu L^\beta u=f(t),\qquad
+u_0=a_0e_5,\qquad f(t)=a_f A\sin(\omega t)e_7,
+\qquad \beta=\alpha/2,\quad L=\kappa^2-\Delta_\Gamma.
 $$
-The rational evolution applies shifted sparse solves with installed `rSPDE`
-BRASIL coefficients and retains the mass solve from the constant term.
-The numerical eigenbasis supplies an independent reference and diagnostic;
-it does not replace the rational matrix solver. The isolated error is
+The amplitudes and frequency are `initial_amplitude`,
+`forcing_amplitude`, `AAA`, and `OMEGA`. These finite eigenfunction
+sums have arbitrarily high spectral spatial regularity. This study
+measures the error introduced by rational approximation on a fixed
+FEM mesh and time grid.
+
+Let $\psi_i$ be the P1 hats and define
 $$
-E_m^2=\tau\sum_{k=1}^N
- (U_h^k-U_{h,m}^k)^\top C(U_h^k-U_{h,m}^k).
+\mathbf C_{ij}=(\psi_j,\psi_i)_{L_2(\Gamma)},\qquad
+\mathbf G_{ij}=(\psi_j',\psi_i')_{L_2(\Gamma)},\qquad
+\mathbf L=\kappa^2\mathbf C+\mathbf G,
+\qquad\mathbf B=\mathbf C^{-1}\mathbf L.
 $$
-All orders use the same mesh and time grid. Dense eigendecomposition is
-restricted to moderate meshes. For $\alpha=2$, ordinary backward Euler
-provides a control without rational approximation.
+Writing $(\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}$, both
+evolutions start from the same $L_2$ projection and use the same load:
+$$
+\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5,\qquad
+\mathbf F^{k+1}=a_f\overline g_{k+1}\boldsymbol\ell_7,
+\qquad
+\overline g_{k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}A\sin(\omega t)\,dt.
+$$
+The sine--hat integrals are analytic. For $\omega\ne0$,
+$\overline g_{k+1}=A[\cos(\omega t_k)-\cos(\omega t_{k+1})]/(\omega\tau)$;
+the code evaluates its stable midpoint-sinc form, including $\omega=0$.
+Thus projection, assembly, and forcing treatment are shared across all
+orders and both reference and rational solutions.
+
+## Error computation
+
+### Step 1: Build the exact-discrete backward Euler reference
+
+The complete generalized eigensystem satisfies
+$$
+\mathbf L\mathbf V=\mathbf C\mathbf V\boldsymbol\Lambda,
+\qquad\mathbf V^\top\mathbf C\mathbf V=\mathbf I,
+\qquad\boldsymbol\Lambda=\operatorname{diag}(\lambda_{j,h}).
+$$
+All $N_h$ numerical eigenvectors are retained. This diagonalizes the
+FEM operator, up to eigensolver and arithmetic errors. It is not a
+truncation to the two continuum eigenfunctions: their projections can
+excite more than two discrete modes.
+
+Backward Euler for the discrete fractional operator is
+$$
+\mathbf U_h^{k+1}=\mathbf V
+\operatorname{diag}\left((1+\tau\nu\lambda_{j,h}^\beta)^{-1}\right)
+\mathbf V^\top(\mathbf C\mathbf U_h^k+\tau\mathbf F^{k+1}).
+$$
+This reference has no rational approximation. It still includes the
+common FEM and backward Euler discretizations, which makes it the
+appropriate reference for isolating the rational error.
+`isolated_discrete_spectrum()` checks the eigen-equation residuals
+and mass orthogonality. Dense eigendecomposition is restricted to
+moderate meshes by allocation guards.
+
+### Step 2: Compute the rational evolution by shifted sparse solves
+
+Scale the discrete operator by $\kappa^2$ and write
+$$
+x_j=\frac{\kappa^2}{\lambda_{j,h}}\in J_h=[\delta_h,1],\qquad
+\delta_h=\frac{\kappa^2}{\lambda_{\max,h}}.
+$$
+The smallest eigenvalue is $\kappa^2$, so the upper endpoint is one.
+A type-$(m,m)$ rational function $r_m$ approximates $x^\beta$ on
+$[0,1]$. For the shifted-solve implementation, set
+$$
+S_m(y)=r_m(y^{-1})=d_m+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j},
+\qquad
+H_m(y)=\frac{S_m(y)}{S_m(y)+s},\qquad s=\tau\nu\kappa^{2\beta}.
+$$
+The BRASIL source poles $\eta_j<0$, residues $\rho_j>0$, and constant
+$d_m\ge0$ determine the time-step partial fractions
+$$
+H_m(y)=r_\tau+\sum_{n=1}^m\frac{a_n}{y-z_n},
+\qquad r_\tau=\frac{d_m}{d_m+s}.
+$$
+The time-step poles $z_n$ and residues $a_n$ belong to $H_m$, and
+are recomputed from the source coefficients for the chosen $\tau$.
+The actual matrix evolution is
+$$
+\mathbf U_{h,m}^{k+1}
+=\left[r_\tau\mathbf C^{-1}
++\sum_{n=1}^m a_n(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}\right]
+(\mathbf C\mathbf U_{h,m}^k+\tau\mathbf F^{k+1}).
+$$
+It retains the constant-term mass solve and reuses Cholesky factors.
+The numerical eigenbasis supplies the independent reference and
+diagnostics; it does not replace these sparse rational solves.
+
+### Step 3: Measure the isolated space--time error
+
+The difference of two FEM functions with coefficient difference
+$\mathbf d_k=\mathbf U_h^k-\mathbf U_{h,m}^k$ has squared spatial
+norm $\mathbf d_k^\top\mathbf C\mathbf d_k$. Both reconstructions
+are constant on $(t_{k-1},t_k]$, so their time integral is exact:
+$$
+E_m=\|U_h^\tau-U_{h,m}^\tau\|_{L_2(0,T;L_2(\Gamma))},\qquad
+E_m^2=\tau\sum_{k=1}^N\mathbf d_k^\top\mathbf C\mathbf d_k.
+$$
+No reference mesh or reference-time quadrature is needed for this
+norm. Both trajectories use the same projected initial value, load,
+mesh, and time step. Their difference isolates the rational change
+to the discrete propagator. It is not the total continuum error
+$\|u-U_{h,m}^\tau\|$, and it has no continuum spatial or temporal
+error floor in exact arithmetic.
+
+### Step 4: Check whether the measured rational error is resolved
+
+The helper also propagates the rational scalar multipliers in the
+complete numerical eigenbasis and computes `product_error`. Mass
+orthonormality makes that modal difference norm equal to the sparse
+matrix norm in exact arithmetic. Their discrepancy and the final
+mass-norm state gap check the sparse evolution independently.
+
+At $\alpha=2$, $x^\beta=x$ is exact, and both paths reduce to ordinary
+backward Euler. Its measured control error therefore indicates
+numerical disagreement. The code defines, for each fractional case,
+$$
+\eta_{m,\alpha}=\max\left\{
+|E_m-E_{\rm product}|,\ E_{\alpha=2,\rm control},\ d_{\min}\right\},
+$$
+where $d_{\min}$ is `.Machine$double.xmin`, the smallest positive
+normalized floating-point number. A case is marked resolved when
+$E_{\rm product}>100\eta_{m,\alpha}$.
+Open markers fail that empirical criterion. The all-order regression
+keeps finite positive measured errors; the resolved-only regression
+uses only the marked resolved cases. This indicator is an implemented
+diagnostic, rather than a rigorous roundoff error certificate.
+
+## Convergence behavior in m
+
+### Step 5: Obtain the root-exponential approximation scale
+
+For $0<\beta<1$, best uniform type-$(m,m)$ rational approximation to
+$x^\beta$ on $[0,1]$ satisfies
+$$
+\delta_m=\sup_{x\in[0,1]}|x^\beta-r_m(x)|
+\le C_\beta e^{-2\pi\sqrt{\beta m}}.
+$$
+Since the scaled discrete spectrum occupies only $J_h\subset[0,1]$,
+$$
+\delta_{h,m}=\sup_{x\in J_h}|x^\beta-r_m(x)|\le\delta_m.
+$$
+This scaling allows the source coefficient tables to be reused on
+different meshes. The exponent is proportional to $\sqrt m$, which
+is why the convergence plot uses square-root horizontal positions.
+
+The installed `rSPDE` tables provide numerical BRASIL coefficients.
+`brasil_coefficients()` uses a table row when available and otherwise
+interpolates the source poles, residues, and constant in $\beta$.
+An interpolated approximant need not be an exact best approximant.
+Positivity is checked, but the ideal best-approximation rate remains
+a benchmark for those numerical coefficients; it is not an automatic
+certificate for every table interpolation. Stability estimates use
+the actual approximation error when positivity holds.
+
+### Step 6: Connect approximation error to evolution error
+
+On numerical mode $j$, put $q_j=x_j^\beta$ and $r_j=r_m(x_j)$.
+The exact and rational one-step factors are
+$$
+\mu_j=\frac{q_j}{q_j+s}
+=\frac1{1+\tau\nu\lambda_{j,h}^\beta},\qquad
+\widetilde\mu_j=\frac{r_j}{r_j+s}.
+$$
+Both belong to $(0,1)$ when $r_j>0$. Their difference is
+$$
+\mu_j-\widetilde\mu_j
+=\frac{s(q_j-r_j)}{(q_j+s)(r_j+s)}.
+$$
+Thus the power-approximation error changes the damping of each
+discrete mode. With common modal initial coefficient $y_{0,j}$ and
+load $f_j^i=\mathbf v_j^\top\mathbf F^i$, iteration gives
+$$
+y_j^k-\widetilde y_j^k
+=(\mu_j^k-\widetilde\mu_j^k)y_{0,j}
++\tau\sum_{i=1}^k
+(\mu_j^{k+1-i}-\widetilde\mu_j^{k+1-i})f_j^i.
+$$
+The first term describes propagation of the initial value, and the
+second describes the accumulated response to the forcing.
+
+To see why accumulating time steps preserves the approximation-error
+scale, put $c_\nu=\nu\kappa^{2\beta}$, so $s=\tau c_\nu$. For each
+mode, the differences $\mu_j^n-\widetilde\mu_j^n$ have a common sign
+for all $n\ge1$. Summing the two geometric series therefore gives
+$$
+\begin{aligned}
+\tau\sum_{n=1}^{\infty}|\mu_j^n-\widetilde\mu_j^n|
+&=\tau\left|\frac{\mu_j}{1-\mu_j}
+-\frac{\widetilde\mu_j}{1-\widetilde\mu_j}\right|\\
+&=c_\nu^{-1}|q_j-r_j|
+\le c_\nu^{-1}\delta_{h,m}.
+\end{aligned}
+$$
+The forcing response is a discrete convolution with this summable
+kernel. The convolution inequality in the weighted $\ell^2$ time
+norm bounds it by $c_\nu^{-1}\delta_{h,m}$ times the norm of the
+projected, averaged forcing. Orthogonal projection and time averaging
+do not increase its $L_2$ norm.
+
+For the initial contribution, differentiating the scalar powers
+$(q/(q+\tau c_\nu))^n$ and summing their squared derivatives gives
+$$
+\left(\tau\sum_{n=1}^N
+|\mu_j^n-\widetilde\mu_j^n|^2\right)^{1/2}
+\le\frac{2\delta_{h,m}}{\sqrt{c_\nu q_j}}.
+$$
+Since $q_j^{-1}=\kappa^{-2\beta}\lambda_{j,h}^\beta$,
+the weighted modal initial norm is
+$\sum_j\lambda_{j,h}^\beta|y_{0,j}|^2
+=\|L_h^{\beta/2}P_hu_0\|_{L_2(\Gamma)}^2$.
+Stability of the projected initial value bounds this by its continuum
+$\dot H^\beta$ norm. Mass orthonormality and the triangle inequality
+then combine the initial and forcing estimates:
+$$
+E_m\lesssim\delta_{h,m}
+\left(\|u_0\|_{\dot H^\beta(\Gamma)}
++\|f\|_{L_2(0,T;L_2(\Gamma))}\right).
+$$
+The fixed problem constants, including $\nu$ and $\kappa$, are
+absorbed in the inequality. The smooth data satisfy the required
+norm assumptions. With the best-approximation scale, this gives
+$$
+E_m\lesssim e^{c_\alpha\sqrt m},\qquad
+c_\alpha=-2\pi\sqrt{\alpha/2}.
+$$
+This is an upper-bound prediction, not an equality requiring every
+finite-range slope to equal $c_\alpha$. The data excite particular
+parts of the spectrum, and the evolution norm need not attain the
+worst uniform power error.
+
+### Step 7: Interpret the fitted rational convergence slopes
+
+The displayed settings fix $h=0.02$, $\tau=0.005$, $T=1$, and
+$\nu=1$ and vary $m=2,\ldots,8$. The parameter chunk specifies a new
+run; saved results should be interpreted with their saved settings.
+The fitted relation is
+$$
+\ln E_m=s_m\sqrt m+b_m,
+$$
+using natural logarithms. The reference slope is $c_\alpha$; more
+negative slopes mean faster decay. The vertical axis is logarithmic,
+and ticks on the horizontal axis show $m$ at positions $\sqrt m$.
+
+For each $\alpha$, the dashed curve is
+$$
+E_{\rm guide}(m)=C_\alpha e^{c_\alpha\sqrt m},\qquad
+C_\alpha=\frac1{n_m}\sum_i
+\frac{E_{m_i}}{e^{c_\alpha\sqrt{m_i}}}.
+$$
+Its exponent is prescribed, while the reported regression estimates
+its slope freely. The guide is not a certified upper bound. At high
+orders, numerical disagreement can flatten the measured curve even
+though the ideal rational error continues to decrease. Comparing the
+all-order and resolved-only fits helps identify that limitation.
+
+## What the direct-power convergence plot measures
+
+The final plot checks the source rational approximation separately
+from the evolution error. For each $m$ and $\alpha$, the recompute
+chunk evaluates
+$$
+\widehat\delta_m
+=\max_{x\in\mathcal X}|r_m(x)-x^{\alpha/2}|,
+$$
+where $\mathcal X$ consists of $10001$ logarithmically spaced points
+on $[0.001,1]$. This is a sampled maximum on that interval, not the
+certified supremum on all of $[0,1]$; it excludes $[0,0.001)$ and
+can miss maxima between sample points. It is also distinct from the
+space--time solution error $E_m$.
+
+The same root-exponential exponent is a reference for this source
+approximation. Differences between the two plots are expected:
+the solution error also depends on the discrete spectrum, the
+excited modal amplitudes, and the repeated time-step response.
+Neither plot alone certifies a uniform approximation bound.
 
 ## Parameters
 

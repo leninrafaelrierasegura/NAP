@@ -400,6 +400,13 @@ contribution.</li>
 varies.</li>
 <li>Fit raw and logarithmically corrected convergence slopes.</li>
 </ol>
+</div>
+<div id="error-computation" class="section level2">
+<h2>Error computation</h2>
+<p>This section describes how the reported sampled error is evaluated.
+The following step-by-step analysis explains the continuum error and
+derives the logarithmic correction used to compare convergence
+rates.</p>
 <div id="a-finite-reference-and-the-original-forcing"
 class="section level3">
 <h3>A finite reference and the original forcing</h3>
@@ -470,6 +477,328 @@ code requires <code>reference_J &gt;= reference_cutoff + 2</code>,
 giving at least eight elements per shortest wavelength. This prevents
 the cutoff modes from vanishing or aliasing on an inadequately resolved
 dyadic reference mesh.</p>
+</div>
+</div>
+<div
+id="step-by-step-continuum-error-analysis-and-convergence-correction"
+class="section level2">
+<h2>Step-by-step continuum error analysis and convergence
+correction</h2>
+<p>This section derives the logarithmic correction from the rough
+forcing and the modes unresolved by each solver mesh. The continuum tail
+is used in the rate analysis. The reported errors are evaluated by the
+sampled reference calculation described above, with a fixed cutoff <span
+class="math inline">\(K\)</span>.</p>
+<p>Write <span class="math display">\[
+b_j(t)=\frac{1-e^{-a_jt}}{j a_j},\qquad
+a_j=\nu(\kappa^2+\pi^2 2^{2j})^{\alpha/2},
+\qquad u(t)=\sum_{j=1}^{\infty}b_j(t)\phi_j.
+\]</span> All spatial inner products and norms below are on the full
+graph <span class="math inline">\(\Gamma\)</span>. The symmetry
+reduction changes the matrix size, while retaining this full-graph
+norm.</p>
+<div id="step-1-why-this-is-a-rough-data-experiment"
+class="section level3">
+<h3>Step 1: Why this is a rough-data experiment</h3>
+<p>The functions <span class="math inline">\(\phi_j\)</span> are
+orthonormal. Consequently, <span class="math display">\[
+\|g\|_{L_2}^2=\sum_{j=1}^{\infty}\frac{1}{j^2}&lt;\infty.
+\]</span> In a positive spectral Sobolev norm, however, <span
+class="math display">\[
+\|g\|_{\dot H^s}^2
+=\sum_{j=1}^{\infty}\frac{\mu_j^s}{j^2}=\infty,
+\qquad s&gt;0,
+\]</span> because <span class="math inline">\(\mu_j\asymp
+2^{2j}\)</span> and exponential growth dominates <span
+class="math inline">\(j^2\)</span>. Thus <span
+class="math inline">\(g\in L_2=\dot H^0\)</span>, but <span
+class="math inline">\(g\)</span> belongs to no positive-order spectral
+Sobolev space. The same infinite <span class="math inline">\(g\)</span>
+is used on every mesh and for every <span
+class="math inline">\(\alpha\)</span>; its regularity is not improved by
+refinement.</p>
+<p>Each coefficient solves the scalar equation <span
+class="math display">\[
+b_j&#39;(t)+a_jb_j(t)=\frac1j,\qquad b_j(0)=0,
+\]</span> which gives the explicit <span
+class="math inline">\(b_j(t)\)</span> above. This is an exact
+representation of the continuum solution, even though it is an infinite
+series.</p>
+</div>
+<div id="step-2-why-the-infinite-forcing-has-a-finite-exact-load-vector"
+class="section level3">
+<h3>Step 2: Why the infinite forcing has a finite, exact load
+vector</h3>
+<p>Fix the uniform mesh <span class="math inline">\(h_J=2^{-J}\)</span>
+and let <span class="math inline">\(\psi_i\)</span> be its P1 hat
+functions. The load entry is <span class="math display">\[
+F_i=(g,\psi_i)
+=\sum_{j=1}^{\infty}\frac1j(\phi_j,\psi_i).
+\]</span> For these frequencies and this aligned uniform mesh, <span
+class="math display">\[
+(\phi_j,\psi_i)=0\qquad\text{for every }i\text{ and every }j\ge J.
+\]</span> The integrals vanish by cancellation of the sine against the
+hats; at the loop junction the two incident loop pieces are combined.
+Therefore <span class="math display">\[
+\boxed{F_i=\sum_{j=1}^{J-1}\frac1j(\phi_j,\psi_i).}
+\]</span> Every remaining sine–hat integral has an analytic formula. A
+finite calculation therefore gives the load for the original infinite
+forcing, up to floating-point arithmetic. This is not the same as
+replacing the continuum forcing by a truncated series.</p>
+<p>For example, at a loop interior node <span
+class="math inline">\(x_i\)</span>, with <span
+class="math inline">\(k_j=2^j\pi\)</span>, <span class="math display">\[
+(\phi_j,\psi_i)
+=h_J\left(\frac{\sin(k_jh_J/2)}{k_jh_J/2}\right)^2\sin(k_jx_i).
+\]</span> The solver forms the constant load using these retained
+sine–hat integrals and the coefficients <span
+class="math inline">\(1/j\)</span>.</p>
+</div>
+<div id="step-3-what-orthogonality-means-for-the-numerical-solution"
+class="section level3">
+<h3>Step 3: What orthogonality means for the numerical solution</h3>
+<p>Every <span class="math inline">\(v_h\in V_{h_J}\)</span> is a linear
+combination of the hats, so <span class="math display">\[
+(\phi_j,v_h)=0\qquad(j\ge J).
+\]</span> In particular, the numerical solution has zero component in
+each of these directions. This does not make those modes disappear from
+the true solution: <span class="math inline">\(b_j(t)&gt;0\)</span> for
+<span class="math inline">\(t&gt;0\)</span>.</p>
+<p>More strongly, since <span
+class="math inline">\(\|\phi_j\|_{L_2}=1\)</span>, <span
+class="math display">\[
+\|b\phi_j-v_h\|_{L_2}^2=|b|^2+\|v_h\|_{L_2}^2,
+\qquad j\ge J.
+\]</span> Thus the best FEM approximation to that isolated mode is zero.
+Refining the mesh moves the cutoff to higher frequencies. Modes below
+the cutoff become accessible through nonzero projections, but the sines
+themselves are still not piecewise linear and are not represented
+exactly.</p>
+</div>
+<div id="step-4-which-error-is-being-measured" class="section level3">
+<h3>Step 4: Which error is being measured</h3>
+<p>The continuum target is <span class="math display">\[
+\boxed{
+E=\|u-U_{h,m}^{\tau}\|_{L_2(0,T;L_2(\Gamma))}
+=\left(\int_0^T\int_\Gamma
+|u(s,t)-U_{h,m}^{\tau}(s,t)|^2\,ds\,dt\right)^{1/2}.
+}
+\]</span> The right-constant reconstruction is <span
+class="math display">\[
+U_{h,m}^{\tau}(t)=U_{h,m}^{n},\qquad t\in(t_{n-1},t_n],
+\quad t_n=n\tau.
+\]</span> It is an error over the whole graph and time interval, not
+only an error at mesh nodes or at the final time. The reported sampled
+error approximates this target using the finite reference <span
+class="math inline">\(u_K\)</span>, the reference mass matrix, and the
+reference-time sum. For brevity write <span
+class="math inline">\(U_h(t)\)</span> for the right-constant
+reconstruction in the following spatial decompositions. When emphasizing
+the dyadic mesh, write <span
+class="math inline">\(E_{h_J}=E\)</span>.</p>
+<p>Split the exact solution as <span class="math display">\[
+u=u_{&lt;J}+u_{\ge J},\qquad
+u_{&lt;J}=\sum_{j=1}^{J-1}b_j\phi_j,\qquad
+u_{\ge J}=\sum_{j=J}^{\infty}b_j\phi_j.
+\]</span> The tail starts at <span class="math inline">\(j=J\)</span>,
+including that index. It is orthogonal both to <span
+class="math inline">\(u_{&lt;J}\)</span> and to <span
+class="math inline">\(U_h\)</span>. Hence <span class="math display">\[
+\boxed{
+\|u(t)-U_h(t)\|_{L_2}^2
+=\|u_{&lt;J}(t)-U_h(t)\|_{L_2}^2
++\sum_{j=J}^{\infty}b_j(t)^2.
+}
+\]</span> It is the squared contributions that add; their square roots
+do not add in this identity.</p>
+</div>
+<div id="step-5-derive-the-continuum-unresolved-tail-norm"
+class="section level3">
+<h3>Step 5: Derive the continuum unresolved-tail norm</h3>
+<p>Orthonormality gives the spatial norm directly from the coefficients.
+Integrating in time, and interchanging the nonnegative sum and integral,
+<span class="math display">\[
+E_{\mathrm{tail}}^2
+=\sum_{j=J}^{\infty}\frac{1}{j^2a_j^2}
+\int_0^T(1-e^{-a_jt})^2\,dt.
+\]</span> Expanding the square and integrating the exponentials yields
+<span class="math display">\[
+\boxed{
+E_{\mathrm{tail}}^2
+=\sum_{j=J}^{\infty}\frac{1}{j^2a_j^2}
+\left[T-\frac{2(1-e^{-a_jT})}{a_j}
++\frac{1-e^{-2a_jT}}{2a_j}\right].
+}
+\]</span> This identity expresses the continuum tail through its
+coefficients. It will be used below to derive the rate correction; the
+sampled-error routine does not evaluate or add this infinite series.</p>
+</div>
+<div id="step-6-control-the-fixed-reference-cutoff"
+class="section level3">
+<h3>Step 6: Control the fixed reference cutoff</h3>
+<p>The sampled reference retains the modes through <span
+class="math inline">\(K\)</span>. Its omitted part is <span
+class="math display">\[
+u-u_K=\sum_{j=K+1}^{\infty}b_j\phi_j.
+\]</span> Since <span class="math inline">\((1-e^{-a_jt})^2\le1\)</span>
+and <span class="math inline">\(a_j\ge\nu\pi^\alpha 2^{\alpha
+j}\)</span>, <span class="math display">\[
+\|u-u_K\|_{L_2(0,T;L_2(\Gamma))}^2
+\le\frac{T}{\nu^2\pi^{2\alpha}}
+\sum_{j=K+1}^{\infty}\frac{2^{-2\alpha j}}{j^2}.
+\]</span> Using <span class="math inline">\(j^{-2}\le(K+1)^{-2}\)</span>
+and summing the geometric series gives <span class="math display">\[
+\|u-u_K\|_{L_2(0,T;L_2(\Gamma))}^2
+\le B_K:=\frac{T}{\nu^2\pi^{2\alpha}(K+1)^2}
+\frac{2^{-2\alpha(K+1)}}{1-2^{-2\alpha}}.
+\]</span> Because <span class="math inline">\(K\ge\max J-1\)</span>,
+every omitted mode is orthogonal to the solver space on every tested
+mesh and to the retained reference modes. Thus, in the continuum norm,
+<span class="math display">\[
+E_{h_J}^2=\|u_K-U_h\|_{L_2(0,T;L_2(\Gamma))}^2
++\|u-u_K\|_{L_2(0,T;L_2(\Gamma))}^2.
+\]</span> The code computes <span class="math inline">\(B_K\)</span> and
+checks <span class="math inline">\(B_K/E_{\mathrm{sampled}}^2\)</span>
+against <code>max_tail_squared_fraction</code>. It does not add <span
+class="math inline">\(B_K\)</span> or an infinite-tail sum to the
+measured error. The bound controls reference truncation; reference-mesh
+and reference-time refinement separately check the quadrature used to
+approximate <span class="math inline">\(\|u_K-U_h\|\)</span>.</p>
+</div>
+<div id="step-7-how-the-continuum-norm-relates-to-the-error-estimate"
+class="section level3">
+<h3>Step 7: How the continuum norm relates to the error estimate</h3>
+<p>For <span class="math inline">\(0&lt;\alpha&lt;2\)</span>, the error
+estimate has the form <span class="math display">\[
+\|u-U_{h,m}^{\tau}\|_{L_2(0,T;L_2(\Gamma))}
+\lesssim\tau+
+h^{\min\{s_0+\alpha/2,\ s_f+\alpha,\ 2\}-\epsilon}
++\delta_m.
+\]</span> Here <span class="math inline">\(u_0=0\)</span> permits
+arbitrarily large <span class="math inline">\(s_0\)</span>, while the
+forcing only permits <span class="math inline">\(s_f=0\)</span>. Thus,
+for sufficiently small <span
+class="math inline">\(\epsilon&gt;0\)</span>, <span
+class="math display">\[
+\boxed{E\lesssim\tau+h^{\alpha-\epsilon}+\delta_m.}
+\]</span> Under the rational-approximation assumptions, <span
+class="math inline">\(\delta_m\)</span> has root-exponential decay with
+rational order <span class="math inline">\(m\)</span>. A fixed positive
+diffusion coefficient <span class="math inline">\(\nu\)</span> changes
+constants, while preserving these orders. The case <span
+class="math inline">\(\alpha=2\)</span> admits an exact rational
+representation and the bound <span
+class="math inline">\(\tau+h^2\)</span>; this study uses <span
+class="math inline">\(0&lt;\alpha&lt;2\)</span>.</p>
+<p>The sampled quantity approximates the norm on the estimate’s
+left-hand side, with the reference truncation and quadrature
+qualifications above. The resolved/unresolved split in Step 4 is an
+orthogonal identity for that continuum norm. Its resolved part can
+contain temporal, spatial, and rational errors together; it does not
+isolate the three upper-bound terms. Reference truncation, reference
+quadrature, linear-solve, and arithmetic errors require their own
+accuracy checks.</p>
+<p>The spatial experiment keeps <span
+class="math inline">\(\tau\)</span> and <span
+class="math inline">\(m\)</span> fixed along each mesh curve and selects
+them to limit their influence over the tested range. Under further
+refinement, fixed temporal or rational errors can eventually mask
+spatial convergence. The observed spatial slopes provide numerical
+evidence for the predicted order; a finite set of slopes is not a proof
+of the bound.</p>
+</div>
+<div id="step-8-why-this-forcing-suggests-the-factor-1j"
+class="section level3">
+<h3>Step 8: Why this forcing suggests the factor <span
+class="math inline">\(1/J\)</span></h3>
+<p>For fixed <span class="math inline">\(T&gt;0\)</span>, <span
+class="math inline">\(\nu&gt;0\)</span>, and <span
+class="math inline">\(\alpha&gt;0\)</span>, the bracket in the tail
+formula tends to <span class="math inline">\(T\)</span> as <span
+class="math inline">\(j\to\infty\)</span>, and <span
+class="math inline">\(a_j\asymp2^{\alpha j}\)</span>. Hence <span
+class="math display">\[
+E_{\mathrm{tail}}^2\asymp
+\sum_{j=J}^{\infty}\frac{2^{-2\alpha j}}{j^2}.
+\]</span> The first term bounds this sum from below. Replacing <span
+class="math inline">\(j^{-2}\)</span> by <span
+class="math inline">\(J^{-2}\)</span> and summing the geometric series
+bounds it from above: <span class="math display">\[
+\frac{2^{-2\alpha J}}{J^2}
+\le\sum_{j=J}^{\infty}\frac{2^{-2\alpha j}}{j^2}
+\le\frac{2^{-2\alpha J}}{J^2(1-2^{-2\alpha})}.
+\]</span> Therefore <span class="math display">\[
+\boxed{E_{\mathrm{tail}}\asymp\frac{2^{-\alpha J}}{J}
+=\frac{h_J^\alpha}{\log_2(1/h_J)}.}
+\]</span> The factor <span class="math inline">\(h_J^\alpha\)</span>
+comes from damping the high frequencies; <span
+class="math inline">\(1/J\)</span> comes from the forcing amplitudes
+<span class="math inline">\(1/j\)</span>. Since the tail is an
+orthogonal error contribution, <span class="math inline">\(E\ge
+E_{\mathrm{tail}}\)</span>. This establishes a lower bound for the total
+error and motivates the model <span class="math inline">\(E_{h_J}\approx
+C_\alpha h_J^\alpha/J\)</span>. The tail calculation alone does not
+prove a matching upper bound for the other contributions or show that a
+tested mesh range has reached this regime.</p>
+<p>The model is compatible with the error estimate because <span
+class="math display">\[
+\frac{h_J^\alpha/J}{h_J^{\alpha-\epsilon}}
+=\frac{h_J^\epsilon}{J}\longrightarrow0.
+\]</span> An upper bound permits the actual error to decay faster. At
+the same time, for every <span class="math inline">\(\eta&gt;0\)</span>,
+<span class="math display">\[
+\frac{h_J^\alpha/J}{h_J^{\alpha+\eta}}
+=\frac{h_J^{-\eta}}{J}\longrightarrow\infty.
+\]</span> Thus the tail rules out a higher algebraic order <span
+class="math inline">\(\alpha+\eta\)</span> for this fixed forcing, while
+permitting the logarithmic improvement.</p>
+</div>
+<div id="step-9-why-report-raw-and-logarithmically-corrected-slopes"
+class="section level3">
+<h3>Step 9: Why report raw and logarithmically corrected slopes?</h3>
+<p>Under the model <span class="math inline">\(E_{h_J}\approx C_\alpha
+h_J^\alpha/J\)</span>, halving the mesh gives <span
+class="math display">\[
+\frac{E_{h_J}}{E_{h_{J+1}}}\approx
+2^\alpha\frac{J+1}{J}.
+\]</span> The two-mesh observed order is therefore <span
+class="math display">\[
+\log_2\frac{E_{h_J}}{E_{h_{J+1}}}
+\approx\alpha+\log_2\left(\frac{J+1}{J}\right)&gt;\alpha.
+\]</span> The raw slope can exceed <span
+class="math inline">\(\alpha\)</span> even when this model holds
+exactly. Multiplying by <span class="math inline">\(J\)</span> gives
+<span class="math inline">\(J E_{h_J}\approx C_\alpha
+h_J^\alpha\)</span>, which motivates the corrected regression below.
+This correction removes a factor associated with the particular forcing;
+the error estimate does not assert a universal <span
+class="math inline">\(1/J\)</span> factor for all <span
+class="math inline">\(L_2\)</span> data.</p>
+<p>Specifically, the regressions are <span class="math display">\[
+\log_{10}E_h=s_{\rm raw}\log_{10}h+b_{\rm raw},
+\qquad
+\log_{10}(J E_h)=s_{\rm corrected}\log_{10}h+b_{\rm corrected}.
+\]</span> The corrected slope is compared with <span
+class="math inline">\(\alpha\)</span>. Here <span
+class="math inline">\(E_h\)</span> in the regressions is the measured
+sampled error against <span class="math inline">\(u_K\)</span>.
+Multiplication by <span class="math inline">\(J=\log_2(1/h)\)</span> is
+applied after computing that error; it is a correction of the rate
+comparison, not a change to the error norm or an addition of the tail
+bound.</p>
+<p>Lower modes are smooth and can contribute a second-order spatial
+term. Comparing that scale with the tail gives the ratio <span
+class="math display">\[
+\frac{h_J^2}{h_J^\alpha/J}=J h_J^{2-\alpha}.
+\]</span> For fixed <span class="math inline">\(\alpha&lt;2\)</span> it
+eventually tends to zero, but the separation can be slow when <span
+class="math inline">\(\alpha\)</span> is close to <span
+class="math inline">\(2\)</span>. This is consistent with a remaining
+lower-mode contribution over a finite mesh range; it does not establish
+the cause of a particular observed slope. Corrected slopes near <span
+class="math inline">\(\alpha\)</span>, together with sufficiently small
+other errors, support the predicted regularity-dependent spatial
+order.</p>
 </div>
 </div>
 <div id="parameters" class="section level2">

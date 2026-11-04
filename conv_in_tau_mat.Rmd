@@ -34,24 +34,283 @@ library(ggplot2)
 
 ## Problem and matrix method
 
-On the tadpole with stem length 1 and loop length 2, solve
+On the tadpole graph with stem length $1$ and loop length $2$, let
+$L=\kappa^2-\Delta_\Gamma$ be the shifted Kirchhoff--Laplacian. We solve
 $$
-u_t+\nu L^{\alpha/2}u=a_f A\sin(\omega t)e_7,
-\qquad u(0)=a_0e_5,\qquad L=\kappa^2-\Delta_\Gamma.
+u_t+\nu L^\beta u=a_f A\sin(\omega t)e_7,
+\qquad u(0)=a_0e_5,\qquad \beta=\alpha/2.
 $$
-The data contain finitely many smooth eigenfunctions; the editable amplitudes
-are `initial_amplitude` and `forcing_amplitude`, with sine factor `AAA` and
-frequency `OMEGA`. Consistent P1 mass
-and stiffness matrices are assembled on the tadpole. Every backward Euler
-step applies shifted sparse matrix solves using the installed `rSPDE`
-BRASIL poles, residues, and constant. Cholesky factors are reused, including
-the mass-matrix factor for the constant contribution. Analytic sine–hat
-loads and interval-averaged forcing are used.
+Here $Le_j=\lambda_j e_j$ and the $e_j$ are orthonormal in
+$L_2(\Gamma)$. The amplitudes $a_0,a_f,A$ and frequency $\omega$ are
+`initial_amplitude`, `forcing_amplitude`, `AAA`, and `OMEGA`.
 
-The reported error is the right-constant space–time $L_2$ error against the
-continuum solution, evaluated on the saved reference mesh and time grid.
-A compiled C++ loop advances every FEM time step and accumulates the same norm
-using centered coefficient moments. The reference modes evaluate the continuum solution only.
+### Step 1: Derive the exact continuum solution
+
+Writing $u(t)=\sum_j c_j(t)e_j$ and taking the inner product with $e_j$
+reduces the equation to
+$$
+c_j'(t)+\gamma_j c_j(t)=a_f A\sin(\omega t)\,\mathbf{1}_{\{j=7\}},
+\qquad c_j(0)=a_0\mathbf{1}_{\{j=5\}},
+\qquad \gamma_j=\nu\lambda_j^\beta.
+$$
+Only two coefficients are nonzero. The initial mode decays as
+$c_5(t)=a_0e^{-\gamma_5t}$. Variation of constants gives
+$$
+\begin{aligned}
+c_7(t)
+&=a_f A\int_0^t e^{-\gamma_7(t-r)}\sin(\omega r)\,dr\\
+&=\frac{a_f A}{\gamma_7^2+\omega^2}
+\left[\gamma_7\sin(\omega t)-\omega\cos(\omega t)
++\omega e^{-\gamma_7t}\right].
+\end{aligned}
+$$
+Therefore the reference solution is exactly
+$$
+u(s,t)=c_5(t)e_5(s)+c_7(t)e_7(s).
+$$
+`exact_modal_coefficients()` evaluates these coefficients at the reference
+times. The reference eigenfunctions evaluate the continuum solution;
+the computed FEM solution is advanced by sparse matrix solves.
+Increasing `N_finite` does not add active solution modes for these data:
+all initial and forcing coefficients outside modes $5$ and $7$ are zero.
+
+### Step 2: Identify the regularity of the data
+
+For any finite $r\ge0$, the spectral Sobolev norm of the initial data is
+$$
+\|u_0\|_{\dot H^r(\Gamma)}^2=a_0^2\lambda_5^r<\infty.
+$$
+Likewise,
+$$
+\|f\|_{L_2(0,T;\dot H^r(\Gamma))}^2
+=a_f^2 A^2\lambda_7^r\int_0^T\sin^2(\omega t)\,dt<\infty.
+$$
+Thus both data have arbitrarily high spectral spatial regularity. Their
+regularity permits the spatial estimate to reach the P1 rate limit, and
+the solution coefficients are smooth in time. Changing $\alpha$ changes
+the damping rates $\gamma_j$, but does not reduce this data regularity.
+
+### Step 3: Assemble the projected initial value and averaged load
+
+Let $V_h$ be the continuous P1 space with hats $\psi_i$. Define
+$$
+\mathbf C_{ij}=(\psi_j,\psi_i)_{L_2(\Gamma)},\qquad
+\mathbf G_{ij}=(\psi_j',\psi_i')_{L_2(\Gamma)},\qquad
+\mathbf L=\kappa^2\mathbf C+\mathbf G,
+$$
+and $(\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}$.
+The initial coefficient vector represents the orthogonal projection
+$P_hu_0$:
+$$
+\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5.
+$$
+`project_u0_tadpole()` computes this mass-matrix solve. The initial
+vector is a projection, rather than the vector of nodal samples.
+
+On $I_{k+1}=(t_k,t_{k+1}]$, with $t_k=k\tau$, the forcing is averaged:
+$$
+\overline g_{k+1}
+=\frac1\tau\int_{t_k}^{t_{k+1}}A\sin(\omega t)\,dt
+=\frac{A[\cos(\omega t_k)-\cos(\omega t_{k+1})]}{\omega\tau},
+\qquad \mathbf F^{k+1}=a_f\overline g_{k+1}\boldsymbol\ell_7.
+$$
+The quotient formula applies when $\omega\ne0$. The code uses the
+equivalent stable expression
+$A\sin(\omega(t_k+\tau/2))\operatorname{sinc}(\omega\tau/2)$, where
+$\operatorname{sinc}(z)=\sin(z)/z$ and $\operatorname{sinc}(0)=1$.
+The sine--hat integrals defining $\boldsymbol\ell_5$ and
+$\boldsymbol\ell_7$ are evaluated analytically on the solver mesh.
+
+### Step 4: Advance the fractional backward Euler scheme
+
+The matrix of the discrete operator $L_h$ is
+$\mathbf B=\mathbf C^{-1}\mathbf L$. Exact-discrete backward Euler would
+apply
+$$
+\mathbf U_h^{k+1}
+=(\mathbf I+\tau\nu\mathbf B^\beta)^{-1}
+\left(\mathbf U_h^k+\tau\mathbf C^{-1}\mathbf F^{k+1}\right).
+$$
+For $0<\alpha<2$, the implementation replaces this fractional inverse
+by a BRASIL rational function. If $r_m(x)$ approximates $x^\beta$, set
+$$
+S_m(y)=r_m(y^{-1}),\qquad
+s=\tau\nu\kappa^{2\beta},\qquad
+H_m(y)=\frac{S_m(y)}{S_m(y)+s}
+=r_\tau+\sum_{n=1}^m\frac{a_n}{y-z_n}.
+$$
+The update used in the notebook is
+$$
+\mathbf U_{h,m}^{k+1}
+=\left[r_\tau\mathbf C^{-1}
++\sum_{n=1}^m a_n(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}\right]
+\left(\mathbf C\mathbf U_{h,m}^k+\tau\mathbf F^{k+1}\right).
+$$
+The time-step poles $z_n$ are negative and the residues $a_n$ positive.
+The shifted matrices are positive definite, so their Cholesky factors
+can be reused at every step of a run. The constant $r_\tau$ contributes
+a mass-matrix solve and is included. For $\alpha=2$, the code directly
+solves $(\mathbf C+\tau\nu\mathbf L)\mathbf U^{k+1}
+=\mathbf C\mathbf U^k+\tau\mathbf F^{k+1}$.
+
+## Error computation
+
+### Step 5: Define the space--time error and reconstruction
+
+The continuum target is
+$$
+E=\|u-U_{h,m}^\tau\|_{L_2(0,T;L_2(\Gamma))},\qquad
+U_{h,m}^\tau(t)=\sum_i(\mathbf U_{h,m}^k)_i\psi_i,
+\quad t\in(t_{k-1},t_k].
+$$
+This norm measures the error over the entire graph and time interval.
+The reconstruction uses the new state on each solver interval; the
+value at $t=0$ has no effect on the time integral.
+
+Let $s_i^\star$ be the reference-mesh nodes, $\mathbf C^\star$ its
+consistent mass matrix, and $t_\ell^\star=\ell\tau_\star$ the reference
+times. Define
+$$
+\boldsymbol\Psi_{ij}=\psi_j(s_i^\star),\qquad
+\mathbf u^\star(t)=\left[u(s_i^\star,t)\right]_i,
+\qquad
+\mathbf d_\ell=\mathbf u^\star(t_\ell^\star)
+-\boldsymbol\Psi\mathbf U_{h,m}^{k(\ell)},
+$$
+where $t_\ell^\star\in(t_{k(\ell)-1},t_{k(\ell)}]$. The reported error is
+$$
+E_{\rm sampled}^2
+=\tau_\star\sum_{\ell=1}^{N_\star}
+\mathbf d_\ell^\top\mathbf C^\star\mathbf d_\ell.
+$$
+The quadratic form is the exact mass norm of the P1 interpolant on the
+reference mesh. Together with the right-endpoint time sum, it
+approximates the continuum norm. No reference PDE is solved, and the
+two-mode exact solution has no omitted spectral tail.
+
+### Step 6: Connect the implemented error evaluation to this norm
+
+`prepare_reference_error()` compresses the sampled quadratic form using
+the reference-mesh inner product. The compiled solver groups reference
+times belonging to the same solver interval and uses their weighted
+coefficient means and centered scatter to accumulate that same sum.
+These are moments of discrete reference samples. They do not replace
+the reference-time sum by analytic integration in time.
+
+Every backward Euler step is advanced, including steps between reference
+samples. Spatial reference refinement and reference-time refinement
+check the accuracy of the measured norm separately from the solver's
+spatial, temporal, and rational approximation errors.
+
+## Convergence behavior in tau
+
+### Step 7: Identify the first-order temporal contribution
+
+For $0<\alpha<2$, the total error estimate has the form
+$$
+E\lesssim\tau+h^q+e^{c_\alpha\sqrt m},\qquad
+q=\min\{s_0+\alpha/2,\ s_f+\alpha,\ 2\}-\epsilon,
+\qquad c_\alpha=-2\pi\sqrt{\alpha/2}.
+$$
+The temporal estimate requires $u_0\in\dot H^{\alpha/2}(\Gamma)$
+and $f\in L_2(0,T;L_2(\Gamma))$. Step 2 verifies these requirements,
+and also permits the spatial exponent $q=2-\epsilon$ for every
+sufficiently small $\epsilon>0$. Thus
+$$
+E\lesssim\tau+h^{2-\epsilon}+e^{c_\alpha\sqrt m}.
+$$
+The rational term assumes the stated approximation quality. For
+$\alpha=2$, the exact rational representation gives
+$E\lesssim\tau+h^2$. A fixed $\nu>0$ changes constants and damping
+rates, while preserving the first-order temporal prediction.
+
+### Step 8: See first order in the scalar coefficient equation
+
+Consider one exact coefficient $c'(t)+\gamma c(t)=F(t)$ with
+$\gamma>0$. Integrating over a step gives
+$$
+c(t_{k+1})-c(t_k)+\gamma\int_{t_k}^{t_{k+1}}c(t)\,dt
+=\tau\overline F_{k+1}.
+$$
+Backward Euler uses the right endpoint in the damping term. Substituting
+the exact solution into that step leaves the residual
+$$
+\begin{aligned}
+\rho_{k+1}
+&=c(t_{k+1})-c(t_k)+\tau\gamma c(t_{k+1})
+-\tau\overline F_{k+1}\\
+&=\gamma\int_{t_k}^{t_{k+1}}[c(t_{k+1})-c(t)]\,dt.
+\end{aligned}
+$$
+For the smooth coefficients in Step 1,
+$|\rho_{k+1}|\le\gamma\tau^2\sup_{I_{k+1}}|c'|/2$.
+The exact forcing average introduces no additional load quadrature
+error. If $z_k$ is the backward Euler coefficient and
+$e_k=c(t_k)-z_k$, then
+$$
+e_{k+1}=\frac{e_k+\rho_{k+1}}{1+\tau\gamma}.
+$$
+The multiplier lies in $(0,1)$. Starting from the same initial value,
+accumulating $N=T/\tau$ step residuals of order $\tau^2$ gives a
+nodal error of order $\tau$.
+
+The right-constant reconstruction has the same first-order scale,
+because for $t\in(t_k,t_{k+1}]$,
+$$
+|c(t)-z_{k+1}|
+\le\tau\sup_{I_{k+1}}|c'|+|e_{k+1}|.
+$$
+Integrating its square over $[0,T]$ and taking the square root preserves
+order $\tau$. This modal argument explains the temporal rate for the
+smooth exact solution; the full estimate also includes the spatial and
+rational approximations present in the computed solution.
+
+### Step 9: Vary the time step while controlling the other errors
+
+The displayed study fixes $h=10^{-3}$, $m=8$, and $\nu=10^{-3}$ and
+varies $\tau=T/N$ for $N\in\{200,63,20,6,2\}$, with $T=1$.
+The reference mesh and reference time step are both $10^{-5}$.
+`make_time_grid()` uses an integer number of steps and returns the
+actual step size, which is used in the solver and regression. The
+parameter chunk specifies a new run; saved errors should be read with
+the settings used to generate them.
+
+For each $\tau$, the code recomputes the forcing averages and the
+rational time-step coefficients. Even at fixed $m$, the shifted
+matrices and residues depend on $s=\tau\nu\kappa^{2\beta}$.
+
+The triangle inequality separates the theoretical estimates:
+$$
+E\le\|u-U^\tau\|+\|U^\tau-U_h^\tau\|
++\|U_h^\tau-U_{h,m}^\tau\|,
+$$
+with all norms in $L_2(0,T;L_2(\Gamma))$. When the first contribution
+dominates, $E_\tau\approx C_\alpha\tau$: halving $\tau$ should roughly
+halve the error. Fixed spatial and rational errors can eventually mask
+this trend; their actual values need not be independent of $\tau$,
+although $h$ and $m$ remain fixed. A reference-time sum that is too
+coarse can also obscure the measured temporal rate.
+
+### Step 10: Interpret the regression and reference slope
+
+The code fits
+$$
+\log_{10}E_\tau=s_\tau\log_{10}\tau+b_\tau
+$$
+over the listed time steps and compares $s_\tau$ with $1$. Both plot
+axes are logarithmic. The dashed curves have prescribed slope one,
+with constants
+$$
+C_\alpha=\frac1{n_\tau}\sum_i\frac{E_{\tau_i}}{\tau_i},
+\qquad E_{\rm guide}(\tau)=C_\alpha\tau.
+$$
+This averaging fixes only their vertical position. The reported
+regression estimates its slope freely and is a separate calculation.
+The guides are not certified upper bounds, and coarse steps or an
+error floor can shift the fitted slope away from one. Observed slopes
+close to one, together with adequate spatial, rational, and reference
+accuracy, support first-order backward Euler convergence for the
+right-constant space--time error.
 
 ## Parameters
 

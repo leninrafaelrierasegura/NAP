@@ -368,30 +368,315 @@ knitr::purl(&quot;brasilfunc.Rmd&quot;, output=&quot;brasilfunc.R&quot;, quiet=T
 <pre class="r"><code>source(&quot;brasilfunc.R&quot;)</code></pre>
 <pre class="r"><code>knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)</code></pre>
 <pre class="r"><code>library(ggplot2)</code></pre>
-<div id="matrix-experiment" class="section level2">
-<h2>Matrix experiment</h2>
-<p>The smooth data are <span class="math inline">\(u_0=a_0e_5\)</span>
-and <span class="math inline">\(f(t)=a_f A\sin(\omega t)e_7\)</span> on
-the length-(1,2) tadpole. Both evolutions use the <strong>same assembled
-consistent P1 FEM matrices</strong>, analytic loads, and
-interval-averaged forcing. For <span
-class="math inline">\(LV=CV\Lambda\)</span> with <span
-class="math inline">\(V^\top CV=I\)</span>, the reference is <span
+<div id="problem-and-common-matrix-discretization"
+class="section level2">
+<h2>Problem and common matrix discretization</h2>
+<p>The smooth data on the length-<span
+class="math inline">\((1,2)\)</span> tadpole are <span
 class="math display">\[
-U_h^{k+1}=V\operatorname{diag}\!\left(
-  \frac{1}{1+\tau\nu\lambda_j^{\alpha/2}}\right)
-  V^\top(CU_h^k+\tau F^{k+1}).
-\]</span> The rational evolution applies shifted sparse solves with
-installed <code>rSPDE</code> BRASIL coefficients and retains the mass
-solve from the constant term. The numerical eigenbasis supplies an
-independent reference and diagnostic; it does not replace the rational
-matrix solver. The isolated error is <span class="math display">\[
-E_m^2=\tau\sum_{k=1}^N
-(U_h^k-U_{h,m}^k)^\top C(U_h^k-U_{h,m}^k).
-\]</span> All orders use the same mesh and time grid. Dense
-eigendecomposition is restricted to moderate meshes. For <span
-class="math inline">\(\alpha=2\)</span>, ordinary backward Euler
-provides a control without rational approximation.</p>
+u_t+\nu L^\beta u=f(t),\qquad
+u_0=a_0e_5,\qquad f(t)=a_f A\sin(\omega t)e_7,
+\qquad \beta=\alpha/2,\quad L=\kappa^2-\Delta_\Gamma.
+\]</span> The amplitudes and frequency are
+<code>initial_amplitude</code>, <code>forcing_amplitude</code>,
+<code>AAA</code>, and <code>OMEGA</code>. These finite eigenfunction
+sums have arbitrarily high spectral spatial regularity. This study
+measures the error introduced by rational approximation on a fixed FEM
+mesh and time grid.</p>
+<p>Let <span class="math inline">\(\psi_i\)</span> be the P1 hats and
+define <span class="math display">\[
+\mathbf C_{ij}=(\psi_j,\psi_i)_{L_2(\Gamma)},\qquad
+\mathbf G_{ij}=(\psi_j&#39;,\psi_i&#39;)_{L_2(\Gamma)},\qquad
+\mathbf L=\kappa^2\mathbf C+\mathbf G,
+\qquad\mathbf B=\mathbf C^{-1}\mathbf L.
+\]</span> Writing <span
+class="math inline">\((\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}\)</span>,
+both evolutions start from the same <span
+class="math inline">\(L_2\)</span> projection and use the same load:
+<span class="math display">\[
+\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5,\qquad
+\mathbf F^{k+1}=a_f\overline g_{k+1}\boldsymbol\ell_7,
+\qquad
+\overline g_{k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}A\sin(\omega t)\,dt.
+\]</span> The sine–hat integrals are analytic. For <span
+class="math inline">\(\omega\ne0\)</span>, <span
+class="math inline">\(\overline g_{k+1}=A[\cos(\omega t_k)-\cos(\omega
+t_{k+1})]/(\omega\tau)\)</span>; the code evaluates its stable
+midpoint-sinc form, including <span
+class="math inline">\(\omega=0\)</span>. Thus projection, assembly, and
+forcing treatment are shared across all orders and both reference and
+rational solutions.</p>
+</div>
+<div id="error-computation" class="section level2">
+<h2>Error computation</h2>
+<div id="step-1-build-the-exact-discrete-backward-euler-reference"
+class="section level3">
+<h3>Step 1: Build the exact-discrete backward Euler reference</h3>
+<p>The complete generalized eigensystem satisfies <span
+class="math display">\[
+\mathbf L\mathbf V=\mathbf C\mathbf V\boldsymbol\Lambda,
+\qquad\mathbf V^\top\mathbf C\mathbf V=\mathbf I,
+\qquad\boldsymbol\Lambda=\operatorname{diag}(\lambda_{j,h}).
+\]</span> All <span class="math inline">\(N_h\)</span> numerical
+eigenvectors are retained. This diagonalizes the FEM operator, up to
+eigensolver and arithmetic errors. It is not a truncation to the two
+continuum eigenfunctions: their projections can excite more than two
+discrete modes.</p>
+<p>Backward Euler for the discrete fractional operator is <span
+class="math display">\[
+\mathbf U_h^{k+1}=\mathbf V
+\operatorname{diag}\left((1+\tau\nu\lambda_{j,h}^\beta)^{-1}\right)
+\mathbf V^\top(\mathbf C\mathbf U_h^k+\tau\mathbf F^{k+1}).
+\]</span> This reference has no rational approximation. It still
+includes the common FEM and backward Euler discretizations, which makes
+it the appropriate reference for isolating the rational error.
+<code>isolated_discrete_spectrum()</code> checks the eigen-equation
+residuals and mass orthogonality. Dense eigendecomposition is restricted
+to moderate meshes by allocation guards.</p>
+</div>
+<div id="step-2-compute-the-rational-evolution-by-shifted-sparse-solves"
+class="section level3">
+<h3>Step 2: Compute the rational evolution by shifted sparse solves</h3>
+<p>Scale the discrete operator by <span
+class="math inline">\(\kappa^2\)</span> and write <span
+class="math display">\[
+x_j=\frac{\kappa^2}{\lambda_{j,h}}\in J_h=[\delta_h,1],\qquad
+\delta_h=\frac{\kappa^2}{\lambda_{\max,h}}.
+\]</span> The smallest eigenvalue is <span
+class="math inline">\(\kappa^2\)</span>, so the upper endpoint is one. A
+type-<span class="math inline">\((m,m)\)</span> rational function <span
+class="math inline">\(r_m\)</span> approximates <span
+class="math inline">\(x^\beta\)</span> on <span
+class="math inline">\([0,1]\)</span>. For the shifted-solve
+implementation, set <span class="math display">\[
+S_m(y)=r_m(y^{-1})=d_m+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j},
+\qquad
+H_m(y)=\frac{S_m(y)}{S_m(y)+s},\qquad s=\tau\nu\kappa^{2\beta}.
+\]</span> The BRASIL source poles <span
+class="math inline">\(\eta_j&lt;0\)</span>, residues <span
+class="math inline">\(\rho_j&gt;0\)</span>, and constant <span
+class="math inline">\(d_m\ge0\)</span> determine the time-step partial
+fractions <span class="math display">\[
+H_m(y)=r_\tau+\sum_{n=1}^m\frac{a_n}{y-z_n},
+\qquad r_\tau=\frac{d_m}{d_m+s}.
+\]</span> The time-step poles <span class="math inline">\(z_n\)</span>
+and residues <span class="math inline">\(a_n\)</span> belong to <span
+class="math inline">\(H_m\)</span>, and are recomputed from the source
+coefficients for the chosen <span class="math inline">\(\tau\)</span>.
+The actual matrix evolution is <span class="math display">\[
+\mathbf U_{h,m}^{k+1}
+=\left[r_\tau\mathbf C^{-1}
++\sum_{n=1}^m a_n(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}\right]
+(\mathbf C\mathbf U_{h,m}^k+\tau\mathbf F^{k+1}).
+\]</span> It retains the constant-term mass solve and reuses Cholesky
+factors. The numerical eigenbasis supplies the independent reference and
+diagnostics; it does not replace these sparse rational solves.</p>
+</div>
+<div id="step-3-measure-the-isolated-spacetime-error"
+class="section level3">
+<h3>Step 3: Measure the isolated space–time error</h3>
+<p>The difference of two FEM functions with coefficient difference <span
+class="math inline">\(\mathbf d_k=\mathbf U_h^k-\mathbf
+U_{h,m}^k\)</span> has squared spatial norm <span
+class="math inline">\(\mathbf d_k^\top\mathbf C\mathbf d_k\)</span>.
+Both reconstructions are constant on <span
+class="math inline">\((t_{k-1},t_k]\)</span>, so their time integral is
+exact: <span class="math display">\[
+E_m=\|U_h^\tau-U_{h,m}^\tau\|_{L_2(0,T;L_2(\Gamma))},\qquad
+E_m^2=\tau\sum_{k=1}^N\mathbf d_k^\top\mathbf C\mathbf d_k.
+\]</span> No reference mesh or reference-time quadrature is needed for
+this norm. Both trajectories use the same projected initial value, load,
+mesh, and time step. Their difference isolates the rational change to
+the discrete propagator. It is not the total continuum error <span
+class="math inline">\(\|u-U_{h,m}^\tau\|\)</span>, and it has no
+continuum spatial or temporal error floor in exact arithmetic.</p>
+</div>
+<div id="step-4-check-whether-the-measured-rational-error-is-resolved"
+class="section level3">
+<h3>Step 4: Check whether the measured rational error is resolved</h3>
+<p>The helper also propagates the rational scalar multipliers in the
+complete numerical eigenbasis and computes <code>product_error</code>.
+Mass orthonormality makes that modal difference norm equal to the sparse
+matrix norm in exact arithmetic. Their discrepancy and the final
+mass-norm state gap check the sparse evolution independently.</p>
+<p>At <span class="math inline">\(\alpha=2\)</span>, <span
+class="math inline">\(x^\beta=x\)</span> is exact, and both paths reduce
+to ordinary backward Euler. Its measured control error therefore
+indicates numerical disagreement. The code defines, for each fractional
+case, <span class="math display">\[
+\eta_{m,\alpha}=\max\left\{
+|E_m-E_{\rm product}|,\ E_{\alpha=2,\rm control},\ d_{\min}\right\},
+\]</span> where <span class="math inline">\(d_{\min}\)</span> is
+<code>.Machine$double.xmin</code>, the smallest positive normalized
+floating-point number. A case is marked resolved when <span
+class="math inline">\(E_{\rm product}&gt;100\eta_{m,\alpha}\)</span>.
+Open markers fail that empirical criterion. The all-order regression
+keeps finite positive measured errors; the resolved-only regression uses
+only the marked resolved cases. This indicator is an implemented
+diagnostic, rather than a rigorous roundoff error certificate.</p>
+</div>
+</div>
+<div id="convergence-behavior-in-m" class="section level2">
+<h2>Convergence behavior in m</h2>
+<div id="step-5-obtain-the-root-exponential-approximation-scale"
+class="section level3">
+<h3>Step 5: Obtain the root-exponential approximation scale</h3>
+<p>For <span class="math inline">\(0&lt;\beta&lt;1\)</span>, best
+uniform type-<span class="math inline">\((m,m)\)</span> rational
+approximation to <span class="math inline">\(x^\beta\)</span> on <span
+class="math inline">\([0,1]\)</span> satisfies <span
+class="math display">\[
+\delta_m=\sup_{x\in[0,1]}|x^\beta-r_m(x)|
+\le C_\beta e^{-2\pi\sqrt{\beta m}}.
+\]</span> Since the scaled discrete spectrum occupies only <span
+class="math inline">\(J_h\subset[0,1]\)</span>, <span
+class="math display">\[
+\delta_{h,m}=\sup_{x\in J_h}|x^\beta-r_m(x)|\le\delta_m.
+\]</span> This scaling allows the source coefficient tables to be reused
+on different meshes. The exponent is proportional to <span
+class="math inline">\(\sqrt m\)</span>, which is why the convergence
+plot uses square-root horizontal positions.</p>
+<p>The installed <code>rSPDE</code> tables provide numerical BRASIL
+coefficients. <code>brasil_coefficients()</code> uses a table row when
+available and otherwise interpolates the source poles, residues, and
+constant in <span class="math inline">\(\beta\)</span>. An interpolated
+approximant need not be an exact best approximant. Positivity is
+checked, but the ideal best-approximation rate remains a benchmark for
+those numerical coefficients; it is not an automatic certificate for
+every table interpolation. Stability estimates use the actual
+approximation error when positivity holds.</p>
+</div>
+<div id="step-6-connect-approximation-error-to-evolution-error"
+class="section level3">
+<h3>Step 6: Connect approximation error to evolution error</h3>
+<p>On numerical mode <span class="math inline">\(j\)</span>, put <span
+class="math inline">\(q_j=x_j^\beta\)</span> and <span
+class="math inline">\(r_j=r_m(x_j)\)</span>. The exact and rational
+one-step factors are <span class="math display">\[
+\mu_j=\frac{q_j}{q_j+s}
+=\frac1{1+\tau\nu\lambda_{j,h}^\beta},\qquad
+\widetilde\mu_j=\frac{r_j}{r_j+s}.
+\]</span> Both belong to <span class="math inline">\((0,1)\)</span> when
+<span class="math inline">\(r_j&gt;0\)</span>. Their difference is <span
+class="math display">\[
+\mu_j-\widetilde\mu_j
+=\frac{s(q_j-r_j)}{(q_j+s)(r_j+s)}.
+\]</span> Thus the power-approximation error changes the damping of each
+discrete mode. With common modal initial coefficient <span
+class="math inline">\(y_{0,j}\)</span> and load <span
+class="math inline">\(f_j^i=\mathbf v_j^\top\mathbf F^i\)</span>,
+iteration gives <span class="math display">\[
+y_j^k-\widetilde y_j^k
+=(\mu_j^k-\widetilde\mu_j^k)y_{0,j}
++\tau\sum_{i=1}^k
+(\mu_j^{k+1-i}-\widetilde\mu_j^{k+1-i})f_j^i.
+\]</span> The first term describes propagation of the initial value, and
+the second describes the accumulated response to the forcing.</p>
+<p>To see why accumulating time steps preserves the approximation-error
+scale, put <span
+class="math inline">\(c_\nu=\nu\kappa^{2\beta}\)</span>, so <span
+class="math inline">\(s=\tau c_\nu\)</span>. For each mode, the
+differences <span
+class="math inline">\(\mu_j^n-\widetilde\mu_j^n\)</span> have a common
+sign for all <span class="math inline">\(n\ge1\)</span>. Summing the two
+geometric series therefore gives <span class="math display">\[
+\begin{aligned}
+\tau\sum_{n=1}^{\infty}|\mu_j^n-\widetilde\mu_j^n|
+&amp;=\tau\left|\frac{\mu_j}{1-\mu_j}
+-\frac{\widetilde\mu_j}{1-\widetilde\mu_j}\right|\\
+&amp;=c_\nu^{-1}|q_j-r_j|
+\le c_\nu^{-1}\delta_{h,m}.
+\end{aligned}
+\]</span> The forcing response is a discrete convolution with this
+summable kernel. The convolution inequality in the weighted <span
+class="math inline">\(\ell^2\)</span> time norm bounds it by <span
+class="math inline">\(c_\nu^{-1}\delta_{h,m}\)</span> times the norm of
+the projected, averaged forcing. Orthogonal projection and time
+averaging do not increase its <span class="math inline">\(L_2\)</span>
+norm.</p>
+<p>For the initial contribution, differentiating the scalar powers <span
+class="math inline">\((q/(q+\tau c_\nu))^n\)</span> and summing their
+squared derivatives gives <span class="math display">\[
+\left(\tau\sum_{n=1}^N
+|\mu_j^n-\widetilde\mu_j^n|^2\right)^{1/2}
+\le\frac{2\delta_{h,m}}{\sqrt{c_\nu q_j}}.
+\]</span> Since <span
+class="math inline">\(q_j^{-1}=\kappa^{-2\beta}\lambda_{j,h}^\beta\)</span>,
+the weighted modal initial norm is <span
+class="math inline">\(\sum_j\lambda_{j,h}^\beta|y_{0,j}|^2
+=\|L_h^{\beta/2}P_hu_0\|_{L_2(\Gamma)}^2\)</span>. Stability of the
+projected initial value bounds this by its continuum <span
+class="math inline">\(\dot H^\beta\)</span> norm. Mass orthonormality
+and the triangle inequality then combine the initial and forcing
+estimates: <span class="math display">\[
+E_m\lesssim\delta_{h,m}
+\left(\|u_0\|_{\dot H^\beta(\Gamma)}
++\|f\|_{L_2(0,T;L_2(\Gamma))}\right).
+\]</span> The fixed problem constants, including <span
+class="math inline">\(\nu\)</span> and <span
+class="math inline">\(\kappa\)</span>, are absorbed in the inequality.
+The smooth data satisfy the required norm assumptions. With the
+best-approximation scale, this gives <span class="math display">\[
+E_m\lesssim e^{c_\alpha\sqrt m},\qquad
+c_\alpha=-2\pi\sqrt{\alpha/2}.
+\]</span> This is an upper-bound prediction, not an equality requiring
+every finite-range slope to equal <span
+class="math inline">\(c_\alpha\)</span>. The data excite particular
+parts of the spectrum, and the evolution norm need not attain the worst
+uniform power error.</p>
+</div>
+<div id="step-7-interpret-the-fitted-rational-convergence-slopes"
+class="section level3">
+<h3>Step 7: Interpret the fitted rational convergence slopes</h3>
+<p>The displayed settings fix <span
+class="math inline">\(h=0.02\)</span>, <span
+class="math inline">\(\tau=0.005\)</span>, <span
+class="math inline">\(T=1\)</span>, and <span
+class="math inline">\(\nu=1\)</span> and vary <span
+class="math inline">\(m=2,\ldots,8\)</span>. The parameter chunk
+specifies a new run; saved results should be interpreted with their
+saved settings. The fitted relation is <span class="math display">\[
+\ln E_m=s_m\sqrt m+b_m,
+\]</span> using natural logarithms. The reference slope is <span
+class="math inline">\(c_\alpha\)</span>; more negative slopes mean
+faster decay. The vertical axis is logarithmic, and ticks on the
+horizontal axis show <span class="math inline">\(m\)</span> at positions
+<span class="math inline">\(\sqrt m\)</span>.</p>
+<p>For each <span class="math inline">\(\alpha\)</span>, the dashed
+curve is <span class="math display">\[
+E_{\rm guide}(m)=C_\alpha e^{c_\alpha\sqrt m},\qquad
+C_\alpha=\frac1{n_m}\sum_i
+\frac{E_{m_i}}{e^{c_\alpha\sqrt{m_i}}}.
+\]</span> Its exponent is prescribed, while the reported regression
+estimates its slope freely. The guide is not a certified upper bound. At
+high orders, numerical disagreement can flatten the measured curve even
+though the ideal rational error continues to decrease. Comparing the
+all-order and resolved-only fits helps identify that limitation.</p>
+</div>
+</div>
+<div id="what-the-direct-power-convergence-plot-measures"
+class="section level2">
+<h2>What the direct-power convergence plot measures</h2>
+<p>The final plot checks the source rational approximation separately
+from the evolution error. For each <span
+class="math inline">\(m\)</span> and <span
+class="math inline">\(\alpha\)</span>, the recompute chunk evaluates
+<span class="math display">\[
+\widehat\delta_m
+=\max_{x\in\mathcal X}|r_m(x)-x^{\alpha/2}|,
+\]</span> where <span class="math inline">\(\mathcal X\)</span> consists
+of <span class="math inline">\(10001\)</span> logarithmically spaced
+points on <span class="math inline">\([0.001,1]\)</span>. This is a
+sampled maximum on that interval, not the certified supremum on all of
+<span class="math inline">\([0,1]\)</span>; it excludes <span
+class="math inline">\([0,0.001)\)</span> and can miss maxima between
+sample points. It is also distinct from the space–time solution error
+<span class="math inline">\(E_m\)</span>.</p>
+<p>The same root-exponential exponent is a reference for this source
+approximation. Differences between the two plots are expected: the
+solution error also depends on the discrete spectrum, the excited modal
+amplitudes, and the repeated time-step response. Neither plot alone
+certifies a uniform approximation bound.</p>
 </div>
 <div id="parameters" class="section level2">
 <h2>Parameters</h2>

@@ -370,25 +370,301 @@ knitr::purl(&quot;brasilfunc.Rmd&quot;, output=&quot;brasilfunc.R&quot;, quiet=T
 <pre class="r"><code>library(ggplot2)</code></pre>
 <div id="problem-and-matrix-method" class="section level2">
 <h2>Problem and matrix method</h2>
-<p>On the tadpole with stem length 1 and loop length 2, solve <span
+<p>On the tadpole graph with stem length <span
+class="math inline">\(1\)</span> and loop length <span
+class="math inline">\(2\)</span>, let <span
+class="math inline">\(L=\kappa^2-\Delta_\Gamma\)</span> be the shifted
+Kirchhoff–Laplacian. We solve <span class="math display">\[
+u_t+\nu L^\beta u=a_f A\sin(\omega t)e_7,
+\qquad u(0)=a_0e_5,\qquad \beta=\alpha/2.
+\]</span> Here <span class="math inline">\(Le_j=\lambda_j e_j\)</span>
+and the <span class="math inline">\(e_j\)</span> are orthonormal in
+<span class="math inline">\(L_2(\Gamma)\)</span>. The amplitudes <span
+class="math inline">\(a_0,a_f,A\)</span> and frequency <span
+class="math inline">\(\omega\)</span> are
+<code>initial_amplitude</code>, <code>forcing_amplitude</code>,
+<code>AAA</code>, and <code>OMEGA</code>.</p>
+<div id="step-1-derive-the-exact-continuum-solution"
+class="section level3">
+<h3>Step 1: Derive the exact continuum solution</h3>
+<p>Writing <span class="math inline">\(u(t)=\sum_j c_j(t)e_j\)</span>
+and taking the inner product with <span
+class="math inline">\(e_j\)</span> reduces the equation to <span
 class="math display">\[
-u_t+\nu L^{\alpha/2}u=a_f A\sin(\omega t)e_7,
-\qquad u(0)=a_0e_5,\qquad L=\kappa^2-\Delta_\Gamma.
-\]</span> The data contain finitely many smooth eigenfunctions; the
-editable amplitudes are <code>initial_amplitude</code> and
-<code>forcing_amplitude</code>, with sine factor <code>AAA</code> and
-frequency <code>OMEGA</code>. Consistent P1 mass and stiffness matrices
-are assembled on the tadpole. Every backward Euler step applies shifted
-sparse matrix solves using the installed <code>rSPDE</code> BRASIL
-poles, residues, and constant. Cholesky factors are reused, including
-the mass-matrix factor for the constant contribution. Analytic sine–hat
-loads and interval-averaged forcing are used.</p>
-<p>The reported error is the right-constant space–time <span
-class="math inline">\(L_2\)</span> error against the continuum solution,
-evaluated on the saved reference mesh and time grid. A compiled C++ loop
-advances every FEM time step and accumulates the same norm using
-centered coefficient moments. The reference modes evaluate the continuum
-solution only.</p>
+c_j&#39;(t)+\gamma_j c_j(t)=a_f A\sin(\omega t)\,\mathbf{1}_{\{j=7\}},
+\qquad c_j(0)=a_0\mathbf{1}_{\{j=5\}},
+\qquad \gamma_j=\nu\lambda_j^\beta.
+\]</span> Only two coefficients are nonzero. The initial mode decays as
+<span class="math inline">\(c_5(t)=a_0e^{-\gamma_5t}\)</span>. Variation
+of constants gives <span class="math display">\[
+\begin{aligned}
+c_7(t)
+&amp;=a_f A\int_0^t e^{-\gamma_7(t-r)}\sin(\omega r)\,dr\\
+&amp;=\frac{a_f A}{\gamma_7^2+\omega^2}
+\left[\gamma_7\sin(\omega t)-\omega\cos(\omega t)
++\omega e^{-\gamma_7t}\right].
+\end{aligned}
+\]</span> Therefore the reference solution is exactly <span
+class="math display">\[
+u(s,t)=c_5(t)e_5(s)+c_7(t)e_7(s).
+\]</span> <code>exact_modal_coefficients()</code> evaluates these
+coefficients at the reference times. The reference eigenfunctions
+evaluate the continuum solution; the computed FEM solution is advanced
+by sparse matrix solves. Increasing <code>N_finite</code> does not add
+active solution modes for these data: all initial and forcing
+coefficients outside modes <span class="math inline">\(5\)</span> and
+<span class="math inline">\(7\)</span> are zero.</p>
+</div>
+<div id="step-2-identify-the-regularity-of-the-data"
+class="section level3">
+<h3>Step 2: Identify the regularity of the data</h3>
+<p>For any finite <span class="math inline">\(r\ge0\)</span>, the
+spectral Sobolev norm of the initial data is <span
+class="math display">\[
+\|u_0\|_{\dot H^r(\Gamma)}^2=a_0^2\lambda_5^r&lt;\infty.
+\]</span> Likewise, <span class="math display">\[
+\|f\|_{L_2(0,T;\dot H^r(\Gamma))}^2
+=a_f^2 A^2\lambda_7^r\int_0^T\sin^2(\omega t)\,dt&lt;\infty.
+\]</span> Thus both data have arbitrarily high spectral spatial
+regularity. Their regularity permits the spatial estimate to reach the
+P1 rate limit, and the solution coefficients are smooth in time.
+Changing <span class="math inline">\(\alpha\)</span> changes the damping
+rates <span class="math inline">\(\gamma_j\)</span>, but does not reduce
+this data regularity.</p>
+</div>
+<div id="step-3-assemble-the-projected-initial-value-and-averaged-load"
+class="section level3">
+<h3>Step 3: Assemble the projected initial value and averaged load</h3>
+<p>Let <span class="math inline">\(V_h\)</span> be the continuous P1
+space with hats <span class="math inline">\(\psi_i\)</span>. Define
+<span class="math display">\[
+\mathbf C_{ij}=(\psi_j,\psi_i)_{L_2(\Gamma)},\qquad
+\mathbf G_{ij}=(\psi_j&#39;,\psi_i&#39;)_{L_2(\Gamma)},\qquad
+\mathbf L=\kappa^2\mathbf C+\mathbf G,
+\]</span> and <span
+class="math inline">\((\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}\)</span>.
+The initial coefficient vector represents the orthogonal projection
+<span class="math inline">\(P_hu_0\)</span>: <span
+class="math display">\[
+\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5.
+\]</span> <code>project_u0_tadpole()</code> computes this mass-matrix
+solve. The initial vector is a projection, rather than the vector of
+nodal samples.</p>
+<p>On <span class="math inline">\(I_{k+1}=(t_k,t_{k+1}]\)</span>, with
+<span class="math inline">\(t_k=k\tau\)</span>, the forcing is averaged:
+<span class="math display">\[
+\overline g_{k+1}
+=\frac1\tau\int_{t_k}^{t_{k+1}}A\sin(\omega t)\,dt
+=\frac{A[\cos(\omega t_k)-\cos(\omega t_{k+1})]}{\omega\tau},
+\qquad \mathbf F^{k+1}=a_f\overline g_{k+1}\boldsymbol\ell_7.
+\]</span> The quotient formula applies when <span
+class="math inline">\(\omega\ne0\)</span>. The code uses the equivalent
+stable expression <span
+class="math inline">\(A\sin(\omega(t_k+\tau/2))\operatorname{sinc}(\omega\tau/2)\)</span>,
+where <span
+class="math inline">\(\operatorname{sinc}(z)=\sin(z)/z\)</span> and
+<span class="math inline">\(\operatorname{sinc}(0)=1\)</span>. The
+sine–hat integrals defining <span
+class="math inline">\(\boldsymbol\ell_5\)</span> and <span
+class="math inline">\(\boldsymbol\ell_7\)</span> are evaluated
+analytically on the solver mesh.</p>
+</div>
+<div id="step-4-advance-the-fractional-backward-euler-scheme"
+class="section level3">
+<h3>Step 4: Advance the fractional backward Euler scheme</h3>
+<p>The matrix of the discrete operator <span
+class="math inline">\(L_h\)</span> is <span
+class="math inline">\(\mathbf B=\mathbf C^{-1}\mathbf L\)</span>.
+Exact-discrete backward Euler would apply <span class="math display">\[
+\mathbf U_h^{k+1}
+=(\mathbf I+\tau\nu\mathbf B^\beta)^{-1}
+\left(\mathbf U_h^k+\tau\mathbf C^{-1}\mathbf F^{k+1}\right).
+\]</span> For <span class="math inline">\(0&lt;\alpha&lt;2\)</span>, the
+implementation replaces this fractional inverse by a BRASIL rational
+function. If <span class="math inline">\(r_m(x)\)</span> approximates
+<span class="math inline">\(x^\beta\)</span>, set <span
+class="math display">\[
+S_m(y)=r_m(y^{-1}),\qquad
+s=\tau\nu\kappa^{2\beta},\qquad
+H_m(y)=\frac{S_m(y)}{S_m(y)+s}
+=r_\tau+\sum_{n=1}^m\frac{a_n}{y-z_n}.
+\]</span> The update used in the notebook is <span
+class="math display">\[
+\mathbf U_{h,m}^{k+1}
+=\left[r_\tau\mathbf C^{-1}
++\sum_{n=1}^m a_n(\mathbf L/\kappa^2-z_n\mathbf C)^{-1}\right]
+\left(\mathbf C\mathbf U_{h,m}^k+\tau\mathbf F^{k+1}\right).
+\]</span> The time-step poles <span class="math inline">\(z_n\)</span>
+are negative and the residues <span class="math inline">\(a_n\)</span>
+positive. The shifted matrices are positive definite, so their Cholesky
+factors can be reused at every step of a run. The constant <span
+class="math inline">\(r_\tau\)</span> contributes a mass-matrix solve
+and is included. For <span class="math inline">\(\alpha=2\)</span>, the
+code directly solves <span class="math inline">\((\mathbf
+C+\tau\nu\mathbf L)\mathbf U^{k+1} =\mathbf C\mathbf U^k+\tau\mathbf
+F^{k+1}\)</span>.</p>
+</div>
+</div>
+<div id="error-computation" class="section level2">
+<h2>Error computation</h2>
+<div id="step-5-define-the-spacetime-error-and-reconstruction"
+class="section level3">
+<h3>Step 5: Define the space–time error and reconstruction</h3>
+<p>The continuum target is <span class="math display">\[
+E=\|u-U_{h,m}^\tau\|_{L_2(0,T;L_2(\Gamma))},\qquad
+U_{h,m}^\tau(t)=\sum_i(\mathbf U_{h,m}^k)_i\psi_i,
+\quad t\in(t_{k-1},t_k].
+\]</span> This norm measures the error over the entire graph and time
+interval. The reconstruction uses the new state on each solver interval;
+the value at <span class="math inline">\(t=0\)</span> has no effect on
+the time integral.</p>
+<p>Let <span class="math inline">\(s_i^\star\)</span> be the
+reference-mesh nodes, <span class="math inline">\(\mathbf
+C^\star\)</span> its consistent mass matrix, and <span
+class="math inline">\(t_\ell^\star=\ell\tau_\star\)</span> the reference
+times. Define <span class="math display">\[
+\boldsymbol\Psi_{ij}=\psi_j(s_i^\star),\qquad
+\mathbf u^\star(t)=\left[u(s_i^\star,t)\right]_i,
+\qquad
+\mathbf d_\ell=\mathbf u^\star(t_\ell^\star)
+-\boldsymbol\Psi\mathbf U_{h,m}^{k(\ell)},
+\]</span> where <span
+class="math inline">\(t_\ell^\star\in(t_{k(\ell)-1},t_{k(\ell)}]\)</span>.
+The reported error is <span class="math display">\[
+E_{\rm sampled}^2
+=\tau_\star\sum_{\ell=1}^{N_\star}
+\mathbf d_\ell^\top\mathbf C^\star\mathbf d_\ell.
+\]</span> The quadratic form is the exact mass norm of the P1
+interpolant on the reference mesh. Together with the right-endpoint time
+sum, it approximates the continuum norm. No reference PDE is solved, and
+the two-mode exact solution has no omitted spectral tail.</p>
+</div>
+<div id="step-6-connect-the-implemented-error-evaluation-to-this-norm"
+class="section level3">
+<h3>Step 6: Connect the implemented error evaluation to this norm</h3>
+<p><code>prepare_reference_error()</code> compresses the sampled
+quadratic form using the reference-mesh inner product. The compiled
+solver groups reference times belonging to the same solver interval and
+uses their weighted coefficient means and centered scatter to accumulate
+that same sum. These are moments of discrete reference samples. They do
+not replace the reference-time sum by analytic integration in time.</p>
+<p>Every backward Euler step is advanced, including steps between
+reference samples. Spatial reference refinement and reference-time
+refinement check the accuracy of the measured norm separately from the
+solver’s spatial, temporal, and rational approximation errors.</p>
+</div>
+</div>
+<div id="convergence-behavior-in-h" class="section level2">
+<h2>Convergence behavior in h</h2>
+<div id="step-7-specialize-the-error-estimate-to-smooth-data"
+class="section level3">
+<h3>Step 7: Specialize the error estimate to smooth data</h3>
+<p>For <span class="math inline">\(0&lt;\alpha&lt;2\)</span>, the total
+error estimate has the form <span class="math display">\[
+E\lesssim\tau+h^q+e^{c_\alpha\sqrt m},\qquad
+q=\min\{s_0+\alpha/2,\ s_f+\alpha,\ 2\}-\epsilon,
+\qquad c_\alpha=-2\pi\sqrt{\alpha/2},
+\]</span> where <span class="math inline">\(u_0\in\dot
+H^{s_0}(\Gamma)\)</span>, <span class="math inline">\(f\in L_2(0,T;\dot
+H^{s_f}(\Gamma))\)</span>, and <span
+class="math inline">\(\epsilon&gt;0\)</span> is sufficiently small.
+Constants depend on the fixed problem data, including <span
+class="math inline">\(\nu\)</span>. Under the rational-approximation
+assumptions, the last term is the root-exponential rational
+contribution.</p>
+<p>Step 2 permits <span class="math inline">\(s_0\ge2-\alpha/2\)</span>
+and <span class="math inline">\(s_f\ge2-\alpha\)</span>. Therefore <span
+class="math display">\[
+q=2-\epsilon,\qquad
+E\lesssim\tau+h^{2-\epsilon}+e^{c_\alpha\sqrt m}.
+\]</span> For rate comparisons one may take <span
+class="math inline">\(\epsilon=10^{-10}\)</span>, making <span
+class="math inline">\(2-\epsilon\)</span> indistinguishable from <span
+class="math inline">\(2\)</span> at the displayed precision. The plot
+uses the reference exponent <span class="math inline">\(2\)</span>. For
+<span class="math inline">\(\alpha=2\)</span>, the estimate is <span
+class="math inline">\(E\lesssim\tau+h^2\)</span> with an exact rational
+representation.</p>
+</div>
+<div
+id="step-8-explain-why-smooth-p1-approximation-reaches-second-order"
+class="section level3">
+<h3>Step 8: Explain why smooth P1 approximation reaches second
+order</h3>
+<p>For a smooth function <span class="math inline">\(v\)</span>, its P1
+interpolant <span class="math inline">\(I_hv\)</span> is affine on each
+mesh element. Taylor’s formula gives an elementwise interpolation error
+of second order. Summing the squared elementwise estimates yields <span
+class="math display">\[
+\|v-I_hv\|_{L_2(\Gamma)}
+\lesssim h^2\left(\sum_{e}\|v&#39;&#39;\|_{L_2(e)}^2\right)^{1/2}.
+\]</span> Since <span class="math inline">\(P_h\)</span> is the best
+approximation in the <span class="math inline">\(L_2\)</span> norm,
+<span class="math display">\[
+\|v-P_hv\|_{L_2(\Gamma)}\le\|v-I_hv\|_{L_2(\Gamma)}.
+\]</span> The eigenfunctions in this experiment are smooth on every edge
+and continuous at the vertices. Their finite sum therefore has this
+second-order approximation scale. The full evolution estimate accounts
+also for the discrete fractional operator and gives <span
+class="math inline">\(h^{2-\epsilon}\)</span>. The interpolation
+argument explains the P1 limit; it is not a separate proof of the
+complete evolution error estimate.</p>
+</div>
+<div id="step-9-isolate-the-spatial-trend-over-the-tested-mesh-range"
+class="section level3">
+<h3>Step 9: Isolate the spatial trend over the tested mesh range</h3>
+<p>The experiment varies <span class="math inline">\(h\)</span> while
+fixing <span class="math inline">\(\tau\)</span> and <span
+class="math inline">\(m\)</span>. For the displayed settings, <span
+class="math inline">\(\tau=2\cdot10^{-5}\)</span>, <span
+class="math inline">\(m=8\)</span>, and <span
+class="math inline">\(\nu=10^{-3}\)</span>, while <span
+class="math inline">\(h\in\{1/128,1/64,1/32,1/16,1/8\}\)</span>. The
+reference mesh and time step are both <span
+class="math inline">\(10^{-5}\)</span>. The parameter chunk specifies
+these values for a new run; saved results should be interpreted with
+their saved settings.</p>
+<p>The theoretical decomposition follows the triangle inequality <span
+class="math display">\[
+E\le\|u-U^\tau\|+\|U^\tau-U_h^\tau\|
++\|U_h^\tau-U_{h,m}^\tau\|,
+\]</span> where all norms are <span
+class="math inline">\(L_2(0,T;L_2(\Gamma))\)</span> and <span
+class="math inline">\(U^\tau\)</span> is backward Euler before spatial
+discretization. The three upper-bound scales are <span
+class="math inline">\(\tau\)</span>, <span
+class="math inline">\(h^{2-\epsilon}\)</span>, and <span
+class="math inline">\(e^{c_\alpha\sqrt m}\)</span>. They are not
+orthogonal error components, so their squared values do not add as an
+identity.</p>
+<p>When the spatial contribution dominates, <span
+class="math inline">\(E_h\approx C_\alpha h^2\)</span> is the comparison
+model. Halving <span class="math inline">\(h\)</span> should then reduce
+the error by about four. Eventually the fixed temporal or rational error
+can become visible and flatten the curve. Reference quadrature can also
+obscure the rate if its resolution is insufficient. Thus fixing the
+other parameters targets spatial convergence over a finite range, rather
+than asserting that the measured error is purely spatial.</p>
+</div>
+<div id="step-10-interpret-the-regression-and-dashed-curves"
+class="section level3">
+<h3>Step 10: Interpret the regression and dashed curves</h3>
+<p>The fitted relation is <span class="math display">\[
+\log_{10}E_h=s_h\log_{10}h+b_h.
+\]</span> The code estimates <span class="math inline">\(s_h\)</span>
+freely from all listed meshes and compares it with <span
+class="math inline">\(2\)</span>. The dashed curves prescribe that
+reference exponent and use <span class="math display">\[
+C_\alpha=\frac1{n_h}\sum_i\frac{E_{h_i}}{h_i^2},
+\qquad E_{\rm guide}(h)=C_\alpha h^2.
+\]</span> Their scale is the arithmetic mean of the anchored constants;
+it is not the intercept obtained from the free-slope log regression.
+These guides illustrate the expected order and are not certified upper
+bounds. Slopes close to <span class="math inline">\(2\)</span>, with the
+other errors controlled, support the smooth-data spatial prediction
+across the tested fractional exponents. Finite data determine an
+observed slope, not a proof of an asymptotic equality.</p>
+</div>
 </div>
 <div id="parameters" class="section level2">
 <h2>Parameters</h2>
