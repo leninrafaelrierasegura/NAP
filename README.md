@@ -21,8 +21,8 @@ it. Both files are kept in the project; edit the R Markdown source.
 | Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:8; h=0.02; tau=0.005; diffusion=1 |
 | Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=5:9; reference cutoff=16; reference h=2^-18 |
 
-All studies use alpha=0.5,0.7,...,1.9, kappa=4 and T=1. Each notebook lists
-the settings used for its saved results.
+All studies use kappa=4 and T=1. Each notebook defines its own alpha grid
+and experiment settings in its parameter chunk.
 
 ## Rendering
 

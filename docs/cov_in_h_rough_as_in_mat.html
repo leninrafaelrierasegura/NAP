@@ -430,8 +430,8 @@ class="math display">\[
 \qquad \|u-u_K\|^2\le B_K.
 \]</span> The bound is recorded as a diagnostic and <strong>is not added
 to the plotted error</strong>. Reference-mesh and reference-time
-quadrature errors must be checked separately. The saved run passed those
-checks in DOCS/NAP.</p>
+quadrature errors must be checked separately. The original eight-alpha
+run passed those checks in DOCS/NAP.</p>
 </div>
 <div id="the-same-sampled-norm-as-the-smooth-notebook"
 class="section level3">
@@ -477,9 +477,20 @@ dyadic reference mesh.</p>
 <pre class="r"><code>T_final &lt;- 1
 kappa &lt;- 4
 diffusion &lt;- 1
-alpha_vector &lt;- seq(0.5,1.9,0.2)
+alpha_vector &lt;- seq(0.9,1.7,0.1)
 J_vector &lt;- 5:9
-time_steps &lt;- c(1e-3,2.5e-4,1/15000,2e-5,6.25e-6,2e-6,8e-7,4e-7)
+# Explicit solver steps, one for each alpha; every error is computed directly.
+time_steps &lt;- c(
+    `0.9` = 1/15000,
+    `1.0` = 2e-5,
+    `1.1` = 2e-5,
+    `1.2` = 6.25e-6,
+    `1.3` = 6.25e-6,
+    `1.4` = 2e-6,
+    `1.5` = 2e-6,
+    `1.6` = 8e-7,
+    `1.7` = 8e-7
+)
 m_fixed &lt;- 14L
 reference_cutoff &lt;- 16L
 reference_J &lt;- 18L
@@ -487,6 +498,13 @@ reference_time_step &lt;- 1e-5
 fit_J &lt;- 7:9
 workers &lt;- 1L
 max_tail_squared_fraction &lt;- 0.002</code></pre>
+<p>The original time steps were selected by finest-mesh refinement
+tests: the errors changed by less than 0.3% relative to the original
+finer-step runs. The new intermediate alphas use the next smaller
+previously tested time step. Their time-step choices have not undergone
+the same refinement checks. Every error is computed by an independent
+solver run; no errors are interpolated. Each time step is held fixed
+while the spatial mesh is refined.</p>
 </div>
 <div id="computation" class="section level2">
 <h2>Computation</h2>
@@ -577,6 +595,8 @@ saveRDS(result,output_file)</code></pre>
 <h2>Results</h2>
 <pre class="r"><code>r &lt;- readRDS(&quot;data_files/rough_h_as_in_mat_results.rds&quot;)
 errors &lt;- r$errors
+if (ncol(errors) != length(alpha_vector))
+    stop(&quot;Saved errors use a different alpha grid. Run the recompute chunk before plotting.&quot;)
 corrected &lt;- errors * J_vector
 axis &lt;- 2^-J_vector
 fit &lt;- which(J_vector %in% fit_J)
@@ -629,13 +649,15 @@ figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
     max_omitted_squared_fraction=formatC(r$max_tail_squared_fraction, format=&quot;e&quot;, digits=6)))</code></pre>
 <table>
 <colgroup>
+<col width="5%" />
 <col width="8%" />
-<col width="18%" />
-<col width="31%" />
-<col width="41%" />
+<col width="17%" />
+<col width="29%" />
+<col width="39%" />
 </colgroup>
 <thead>
 <tr class="header">
+<th align="left"></th>
 <th align="right">alpha</th>
 <th align="left">tau</th>
 <th align="left">omitted_squared_bound</th>
@@ -644,52 +666,67 @@ figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
 </thead>
 <tbody>
 <tr class="odd">
-<td align="right">0.5</td>
-<td align="left">1.000000e-03</td>
-<td align="left">1.680631e-08</td>
-<td align="left">1.294024e-03</td>
-</tr>
-<tr class="even">
-<td align="right">0.7</td>
-<td align="left">2.500000e-04</td>
-<td align="left">7.681345e-11</td>
-<td align="left">1.264296e-04</td>
-</tr>
-<tr class="odd">
+<td align="left">0.9</td>
 <td align="right">0.9</td>
 <td align="left">6.666667e-05</td>
 <td align="left">3.799543e-13</td>
 <td align="left">1.268918e-05</td>
 </tr>
 <tr class="even">
+<td align="left">1.0</td>
+<td align="right">1.0</td>
+<td align="left">2.000000e-05</td>
+<td align="left">2.720955e-14</td>
+<td align="left">4.011828e-06</td>
+</tr>
+<tr class="odd">
+<td align="left">1.1</td>
 <td align="right">1.1</td>
 <td align="left">2.000000e-05</td>
 <td align="left">1.965362e-15</td>
 <td align="left">1.251361e-06</td>
 </tr>
+<tr class="even">
+<td align="left">1.2</td>
+<td align="right">1.2</td>
+<td align="left">6.250000e-06</td>
+<td align="left">1.429376e-16</td>
+<td align="left">3.851711e-07</td>
+</tr>
 <tr class="odd">
+<td align="left">1.3</td>
 <td align="right">1.3</td>
 <td align="left">6.250000e-06</td>
 <td align="left">1.045366e-17</td>
 <td align="left">1.149471e-07</td>
 </tr>
 <tr class="even">
+<td align="left">1.4</td>
+<td align="right">1.4</td>
+<td align="left">2.000000e-06</td>
+<td align="left">7.680184e-19</td>
+<td align="left">3.295080e-08</td>
+</tr>
+<tr class="odd">
+<td align="left">1.5</td>
 <td align="right">1.5</td>
 <td align="left">2.000000e-06</td>
 <td align="left">5.663889e-20</td>
 <td align="left">8.726405e-09</td>
 </tr>
+<tr class="even">
+<td align="left">1.6</td>
+<td align="right">1.6</td>
+<td align="left">8.000000e-07</td>
+<td align="left">4.190104e-21</td>
+<td align="left">2.092261e-09</td>
+</tr>
 <tr class="odd">
+<td align="left">1.7</td>
 <td align="right">1.7</td>
 <td align="left">8.000000e-07</td>
 <td align="left">3.108006e-22</td>
-<td align="left">4.256528e-10</td>
-</tr>
-<tr class="even">
-<td align="right">1.9</td>
-<td align="left">4.000000e-07</td>
-<td align="left">1.720879e-24</td>
-<td align="left">1.078611e-11</td>
+<td align="left">4.256527e-10</td>
 </tr>
 </tbody>
 </table>
@@ -767,28 +804,28 @@ curves are comparison guides, not certified upper bounds.</p>
 </thead>
 <tbody>
 <tr class="odd">
-<td align="right">0.5</td>
-<td align="right">0.5</td>
-<td align="right">0.657239</td>
-<td align="right">0.475954</td>
-</tr>
-<tr class="even">
-<td align="right">0.7</td>
-<td align="right">0.7</td>
-<td align="right">0.869532</td>
-<td align="right">0.688247</td>
-</tr>
-<tr class="odd">
 <td align="right">0.9</td>
 <td align="right">0.9</td>
 <td align="right">1.076883</td>
 <td align="right">0.895598</td>
 </tr>
 <tr class="even">
+<td align="right">1.0</td>
+<td align="right">1.0</td>
+<td align="right">1.181027</td>
+<td align="right">0.999742</td>
+</tr>
+<tr class="odd">
 <td align="right">1.1</td>
 <td align="right">1.1</td>
 <td align="right">1.284305</td>
 <td align="right">1.103020</td>
+</tr>
+<tr class="even">
+<td align="right">1.2</td>
+<td align="right">1.2</td>
+<td align="right">1.389582</td>
+<td align="right">1.208297</td>
 </tr>
 <tr class="odd">
 <td align="right">1.3</td>
@@ -797,10 +834,22 @@ curves are comparison guides, not certified upper bounds.</p>
 <td align="right">1.313602</td>
 </tr>
 <tr class="even">
+<td align="right">1.4</td>
+<td align="right">1.4</td>
+<td align="right">1.602468</td>
+<td align="right">1.421183</td>
+</tr>
+<tr class="odd">
 <td align="right">1.5</td>
 <td align="right">1.5</td>
 <td align="right">1.705939</td>
 <td align="right">1.524654</td>
+</tr>
+<tr class="even">
+<td align="right">1.6</td>
+<td align="right">1.6</td>
+<td align="right">1.805576</td>
+<td align="right">1.624291</td>
 </tr>
 <tr class="odd">
 <td align="right">1.7</td>
@@ -808,104 +857,105 @@ curves are comparison guides, not certified upper bounds.</p>
 <td align="right">1.883250</td>
 <td align="right">1.701965</td>
 </tr>
-<tr class="even">
-<td align="right">1.9</td>
-<td align="right">1.9</td>
-<td align="right">1.968050</td>
-<td align="right">1.786765</td>
-</tr>
 </tbody>
 </table>
 <pre class="r"><code>knitr::kable(data.frame(h=axis, errors, check.names=FALSE),
     col.names=c(&quot;h&quot;, paste0(&quot;alpha=&quot;, alpha_vector)),
     format.args=list(scientific=TRUE, digits=6))</code></pre>
-<table style="width:100%;">
+<table>
 <colgroup>
-<col width="11%" />
-<col width="12%" />
-<col width="11%" />
-<col width="11%" />
-<col width="11%" />
 <col width="10%" />
 <col width="10%" />
 <col width="10%" />
 <col width="10%" />
+<col width="9%" />
+<col width="9%" />
+<col width="9%" />
+<col width="9%" />
+<col width="9%" />
+<col width="9%" />
 </colgroup>
 <thead>
 <tr class="header">
 <th align="right">h</th>
-<th align="right">alpha=0.5</th>
-<th align="right">alpha=0.7</th>
 <th align="right">alpha=0.9</th>
+<th align="right">alpha=1</th>
 <th align="right">alpha=1.1</th>
+<th align="right">alpha=1.2</th>
 <th align="right">alpha=1.3</th>
+<th align="right">alpha=1.4</th>
 <th align="right">alpha=1.5</th>
+<th align="right">alpha=1.6</th>
 <th align="right">alpha=1.7</th>
-<th align="right">alpha=1.9</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td align="right">3.1250e-02</td>
-<td align="right">2.36288e-02</td>
-<td align="right">9.3258e-03</td>
 <td align="right">3.7126e-03</td>
+<td align="right">2.3645e-03</td>
 <td align="right">1.5203e-03</td>
+<td align="right">9.899e-04</td>
 <td align="right">6.552e-04</td>
+<td align="right">4.426e-04</td>
 <td align="right">3.065e-04</td>
+<td align="right">2.181e-04</td>
 <td align="right">1.597e-04</td>
-<td align="right">9.25e-05</td>
 </tr>
 <tr class="even">
 <td align="right">1.5625e-02</td>
-<td align="right">1.44204e-02</td>
-<td align="right">4.8712e-03</td>
 <td align="right">1.6696e-03</td>
+<td align="right">9.8750e-04</td>
 <td align="right">5.9000e-04</td>
+<td align="right">3.571e-04</td>
 <td align="right">2.202e-04</td>
+<td align="right">1.390e-04</td>
 <td align="right">9.060e-05</td>
+<td align="right">6.120e-05</td>
 <td align="right">4.310e-05</td>
-<td align="right">2.38e-05</td>
 </tr>
 <tr class="odd">
 <td align="right">7.8125e-03</td>
-<td align="right">8.96320e-03</td>
-<td align="right">2.6020e-03</td>
 <td align="right">7.7000e-04</td>
+<td align="right">4.2340e-04</td>
 <td align="right">2.3510e-04</td>
+<td align="right">1.322e-04</td>
 <td align="right">7.580e-05</td>
+<td align="right">4.450e-05</td>
 <td align="right">2.710e-05</td>
+<td align="right">1.730e-05</td>
 <td align="right">1.160e-05</td>
-<td align="right">6.10e-06</td>
 </tr>
 <tr class="even">
 <td align="right">3.9063e-03</td>
-<td align="right">5.65070e-03</td>
-<td align="right">1.4141e-03</td>
 <td align="right">3.6210e-04</td>
+<td align="right">1.8520e-04</td>
 <td align="right">9.5700e-05</td>
+<td align="right">5.000e-05</td>
 <td align="right">2.660e-05</td>
+<td align="right">1.450e-05</td>
 <td align="right">8.200e-06</td>
+<td align="right">4.900e-06</td>
 <td align="right">3.100e-06</td>
-<td align="right">1.60e-06</td>
 </tr>
 <tr class="odd">
 <td align="right">1.9531e-03</td>
-<td align="right">3.60380e-03</td>
-<td align="right">7.7950e-04</td>
 <td align="right">1.7300e-04</td>
+<td align="right">8.2400e-05</td>
 <td align="right">3.9600e-05</td>
+<td align="right">1.930e-05</td>
 <td align="right">9.500e-06</td>
+<td align="right">4.800e-06</td>
 <td align="right">2.500e-06</td>
+<td align="right">1.400e-06</td>
 <td align="right">9.000e-07</td>
-<td align="right">4.00e-07</td>
 </tr>
 </tbody>
 </table>
 </div>
-<div id="what-was-checked-before-selecting-these-parameters"
+<div id="checks-for-the-original-eight-alpha-run"
 class="section level2">
-<h2>What was checked before selecting these parameters</h2>
+<h2>Checks for the original eight-alpha run</h2>
 <p>The diagnostics and rejected parameter choices are in
 <code>/home/rierasl/Desktop/DOCS/NAP/rough_h_sampled_reference_2026-11-01</code>.
 They include comparison with the existing analytic-error method at the
@@ -915,9 +965,9 @@ checking solver-time refinement. A complete numerical spectrum bounds
 the isolated rational contribution. Small cases compare the sampled
 kernel with the smooth notebook’s error routine, direct reference-grid
 integration, and full-graph mass integration.</p>
-<p>The selected parameters keep those discrepancies below the documented
-diagnostic thresholds. They do not turn the sampled norm into an exact
-continuum norm.</p>
+<p>The original selected parameters kept those discrepancies below the
+documented diagnostic thresholds. They do not turn the sampled norm into
+an exact continuum norm.</p>
 </div>
 
 

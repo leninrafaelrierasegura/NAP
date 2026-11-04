@@ -91,7 +91,7 @@ $$
 $$
 The bound is recorded as a diagnostic and **is not added to the plotted
 error**. Reference-mesh and reference-time quadrature errors must be checked
-separately. The saved run passed those checks in DOCS/NAP.
+separately. The original eight-alpha run passed those checks in DOCS/NAP.
 
 ### The same sampled norm as the smooth notebook
 
@@ -136,9 +136,20 @@ vanishing or aliasing on an inadequately resolved dyadic reference mesh.
 T_final <- 1
 kappa <- 4
 diffusion <- 1
-alpha_vector <- seq(0.5,1.9,0.2)
+alpha_vector <- seq(0.9,1.7,0.1)
 J_vector <- 5:9
-time_steps <- c(1e-3,2.5e-4,1/15000,2e-5,6.25e-6,2e-6,8e-7,4e-7)
+# Explicit solver steps, one for each alpha; every error is computed directly.
+time_steps <- c(
+    `0.9` = 1/15000,
+    `1.0` = 2e-5,
+    `1.1` = 2e-5,
+    `1.2` = 6.25e-6,
+    `1.3` = 6.25e-6,
+    `1.4` = 2e-6,
+    `1.5` = 2e-6,
+    `1.6` = 8e-7,
+    `1.7` = 8e-7
+)
 m_fixed <- 14L
 reference_cutoff <- 16L
 reference_J <- 18L
@@ -147,6 +158,13 @@ fit_J <- 7:9
 workers <- 1L
 max_tail_squared_fraction <- 0.002
 ```
+
+The original time steps were selected by finest-mesh refinement tests: the
+errors changed by less than 0.3% relative to the original finer-step runs.
+The new intermediate alphas use the next smaller previously tested time step.
+Their time-step choices have not undergone the same refinement checks.
+Every error is computed by an independent solver run; no errors are interpolated.
+Each time step is held fixed while the spatial mesh is refined.
 
 ## Computation
 
@@ -240,6 +258,8 @@ saveRDS(result,output_file)
 ```{r load-results}
 r <- readRDS("data_files/rough_h_as_in_mat_results.rds")
 errors <- r$errors
+if (ncol(errors) != length(alpha_vector))
+    stop("Saved errors use a different alpha grid. Run the recompute chunk before plotting.")
 corrected <- errors * J_vector
 axis <- 2^-J_vector
 fit <- which(J_vector %in% fit_J)
@@ -332,7 +352,7 @@ knitr::kable(data.frame(h=axis, errors, check.names=FALSE),
     format.args=list(scientific=TRUE, digits=6))
 ```
 
-## What was checked before selecting these parameters
+## Checks for the original eight-alpha run
 
 The diagnostics and rejected parameter choices are in
 `/home/rierasl/Desktop/DOCS/NAP/rough_h_sampled_reference_2026-11-01`.
@@ -344,6 +364,6 @@ contribution. Small cases compare the sampled kernel with the smooth
 notebook's error routine, direct reference-grid integration, and full-graph mass
 integration.
 
-The selected parameters keep those discrepancies below the documented
+The original selected parameters kept those discrepancies below the documented
 diagnostic thresholds. They do not turn the sampled norm into an exact
 continuum norm.

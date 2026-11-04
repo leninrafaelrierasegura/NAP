@@ -59,7 +59,7 @@ time evolution. The reference modes evaluate the continuum solution only.
 T_final <- 1
 kappa <- 4
 diffusion <- 1e-3
-alpha_vector <- seq(0.5,1.9,0.2)
+alpha_vector <- seq(0.9,1.7,0.1)
 m_fixed <- 8L
 h_vector <- 2^seq(-7,-3)
 time_step <- 2e-5

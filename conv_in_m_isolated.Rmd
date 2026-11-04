@@ -61,7 +61,7 @@ provides a control without rational approximation.
 h <- 0.02
 tau <- 0.005
 m_max <- 8L
-alpha_vector <- seq(0.5,1.9,0.2)
+alpha_vector <- seq(0.9,1.7,0.1)
 T_final <- 1
 kappa <- 4
 diffusion <- 1
@@ -122,37 +122,10 @@ slopes <- do.call(rbind, lapply(alpha_vector, function(a) {
     data.frame(alpha = a, benchmark = -2 * pi * sqrt(a/2), all_orders_slope = fit_slope(d), resolved_orders = sum(d$resolved),
         resolved_only_slope = fit_slope(d[d$resolved, ]))
 }))
-# Evaluate the same BRASIL coefficients on the common scalar interval.
-scalar_m_vector <- m_vector
-scalar_alpha_vector <- alpha_vector[alpha_vector != 2]
-scalar_x_max <- 1000
-scalar_grid_points <- 10001L
-scalar_x <- exp(seq(0, log(scalar_x_max), length.out = scalar_grid_points))
-scalar_rows <- list()
-for (scalar_alpha in scalar_alpha_vector) {
-    scalar_beta <- scalar_alpha/2
-    for (scalar_m in scalar_m_vector) {
-        scalar_roots <- brasil_coefficients(scalar_m, scalar_beta)
-        scalar_error <- abs(brasil_inverse(scalar_x, scalar_roots) - scalar_x^(-scalar_beta))
-        stopifnot(all(is.finite(scalar_error)))
-        scalar_rows[[length(scalar_rows) + 1L]] <- data.frame(alpha = scalar_alpha, m = scalar_m,
-            x = scalar_x, absolute_error = scalar_error)
-    }
-}
-scalar_errors <- if (length(scalar_rows))
-    do.call(rbind, scalar_rows) else NULL
-if (!is.null(scalar_errors)) {
-    scalar_errors$alpha_label <- factor(scalar_errors$alpha, levels = scalar_alpha_vector, labels = paste("alpha =",
-        scalar_alpha_vector))
-    scalar_errors$m_label <- factor(scalar_errors$m, levels = scalar_m_vector)
-    scalar_max_errors <- aggregate(absolute_error ~ alpha + m, scalar_errors, max)
-}
-if (!is.null(scalar_errors))
-    scalar_max_errors$alpha_label <- factor(scalar_max_errors$alpha, levels=scalar_alpha_vector)
-# Evaluate the direct-power error on the reciprocal interval.
+# Sample the direct-power error on [0.001, 1] for the retained convergence plot.
 unit_m_vector <- m_vector
 unit_alpha_vector <- alpha_vector[alpha_vector != 2]
-unit_x <- sort(1/scalar_x)
+unit_x <- sort(1/exp(seq(0, log(1000), length.out=10001L)))
 unit_rows <- list()
 for (unit_alpha in unit_alpha_vector) {
     unit_beta <- unit_alpha/2
@@ -160,49 +133,18 @@ for (unit_alpha in unit_alpha_vector) {
         unit_roots <- brasil_coefficients(unit_m, unit_beta)
         unit_error <- abs(brasil_power(unit_x, unit_roots) - unit_x^unit_beta)
         stopifnot(all(is.finite(unit_error)))
-        unit_rows[[length(unit_rows) + 1L]] <- data.frame(alpha = unit_alpha, m = unit_m, x = unit_x,
-            absolute_error = unit_error)
+        unit_rows[[length(unit_rows) + 1L]] <- data.frame(alpha=unit_alpha, m=unit_m,
+            absolute_error=max(unit_error))
     }
 }
-unit_errors <- if (length(unit_rows))
-    do.call(rbind, unit_rows) else NULL
-if (!is.null(unit_errors)) {
-    unit_errors$alpha_label <- factor(unit_errors$alpha, levels = unit_alpha_vector, labels = paste("alpha =",
-        unit_alpha_vector))
-    unit_errors$m_label <- factor(unit_errors$m, levels = unit_m_vector)
-    unit_max_errors <- aggregate(absolute_error ~ alpha + m, unit_errors, max)
-}
-if (!is.null(unit_errors))
+unit_max_errors <- if (length(unit_rows))
+    aggregate(absolute_error ~ alpha + m, do.call(rbind, unit_rows), max) else NULL
+if (!is.null(unit_max_errors))
     unit_max_errors$alpha_label <- factor(unit_max_errors$alpha, levels=unit_alpha_vector)
-# Compare the errors on exactly reciprocal, order-dependent grids.
-reciprocal_domain <- "order-dependent"
-reciprocal_domain <- match.arg(reciprocal_domain, c("order-dependent", "common"))
-reciprocal_rows <- list()
-for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
-    reciprocal_beta <- reciprocal_alpha/2
-    for (reciprocal_m in m_vector) {
-        reciprocal_delta <- if (reciprocal_domain == "order-dependent")
-            10^(-(5 + reciprocal_m)/2) else 0.001
-        reciprocal_z <- exp(seq(0, log(1/reciprocal_delta), length.out = 20001L))
-        reciprocal_x <- 1/reciprocal_z
-        reciprocal_roots <- brasil_coefficients(reciprocal_m, reciprocal_beta)
-        reciprocal_large_error <- abs(brasil_inverse(reciprocal_z, reciprocal_roots) - reciprocal_z^(-reciprocal_beta))
-        reciprocal_unit_error <- abs(brasil_power(reciprocal_x, reciprocal_roots) - reciprocal_x^reciprocal_beta)
-        reciprocal_gap <- max(abs(reciprocal_large_error - reciprocal_unit_error))
-        stopifnot(all(is.finite(c(reciprocal_large_error, reciprocal_unit_error))), reciprocal_gap <=
-            1e-12)
-        reciprocal_rows[[length(reciprocal_rows) + 1L]] <- data.frame(alpha = reciprocal_alpha, m = reciprocal_m,
-            delta = reciprocal_delta, large_interval_error = max(reciprocal_large_error), reciprocal_interval_error = max(reciprocal_unit_error),
-            max_pointwise_disagreement = reciprocal_gap)
-    }
-}
-reciprocal_checks <- if (length(reciprocal_rows))
-    do.call(rbind, reciprocal_rows) else NULL
 result <- list(parameters = list(h = h, tau = tau, m_max = m_max, alpha_vector = alpha_vector, T_final = T_final,
     kappa = kappa, diffusion = diffusion, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
     AAA = AAA, OMEGA = OMEGA), results = results, errors = errors, slopes = slopes, diagnostics = spectrum$diagnostics,
-    control = control, scalar_max_errors = scalar_max_errors, unit_max_errors = unit_max_errors,
-    reciprocal_checks = reciprocal_checks)
+    control = control, unit_max_errors = unit_max_errors)
 dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
 saveRDS(result, output_file)
 ```
@@ -266,137 +208,13 @@ slopes <- do.call(rbind, lapply(alpha_vector, function(a) {
 knitr::kable(slopes, digits=5)
 ```
 
-## Numerical checks
-
-The independent evolution evaluates the supplied inverse approximation
-directly in the complete numerical eigenbasis, including its constant.
-Its agreement with the sparse evolution checks the matrix implementation.
-The resolution indicator is the larger of that disagreement and the
-classical backward Euler control error.
-
-```{r diagnostics, echo=FALSE}
-knitr::kable(r$diagnostics,digits=10)
-knitr::kable(r$control[,c("error","product_error","final_state_gap_C")],
-  format.args=list(scientific=TRUE,digits=5))
-knitr::kable(r$results[,c("alpha","m","error","product_error",
-  "absolute_error_disagreement","resolved")],
-  format.args=list(scientific=TRUE,digits=5))
-```
-
-## Scalar approximation diagnostics
-
-Writing $\beta=\alpha/2$, the same installed coefficients define
-$$
-S_m(y)=d_m+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j}
-\approx y^{-\beta},\qquad B_m(x)=S_m(1/x)\approx x^\beta.
-$$
-The following plots show absolute scalar errors on $[1,1000]$ and
-$[0.001,1]$, followed by their sampled maxima versus $\sqrt m$.
-The two grids are reciprocal, so the errors agree up to rounding.
-Sampled maxima are not certified uniform bounds.
-
-```{r scalar-error-curves, fig.width=8, fig.height=5, out.width="850px", fig.cap="Inverse-power errors on [1,1000]."}
-# Evaluate the same BRASIL coefficients on the common scalar interval.
-scalar_m_vector <- m_vector
-scalar_alpha_vector <- alpha_vector[alpha_vector != 2]
-scalar_x_max <- 1000
-scalar_grid_points <- 10001L
-scalar_x <- exp(seq(0, log(scalar_x_max), length.out = scalar_grid_points))
-scalar_rows <- list()
-for (scalar_alpha in scalar_alpha_vector) {
-    scalar_beta <- scalar_alpha/2
-    for (scalar_m in scalar_m_vector) {
-        scalar_roots <- brasil_coefficients(scalar_m, scalar_beta)
-        scalar_error <- abs(brasil_inverse(scalar_x, scalar_roots) - scalar_x^(-scalar_beta))
-        stopifnot(all(is.finite(scalar_error)))
-        scalar_rows[[length(scalar_rows) + 1L]] <- data.frame(alpha = scalar_alpha, m = scalar_m,
-            x = scalar_x, absolute_error = scalar_error)
-    }
-}
-scalar_errors <- if (length(scalar_rows))
-    do.call(rbind, scalar_rows) else NULL
-if (!is.null(scalar_errors)) {
-    scalar_errors$alpha_label <- factor(scalar_errors$alpha, levels = scalar_alpha_vector, labels = paste("alpha =",
-        scalar_alpha_vector))
-    scalar_errors$m_label <- factor(scalar_errors$m, levels = scalar_m_vector)
-    scalar_max_errors <- aggregate(absolute_error ~ alpha + m, scalar_errors, max)
-}
-if (!is.null(scalar_errors)) {
-    p_scalar_error <- ggplot(scalar_errors, aes(x, absolute_error, colour = m_label, group = m_label)) +
-        geom_line(linewidth = 0.6) + facet_wrap(~alpha_label, nrow = 1) + scale_x_log10() + scale_y_log10(labels = scales::label_scientific()) +
-        labs(x = "x (log scale)", y = "Absolute error |r_m(x) - x^(-alpha/2)| (log scale)", colour = "m",
-            subtitle = sprintf("%s coefficients; common interval [1, 1000]", coefficient_source),
-            caption = "Dips occur where the rational approximation crosses the target function.") +
-        theme_minimal() + theme(legend.position = "bottom")
-}
-ggsave(file.path(figure_dir, "scalar-error-curves.png"), p_scalar_error,
-    width=8, height=5, dpi=144)
-knitr::include_graphics(file.path(figure_dir, "scalar-error-curves.png"))
-```
-
-```{r scalar-error-convergence, fig.width=8, fig.height=5, out.width="850px", fig.cap="Sampled maximum inverse-power errors."}
-if (!is.null(scalar_errors)) {
-    scalar_max_errors$alpha_label <- factor(scalar_max_errors$alpha, levels = scalar_alpha_vector)
-    scalar_guides <- scalar_max_errors
-    for (scalar_alpha in scalar_alpha_vector) {
-        scalar_index <- which(scalar_guides$alpha == scalar_alpha)
-        scalar_anchor <- scalar_index[scalar_guides$m[scalar_index] == 1L]
-        scalar_guides$absolute_error[scalar_index] <- scalar_max_errors$absolute_error[scalar_anchor] *
-            exp(-2 * pi * sqrt(scalar_alpha/2) * (sqrt(scalar_guides$m[scalar_index]) - 1))
-    }
-    p_scalar_error_m <- ggplot(scalar_max_errors, aes(sqrt(m), absolute_error, colour = alpha_label,
-        group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = scalar_guides,
-        linetype = "dashed") + scale_x_continuous(breaks = sqrt(scalar_m_vector), labels = scalar_m_vector) +
-        scale_y_continuous(trans = scales::log_trans(base = exp(1)), labels = scales::label_scientific()) +
-        labs(x = "m (square-root positions)", y = "Sampled maximum absolute scalar error (natural-log scale)",
-            colour = "alpha", subtitle = sprintf("%s coefficients; common interval [1, 1000]", coefficient_source)) +
-        theme_minimal() + theme(legend.position = "bottom", plot.background = element_rect(fill = "white",
-        colour = NA))
-}
-ggsave(file.path(figure_dir, "scalar-error-convergence.png"), p_scalar_error_m,
-    width=8, height=5, dpi=144)
-knitr::include_graphics(file.path(figure_dir, "scalar-error-convergence.png"))
-```
-
-```{r unit-interval-error-curves, fig.width=8, fig.height=5, out.width="850px", fig.cap="Direct-power errors on [0.001,1]."}
-# Evaluate the direct-power error on the reciprocal interval.
-unit_m_vector <- m_vector
-unit_alpha_vector <- alpha_vector[alpha_vector != 2]
-unit_x <- sort(1/scalar_x)
-unit_rows <- list()
-for (unit_alpha in unit_alpha_vector) {
-    unit_beta <- unit_alpha/2
-    for (unit_m in unit_m_vector) {
-        unit_roots <- brasil_coefficients(unit_m, unit_beta)
-        unit_error <- abs(brasil_power(unit_x, unit_roots) - unit_x^unit_beta)
-        stopifnot(all(is.finite(unit_error)))
-        unit_rows[[length(unit_rows) + 1L]] <- data.frame(alpha = unit_alpha, m = unit_m, x = unit_x,
-            absolute_error = unit_error)
-    }
-}
-unit_errors <- if (length(unit_rows))
-    do.call(rbind, unit_rows) else NULL
-if (!is.null(unit_errors)) {
-    unit_errors$alpha_label <- factor(unit_errors$alpha, levels = unit_alpha_vector, labels = paste("alpha =",
-        unit_alpha_vector))
-    unit_errors$m_label <- factor(unit_errors$m, levels = unit_m_vector)
-    unit_max_errors <- aggregate(absolute_error ~ alpha + m, unit_errors, max)
-}
-if (!is.null(unit_errors)) {
-    p_unit_error <- ggplot(unit_errors, aes(x, absolute_error, colour = m_label, group = m_label)) +
-        geom_line(linewidth = 0.6) + facet_wrap(~alpha_label, nrow = 1) + scale_x_continuous(limits = c(0.001,
-        1), breaks = c(0.001, 0.25, 0.5, 0.75, 1)) + scale_y_continuous(labels = scales::label_scientific()) +
-        labs(x = "x", y = "Absolute error |B_m(x) - x^(alpha/2)|", colour = "m", subtitle = sprintf("%s coefficients; interval [0.001, 1]",
-            coefficient_source)) + theme_minimal() + theme(legend.position = "bottom", plot.background = element_rect(fill = "white",
-        colour = NA))
-}
-ggsave(file.path(figure_dir, "unit-interval-error-curves.png"), p_unit_error,
-    width=8, height=5, dpi=144)
-knitr::include_graphics(file.path(figure_dir, "unit-interval-error-curves.png"))
-```
+## Unit-interval error convergence
 
 ```{r unit-interval-error-convergence, fig.width=8, fig.height=5, out.width="850px", fig.cap="Sampled maximum direct-power errors."}
-if (!is.null(unit_errors)) {
+unit_m_vector <- m_vector
+unit_alpha_vector <- alpha_vector[alpha_vector != 2]
+unit_max_errors <- r$unit_max_errors
+if (!is.null(unit_max_errors)) {
     unit_max_errors$alpha_label <- factor(unit_max_errors$alpha, levels = unit_alpha_vector)
     unit_guides <- unit_max_errors
     for (unit_alpha in unit_alpha_vector) {
@@ -417,46 +235,4 @@ if (!is.null(unit_errors)) {
 ggsave(file.path(figure_dir, "unit-interval-error-convergence.png"), p_unit_error_m,
     width=8, height=5, dpi=144)
 knitr::include_graphics(file.path(figure_dir, "unit-interval-error-convergence.png"))
-```
-
-The last plot compares exactly reciprocal grids on the order-dependent
-intervals $[1,1/\delta_m]$ and $[\delta_m,1]$, where
-$\delta_m=10^{-(5+m)/2}$. This is a diagnostic domain; coefficients are
-read from `rSPDE` throughout.
-
-```{r reciprocal-figure, fig.width=11, fig.height=5, out.width="850px"}
-reciprocal_checks <- r$reciprocal_checks
-reciprocal_domain <- "order-dependent"
-if (!is.null(reciprocal_checks)) {
-    reciprocal_labels <- if (reciprocal_domain == "order-dependent")
-        c("z in [1, 1/delta_m]", "x in [delta_m, 1]") else c("z in [1, 1000]", "x in [0.001, 1]")
-    reciprocal_plot_data <- rbind(data.frame(alpha = reciprocal_checks$alpha, m = reciprocal_checks$m,
-        error = reciprocal_checks$large_interval_error, domain = reciprocal_labels[1]), data.frame(alpha = reciprocal_checks$alpha,
-        m = reciprocal_checks$m, error = reciprocal_checks$reciprocal_interval_error, domain = reciprocal_labels[2]))
-    reciprocal_plot_data$alpha_label <- factor(reciprocal_plot_data$alpha, levels = alpha_vector[alpha_vector !=
-        2])
-    reciprocal_plot_data$domain <- factor(reciprocal_plot_data$domain, levels = reciprocal_labels)
-    reciprocal_guides <- reciprocal_plot_data
-    for (reciprocal_alpha in alpha_vector[alpha_vector != 2]) {
-        reciprocal_index <- which(reciprocal_guides$alpha == reciprocal_alpha)
-        reciprocal_anchor <- reciprocal_checks$large_interval_error[reciprocal_checks$alpha == reciprocal_alpha &
-            reciprocal_checks$m == 1L]
-        reciprocal_guides$error[reciprocal_index] <- reciprocal_anchor * exp(-2 * pi * sqrt(reciprocal_alpha/2) *
-            (sqrt(reciprocal_guides$m[reciprocal_index]) - 1))
-    }
-}
-if (!is.null(reciprocal_checks)) {
-    p_reciprocal_error_m <- ggplot(reciprocal_plot_data, aes(sqrt(m), error, colour = alpha_label,
-        group = alpha_label)) + geom_line() + geom_point(size = 2) + geom_line(data = reciprocal_guides,
-        linetype = "dashed") + facet_wrap(~domain, nrow = 1) + scale_x_continuous(breaks = sqrt(m_vector),
-        labels = m_vector) + scale_y_continuous(trans = scales::log_trans(base = exp(1)), labels = scales::label_scientific()) +
-        labs(x = "m (square-root positions)", y = "Sampled maximum absolute error (natural-log scale)",
-            colour = "alpha", subtitle = sprintf("%s coefficients; exactly reciprocal grids", coefficient_source),
-            caption = "Dashed: matrix-error reference slopes anchored at m = 1; comparison only.") +
-        theme_minimal() + theme(legend.position = "bottom", plot.background = element_rect(fill = "white",
-        colour = NA))
-}
-ggsave(file.path(figure_dir, "reciprocal-error-comparison-plot.png"), p_reciprocal_error_m,
-    width=11, height=5, dpi=144)
-knitr::include_graphics(file.path(figure_dir, "reciprocal-error-comparison-plot.png"))
 ```
