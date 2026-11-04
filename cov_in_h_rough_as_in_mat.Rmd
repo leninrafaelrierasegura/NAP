@@ -138,18 +138,8 @@ kappa <- 4
 diffusion <- 1
 alpha_vector <- seq(0.9,1.7,0.1)
 J_vector <- 5:9
-# Explicit solver steps, one for each alpha; every error is computed directly.
-time_steps <- c(
-    `0.9` = 1/15000,
-    `1.0` = 2e-5,
-    `1.1` = 2e-5,
-    `1.2` = 6.25e-6,
-    `1.3` = 6.25e-6,
-    `1.4` = 2e-6,
-    `1.5` = 2e-6,
-    `1.6` = 8e-7,
-    `1.7` = 8e-7
-)
+# One solver time step for every alpha and spatial mesh.
+time_step <- 8e-7
 m_fixed <- 14L
 reference_cutoff <- 16L
 reference_J <- 18L
@@ -159,12 +149,11 @@ workers <- 9L
 max_tail_squared_fraction <- 0.002
 ```
 
-The original time steps were selected by finest-mesh refinement tests: the
-errors changed by less than 0.3% relative to the original finer-step runs.
-The new intermediate alphas use the next smaller previously tested time step.
-Their time-step choices have not undergone the same refinement checks.
-Every error is computed by an independent solver run; no errors are interpolated.
-Each time step is held fixed while the spatial mesh is refined.
+The solver time step is fixed across all alphas and spatial meshes. It is the
+smallest step from the previous alpha-dependent schedule. At $T=1$, each
+solution takes 1,250,000 backward Euler steps. Time-refinement checks across
+the complete nine-alpha grid remain to be done.
+After changing the time step, run the recompute chunk before loading results.
 
 ## Computation
 
@@ -172,8 +161,8 @@ Each time step is held fixed while the spatial mesh is refined.
 output_file <- "data_files/rough_h_as_in_mat_results.rds"
 stopifnot(length(alpha_vector)>0L,!anyDuplicated(alpha_vector),
     all(is.finite(alpha_vector)),all(alpha_vector>0 & alpha_vector<2),
-    length(time_steps)==length(alpha_vector),all(is.finite(time_steps)),
-    all(time_steps>0),length(J_vector)>=2L,!anyDuplicated(J_vector),
+    length(time_step)==1L,is.finite(time_step),time_step>0,
+    length(J_vector)>=2L,!anyDuplicated(J_vector),
     all(J_vector==as.integer(J_vector)),all(J_vector>=3L & J_vector<=20L),
     all(fit_J %in% J_vector),length(fit_J)>=2L,
     reference_cutoff>=max(J_vector)-1L,reference_J>max(J_vector),
@@ -197,7 +186,7 @@ run_case <- function(i) {
     h_index <- cases$mesh_index[i]
     a <- cases$alpha_index[i]
     value <- rough_sampled_error(meshes[[h_index]],reference,
-       projections[[h_index]],alpha_vector[a],time_steps[a],
+       projections[[h_index]],alpha_vector[a],time_step,
        reference_time_step,m_fixed,diffusion,T_final)
     value$final_state <- NULL
     value$J <- J_vector[h_index]
@@ -271,17 +260,17 @@ figure_dir <- "data_files/rough_h_as_in_mat"
 
 ```{r settings}
 knitr::kable(data.frame(T=T_final, kappa=kappa, diffusion=diffusion, m=m_fixed,
+    tau=time_step,
     cutoff=reference_cutoff, reference_J=reference_J,
     reference_h=2^-reference_J, reference_tau=reference_time_step))
 knitr::kable(data.frame(alpha=alpha_vector,
-    tau=formatC(time_steps, format="e", digits=6),
     omitted_squared_bound=formatC(r$cutoff_squared_bound, format="e", digits=6),
     max_omitted_squared_fraction=formatC(r$max_tail_squared_fraction, format="e", digits=6)))
 ```
 
 The solver meshes are $h=2^{-J}$ for
-$J\in$ `r paste(J_vector,collapse=", ")`. Each alpha uses a fixed rational order
-and time step along its spatial curve.
+$J\in$ `r paste(J_vector,collapse=", ")`. Every alpha and spatial mesh uses
+the same rational order and solver time step.
 
 ## Convergence plots, axes, and reference curves
 

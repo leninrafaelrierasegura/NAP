@@ -191,12 +191,14 @@ stopifnot(x$result$parameters$h==.25,x$result$parameters$tau==.05,
   x$result$parameters$AAA==.7,x$result$parameters$OMEGA==2,
   identical(dim(x$result$errors),c(2L,2L)),max(x$result$results$absolute_error_disagreement)<1e-10)
 x <- manual_run("cov_in_h_rough_as_in_mat.Rmd",list(alpha_vector=c(.5,.9),J_vector=3:4,
-  time_steps=c(.05,.025),m_fixed=2L,diffusion=.2,T_final=.1,kappa=3,fit_J=3:4,
+  time_step=.025,workers=2L,m_fixed=2L,diffusion=.2,T_final=.1,kappa=3,fit_J=3:4,
   reference_cutoff=10L,reference_J=12L,reference_time_step=.0125,
   max_tail_squared_fraction=1),"rough-h-sampled")
 stopifnot(identical(x$result$parameters$J,3:4),x$result$parameters$m==2L,
   x$result$parameters$T_final==.1,x$result$parameters$diffusion==.2,
   x$result$parameters$reference_cutoff==10L,x$result$parameters$reference_J==12L,
   identical(dim(x$result$errors),c(2L,2L)),
+  all(x$result$parameters$time_steps==.025),
+  all(vapply(x$result$cases,function(case) case$N==4L && case$tau==.025,logical(1))),
   identical(original_hashes,tools::md5sum(original_files)))
 cat("All four notebook workflows compute, load, and plot with edited parameters; committed results unchanged.\n")

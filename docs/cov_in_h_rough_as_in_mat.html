@@ -479,18 +479,8 @@ kappa &lt;- 4
 diffusion &lt;- 1
 alpha_vector &lt;- seq(0.9,1.7,0.1)
 J_vector &lt;- 5:9
-# Explicit solver steps, one for each alpha; every error is computed directly.
-time_steps &lt;- c(
-    `0.9` = 1/15000,
-    `1.0` = 2e-5,
-    `1.1` = 2e-5,
-    `1.2` = 6.25e-6,
-    `1.3` = 6.25e-6,
-    `1.4` = 2e-6,
-    `1.5` = 2e-6,
-    `1.6` = 8e-7,
-    `1.7` = 8e-7
-)
+# One solver time step for every alpha and spatial mesh.
+time_step &lt;- 8e-7
 m_fixed &lt;- 14L
 reference_cutoff &lt;- 16L
 reference_J &lt;- 18L
@@ -498,21 +488,20 @@ reference_time_step &lt;- 1e-5
 fit_J &lt;- 5:9
 workers &lt;- 9L
 max_tail_squared_fraction &lt;- 0.002</code></pre>
-<p>The original time steps were selected by finest-mesh refinement
-tests: the errors changed by less than 0.3% relative to the original
-finer-step runs. The new intermediate alphas use the next smaller
-previously tested time step. Their time-step choices have not undergone
-the same refinement checks. Every error is computed by an independent
-solver run; no errors are interpolated. Each time step is held fixed
-while the spatial mesh is refined.</p>
+<p>The solver time step is fixed across all alphas and spatial meshes.
+It is the smallest step from the previous alpha-dependent schedule. At
+<span class="math inline">\(T=1\)</span>, each solution takes 1,250,000
+backward Euler steps. Time-refinement checks across the complete
+nine-alpha grid remain to be done. After changing the time step, run the
+recompute chunk before loading results.</p>
 </div>
 <div id="computation" class="section level2">
 <h2>Computation</h2>
 <pre class="r"><code>output_file &lt;- &quot;data_files/rough_h_as_in_mat_results.rds&quot;
 stopifnot(length(alpha_vector)&gt;0L,!anyDuplicated(alpha_vector),
     all(is.finite(alpha_vector)),all(alpha_vector&gt;0 &amp; alpha_vector&lt;2),
-    length(time_steps)==length(alpha_vector),all(is.finite(time_steps)),
-    all(time_steps&gt;0),length(J_vector)&gt;=2L,!anyDuplicated(J_vector),
+    length(time_step)==1L,is.finite(time_step),time_step&gt;0,
+    length(J_vector)&gt;=2L,!anyDuplicated(J_vector),
     all(J_vector==as.integer(J_vector)),all(J_vector&gt;=3L &amp; J_vector&lt;=20L),
     all(fit_J %in% J_vector),length(fit_J)&gt;=2L,
     reference_cutoff&gt;=max(J_vector)-1L,reference_J&gt;max(J_vector),
@@ -536,7 +525,7 @@ run_case &lt;- function(i) {
     h_index &lt;- cases$mesh_index[i]
     a &lt;- cases$alpha_index[i]
     value &lt;- rough_sampled_error(meshes[[h_index]],reference,
-       projections[[h_index]],alpha_vector[a],time_steps[a],
+       projections[[h_index]],alpha_vector[a],time_step,
        reference_time_step,m_fixed,diffusion,T_final)
     value$final_state &lt;- NULL
     value$J &lt;- J_vector[h_index]
@@ -605,18 +594,20 @@ rates &lt;- data.frame(alpha=alpha_vector, reference=alpha_vector,
     raw=apply(errors, 2L, slope), corrected=apply(corrected, 2L, slope))
 figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
 <pre class="r"><code>knitr::kable(data.frame(T=T_final, kappa=kappa, diffusion=diffusion, m=m_fixed,
+    tau=time_step,
     cutoff=reference_cutoff, reference_J=reference_J,
     reference_h=2^-reference_J, reference_tau=reference_time_step))</code></pre>
-<table>
+<table style="width:100%;">
 <colgroup>
 <col width="4%" />
 <col width="8%" />
-<col width="14%" />
+<col width="13%" />
 <col width="4%" />
-<col width="10%" />
-<col width="17%" />
-<col width="17%" />
-<col width="20%" />
+<col width="8%" />
+<col width="9%" />
+<col width="16%" />
+<col width="16%" />
+<col width="19%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -624,6 +615,7 @@ figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
 <th align="right">kappa</th>
 <th align="right">diffusion</th>
 <th align="right">m</th>
+<th align="right">tau</th>
 <th align="right">cutoff</th>
 <th align="right">reference_J</th>
 <th align="right">reference_h</th>
@@ -636,6 +628,7 @@ figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
 <td align="right">4</td>
 <td align="right">1</td>
 <td align="right">14</td>
+<td align="right">8e-07</td>
 <td align="right">16</td>
 <td align="right">18</td>
 <td align="right">3.8e-06</td>
@@ -644,95 +637,67 @@ figure_dir &lt;- &quot;data_files/rough_h_as_in_mat&quot;</code></pre>
 </tbody>
 </table>
 <pre class="r"><code>knitr::kable(data.frame(alpha=alpha_vector,
-    tau=formatC(time_steps, format=&quot;e&quot;, digits=6),
     omitted_squared_bound=formatC(r$cutoff_squared_bound, format=&quot;e&quot;, digits=6),
     max_omitted_squared_fraction=formatC(r$max_tail_squared_fraction, format=&quot;e&quot;, digits=6)))</code></pre>
 <table>
-<colgroup>
-<col width="5%" />
-<col width="8%" />
-<col width="17%" />
-<col width="29%" />
-<col width="39%" />
-</colgroup>
 <thead>
 <tr class="header">
-<th align="left"></th>
 <th align="right">alpha</th>
-<th align="left">tau</th>
 <th align="left">omitted_squared_bound</th>
 <th align="left">max_omitted_squared_fraction</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td align="left">0.9</td>
 <td align="right">0.9</td>
-<td align="left">6.666667e-05</td>
 <td align="left">3.799543e-13</td>
-<td align="left">1.268918e-05</td>
+<td align="left">1.272851e-05</td>
 </tr>
 <tr class="even">
-<td align="left">1.0</td>
 <td align="right">1.0</td>
-<td align="left">2.000000e-05</td>
 <td align="left">2.720955e-14</td>
-<td align="left">4.011828e-06</td>
+<td align="left">4.014862e-06</td>
 </tr>
 <tr class="odd">
-<td align="left">1.1</td>
 <td align="right">1.1</td>
-<td align="left">2.000000e-05</td>
 <td align="left">1.965362e-15</td>
-<td align="left">1.251361e-06</td>
+<td align="left">1.254517e-06</td>
 </tr>
 <tr class="even">
-<td align="left">1.2</td>
 <td align="right">1.2</td>
-<td align="left">6.250000e-06</td>
 <td align="left">1.429376e-16</td>
-<td align="left">3.851711e-07</td>
+<td align="left">3.856636e-07</td>
 </tr>
 <tr class="odd">
-<td align="left">1.3</td>
 <td align="right">1.3</td>
-<td align="left">6.250000e-06</td>
 <td align="left">1.045366e-17</td>
-<td align="left">1.149471e-07</td>
+<td align="left">1.154157e-07</td>
 </tr>
 <tr class="even">
-<td align="left">1.4</td>
 <td align="right">1.4</td>
-<td align="left">2.000000e-06</td>
 <td align="left">7.680184e-19</td>
-<td align="left">3.295080e-08</td>
+<td align="left">3.304582e-08</td>
 </tr>
 <tr class="odd">
-<td align="left">1.5</td>
 <td align="right">1.5</td>
-<td align="left">2.000000e-06</td>
 <td align="left">5.663889e-20</td>
-<td align="left">8.726405e-09</td>
+<td align="left">8.799881e-09</td>
 </tr>
 <tr class="even">
-<td align="left">1.6</td>
 <td align="right">1.6</td>
-<td align="left">8.000000e-07</td>
 <td align="left">4.190104e-21</td>
 <td align="left">2.092261e-09</td>
 </tr>
 <tr class="odd">
-<td align="left">1.7</td>
 <td align="right">1.7</td>
-<td align="left">8.000000e-07</td>
 <td align="left">3.108006e-22</td>
 <td align="left">4.256527e-10</td>
 </tr>
 </tbody>
 </table>
 <p>The solver meshes are <span class="math inline">\(h=2^{-J}\)</span>
-for <span class="math inline">\(J\in\)</span> 5, 6, 7, 8, 9. Each alpha
-uses a fixed rational order and time step along its spatial curve.</p>
+for <span class="math inline">\(J\in\)</span> 5, 6, 7, 8, 9. Every alpha
+and spatial mesh uses the same rational order and solver time step.</p>
 </div>
 <div id="convergence-plots-axes-and-reference-curves"
 class="section level2">
@@ -807,44 +772,44 @@ curves are comparison guides, not certified upper bounds.</p>
 <tr class="odd">
 <td align="right">0.9</td>
 <td align="right">0.9</td>
-<td align="right">1.105138</td>
-<td align="right">0.894035</td>
+<td align="right">1.105624</td>
+<td align="right">0.894521</td>
 </tr>
 <tr class="even">
 <td align="right">1.0</td>
 <td align="right">1.0</td>
-<td align="right">1.210143</td>
-<td align="right">0.999040</td>
+<td align="right">1.210258</td>
+<td align="right">0.999155</td>
 </tr>
 <tr class="odd">
 <td align="right">1.1</td>
 <td align="right">1.1</td>
-<td align="right">1.314727</td>
-<td align="right">1.103624</td>
+<td align="right">1.315118</td>
+<td align="right">1.104014</td>
 </tr>
 <tr class="even">
 <td align="right">1.2</td>
 <td align="right">1.2</td>
-<td align="right">1.420220</td>
-<td align="right">1.209117</td>
+<td align="right">1.420420</td>
+<td align="right">1.209316</td>
 </tr>
 <tr class="odd">
 <td align="right">1.3</td>
 <td align="right">1.3</td>
-<td align="right">1.525236</td>
-<td align="right">1.314132</td>
+<td align="right">1.525869</td>
+<td align="right">1.314766</td>
 </tr>
 <tr class="even">
 <td align="right">1.4</td>
 <td align="right">1.4</td>
-<td align="right">1.629583</td>
-<td align="right">1.418480</td>
+<td align="right">1.630022</td>
+<td align="right">1.418919</td>
 </tr>
 <tr class="odd">
 <td align="right">1.5</td>
 <td align="right">1.5</td>
-<td align="right">1.728018</td>
-<td align="right">1.516915</td>
+<td align="right">1.729287</td>
+<td align="right">1.518184</td>
 </tr>
 <tr class="even">
 <td align="right">1.6</td>
@@ -893,9 +858,9 @@ curves are comparison guides, not certified upper bounds.</p>
 <tbody>
 <tr class="odd">
 <td align="right">3.1250e-02</td>
-<td align="right">3.7126e-03</td>
-<td align="right">2.3645e-03</td>
-<td align="right">1.5203e-03</td>
+<td align="right">3.7125e-03</td>
+<td align="right">2.3644e-03</td>
+<td align="right">1.5202e-03</td>
 <td align="right">9.899e-04</td>
 <td align="right">6.552e-04</td>
 <td align="right">4.426e-04</td>
@@ -905,11 +870,11 @@ curves are comparison guides, not certified upper bounds.</p>
 </tr>
 <tr class="even">
 <td align="right">1.5625e-02</td>
-<td align="right">1.6696e-03</td>
+<td align="right">1.6695e-03</td>
 <td align="right">9.8750e-04</td>
-<td align="right">5.9000e-04</td>
+<td align="right">5.8990e-04</td>
 <td align="right">3.571e-04</td>
-<td align="right">2.202e-04</td>
+<td align="right">2.201e-04</td>
 <td align="right">1.390e-04</td>
 <td align="right">9.060e-05</td>
 <td align="right">6.120e-05</td>
@@ -917,11 +882,11 @@ curves are comparison guides, not certified upper bounds.</p>
 </tr>
 <tr class="odd">
 <td align="right">7.8125e-03</td>
-<td align="right">7.7000e-04</td>
+<td align="right">7.6990e-04</td>
 <td align="right">4.2340e-04</td>
 <td align="right">2.3510e-04</td>
 <td align="right">1.322e-04</td>
-<td align="right">7.580e-05</td>
+<td align="right">7.570e-05</td>
 <td align="right">4.450e-05</td>
 <td align="right">2.710e-05</td>
 <td align="right">1.730e-05</td>
@@ -929,7 +894,7 @@ curves are comparison guides, not certified upper bounds.</p>
 </tr>
 <tr class="even">
 <td align="right">3.9063e-03</td>
-<td align="right">3.6210e-04</td>
+<td align="right">3.6200e-04</td>
 <td align="right">1.8520e-04</td>
 <td align="right">9.5700e-05</td>
 <td align="right">5.000e-05</td>
@@ -941,8 +906,8 @@ curves are comparison guides, not certified upper bounds.</p>
 </tr>
 <tr class="odd">
 <td align="right">1.9531e-03</td>
-<td align="right">1.7300e-04</td>
-<td align="right">8.2400e-05</td>
+<td align="right">1.7280e-04</td>
+<td align="right">8.2300e-05</td>
 <td align="right">3.9600e-05</td>
 <td align="right">1.930e-05</td>
 <td align="right">9.500e-06</td>
