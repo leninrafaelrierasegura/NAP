@@ -276,6 +276,7 @@ the same rational order and solver time step.
 
 ```{r plot-results}
 dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
+alpha_colors <- setNames(scales::hue_pal()(length(alpha_vector)), as.character(alpha_vector))
 for (use_correction in c(FALSE,TRUE)) {
     plotted <- if(use_correction) corrected else errors
     frame <- expand.grid(row=seq_along(axis),column=seq_along(alpha_vector))
@@ -295,7 +296,7 @@ for (use_correction in c(FALSE,TRUE)) {
         ggplot2::scale_x_log10(breaks=axis,
             labels=function(x) paste0("1/",round(1/x)))+
         ggplot2::scale_y_log10()+
-        ggplot2::scale_color_viridis_d()+
+        ggplot2::scale_color_manual(values=alpha_colors, drop=FALSE)+
         ggplot2::labs(x="h (log scale)",
           y=if(use_correction) "J times sampled space-time L2 error" else
             "Sampled space-time L2 error",color="alpha",
@@ -331,6 +332,9 @@ $J=\log_2(1/h)$ removes the model's leading logarithmic factor.
 Regressions freely estimate slopes of $\log_{10}E_h$ and
 $\log_{10}(J E_h)$ against $\log_{10}h$ on the fit meshes.
 The dashed curves are comparison guides, not certified upper bounds.
+
+The [combined rational and spatial convergence figure](about.html#rational-and-spatial-convergence)
+compares these corrected errors with the isolated rational-order study.
 
 ```{r rates}
 knitr::kable(rates, digits=6)

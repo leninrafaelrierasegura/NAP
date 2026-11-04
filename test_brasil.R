@@ -118,7 +118,7 @@ cat('C++ agrees with the R reference; nine precompiled fork workers reproduce se
 # Check the saved results retained for publication.
 h <- readRDS('data_files/rough_h_as_in_mat_results.rds')
 iso <- readRDS('data_files/isolated_m_results.rds')
-stopifnot(nrow(iso$results)==iso$parameters$m_max*length(iso$parameters$alpha_vector),
+stopifnot(nrow(iso$results)==(iso$parameters$m_max-iso$parameters$m_min+1L)*length(iso$parameters$alpha_vector),
   identical(h$parameters$study,"rough_h_sampled_reference"),
   identical(dim(h$errors),c(length(h$parameters$J),length(h$parameters$alpha))),
   all(is.finite(h$errors)),all(h$errors>0),
@@ -181,13 +181,13 @@ x <- manual_run("conv_in_tau_mat.Rmd",c(common,list(tau_vector=c(.05,.025),h_fix
 stopifnot(identical(x$result$parameters$axis,c(.05,.025)),x$result$parameters$fixed$h==.25,
   x$result$parameters$kappa==3,x$result$parameters$m==2L,
   x$result$parameters$forcing_amplitude==3,identical(dim(x$result$errors),c(2L,2L)))
-# Printing the scalar diagnostic figures stays on a temporary graphics device.
+# Keep notebook plot layout calculations on a temporary graphics device.
 grDevices::pdf(tempfile(fileext=".pdf"))
-x <- manual_run("conv_in_m_isolated.Rmd",list(h=.25,tau=.05,m_max=2L,alpha_vector=c(.5,.9),
+x <- manual_run("conv_in_m_isolated.Rmd",list(h=.25,tau=.05,m_min=2L,m_max=3L,alpha_vector=c(.5,.9),
   T_final=.1,kappa=3,diffusion=.2,initial_amplitude=2,forcing_amplitude=3,AAA=.7,OMEGA=2),"isolated-m")
-grDevices::dev.off()
 stopifnot(x$result$parameters$h==.25,x$result$parameters$tau==.05,
-  x$result$parameters$m_max==2L,x$result$parameters$T_final==.1,
+  x$result$parameters$m_min==2L,x$result$parameters$m_max==3L,x$result$parameters$T_final==.1,
+  identical(sort(unique(x$result$results$m)),2:3),
   x$result$parameters$AAA==.7,x$result$parameters$OMEGA==2,
   identical(dim(x$result$errors),c(2L,2L)),max(x$result$results$absolute_error_disagreement)<1e-10)
 x <- manual_run("cov_in_h_rough_as_in_mat.Rmd",list(alpha_vector=c(.5,.9),J_vector=3:4,
@@ -201,4 +201,5 @@ stopifnot(identical(x$result$parameters$J,3:4),x$result$parameters$m==2L,
   all(x$result$parameters$time_steps==.025),
   all(vapply(x$result$cases,function(case) case$N==4L && case$tau==.025,logical(1))),
   identical(original_hashes,tools::md5sum(original_files)))
+grDevices::dev.off()
 cat("All four notebook workflows compute, load, and plot with edited parameters; committed results unchanged.\n")

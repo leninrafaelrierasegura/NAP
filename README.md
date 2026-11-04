@@ -18,7 +18,7 @@ it. Both files are kept in the project; edit the R Markdown source.
 | --- | --- | --- |
 | Smooth, space | `cov_in_h_mat.Rmd` | m=8; h=2^(-7:-3); tau=2e-5; diffusion=0.001 |
 | Smooth, time | `conv_in_tau_mat.Rmd` | m=8; h=0.001; N=200,63,20,6,2; diffusion=0.001 |
-| Smooth, rational order | `conv_in_m_isolated.Rmd` | m=1:8; h=0.02; tau=0.005; diffusion=1 |
+| Smooth, rational order | `conv_in_m_isolated.Rmd` | m=2:8; h=0.02; tau=0.005; diffusion=1 |
 | Rough, space with sampled reference | `cov_in_h_rough_as_in_mat.Rmd` | m=14; J=5:9; reference cutoff=16; reference h=2^-18 |
 
 All studies use kappa=4 and T=1. Each notebook defines its own alpha grid
@@ -27,11 +27,16 @@ and experiment settings in its parameter chunk.
 ## Rendering
 
 Rendering needs `rmarkdown`, `knitr`, `ggplot2`, and Pandoc. The isolated-order
-scalar plots also use `rSPDE` and `scales`. From the project root:
+scalar plots also use `rSPDE` and `scales`. The combined rational/spatial figure
+is created manually in the `eval=FALSE` chunk of `about.Rmd` from both studies'
+saved results. Creation uses `gridExtra`, `tikzDevice`, a LaTeX installation
+with TikZ and `mathpazo`, and `pdftoppm` (Poppler), and saves a 10 × 4 inch
+PDF, PNG, and standalone TeX source. Knitting `about.Rmd` only displays the
+saved PNG and does not require those creation tools. From the project root:
 
 ```r
 rmarkdown::render("conv_in_m_isolated.Rmd", output_dir="docs")
-# Or render all six pages:
+# Or render the full site:
 rmarkdown::render_site()
 ```
 

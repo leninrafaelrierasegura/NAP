@@ -60,6 +60,7 @@ provides a control without rational approximation.
 ```{r parameters}
 h <- 0.02
 tau <- 0.005
+m_min <- 2L
 m_max <- 8L
 alpha_vector <- seq(0.9,1.7,0.1)
 T_final <- 1
@@ -71,6 +72,8 @@ AAA <- 1
 OMEGA <- pi
 ```
 
+The rational orders are $m=$ `r m_min`, ..., `r m_max`.
+
 ## Computation
 
 ```{r recompute, eval=FALSE}
@@ -81,10 +84,11 @@ output_file <- "data_files/isolated_m_results.rds"
 coefficient_source <- "brasil"
 stopifnot(length(h) == 1L, is.finite(h), h > 0, length(tau) == 1L, is.finite(tau), tau > 0, length(T_final) ==
     1L, is.finite(T_final), T_final > 0, length(kappa) == 1L, is.finite(kappa), kappa > 0, length(diffusion) ==
-    1L, is.finite(diffusion), diffusion > 0, length(m_max) == 1L, is.finite(m_max), m_max >= 2, m_max ==
+    1L, is.finite(diffusion), diffusion > 0, length(m_min) == 1L, is.finite(m_min), m_min >= 2,
+    m_min == floor(m_min), length(m_max) == 1L, is.finite(m_max), m_max >= m_min, m_max ==
     floor(m_max), m_max <= max(brasil_supported_orders()), length(alpha_vector) > 0, !anyDuplicated(alpha_vector),
     all(is.finite(alpha_vector)), all(alpha_vector >= 0.5 & alpha_vector <= 2))
-m_vector <- seq_len(m_max)
+m_vector <- seq.int(m_min, m_max)
 for (alpha in alpha_vector[alpha_vector != 2]) for (m in m_vector) brasil_coefficients(m, alpha/2)
 N <- round(T_final/tau)
 if (!is.finite(N) || N < 1 || N > 1e+06 || abs(T_final/tau - N) > 64 * .Machine$double.eps * max(1,
@@ -107,7 +111,7 @@ for (alpha in alpha_vector) {
 results <- do.call(rbind, rows)
 control_reference <- isolated_exact_be_reference(data$C, spectrum, data$initial, data$spatial_load,
     time_seq, alpha = 2, diffusion = diffusion, A = AAA, omega = OMEGA)
-control <- isolated_rational_error(data, spectrum, control_reference, m = 1L)
+control <- isolated_rational_error(data, spectrum, control_reference, m = m_min)
 results$noise_indicator <- pmax(results$absolute_error_disagreement, control$error, .Machine$double.xmin)
 results$resolved <- results$product_error > 100 * results$noise_indicator
 errors <- matrix(results$error, nrow = length(m_vector), dimnames = list(m = m_vector, alpha = alpha_vector))
@@ -141,7 +145,7 @@ unit_max_errors <- if (length(unit_rows))
     aggregate(absolute_error ~ alpha + m, do.call(rbind, unit_rows), max) else NULL
 if (!is.null(unit_max_errors))
     unit_max_errors$alpha_label <- factor(unit_max_errors$alpha, levels=unit_alpha_vector)
-result <- list(parameters = list(h = h, tau = tau, m_max = m_max, alpha_vector = alpha_vector, T_final = T_final,
+result <- list(parameters = list(h = h, tau = tau, m_min = m_min, m_max = m_max, alpha_vector = alpha_vector, T_final = T_final,
     kappa = kappa, diffusion = diffusion, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
     AAA = AAA, OMEGA = OMEGA), results = results, errors = errors, slopes = slopes, diagnostics = spectrum$diagnostics,
     control = control, unit_max_errors = unit_max_errors)
@@ -155,7 +159,7 @@ saveRDS(result, output_file)
 r <- readRDS("data_files/isolated_m_results.rds")
 results <- r$results
 errors <- r$errors
-m_vector <- seq_len(m_max)
+m_vector <- seq.int(m_min, m_max)
 coefficient_source <- "brasil"
 figure_dir <- "data_files/isolated_m"
 dir.create(figure_dir, recursive=TRUE, showWarnings=FALSE)
