@@ -73,8 +73,6 @@ forcing_amplitude <- 10
 AAA <- 1
 OMEGA <- pi
 workers <- 1L
-error_method <- "compressed"
-error_n_blocks <- 1L
 error_verbose <- FALSE
 ```
 
@@ -105,12 +103,6 @@ g_averages <- lapply(time_grids, function(grid) {
 overkill_graph <- gets.graph.tadpole(h = overkill_h)
 overkill_graph$compute_fem()
 overkill_C <- overkill_graph$mesh$C
-error_memory <- estimate_error_memory(n_reference_nodes = nrow(overkill_C), n_exact_modes = if (error_method ==
-    "compressed")
-    sum(coeff_U_0 != 0 | coeff_FF != 0) else NULL, n_reference_samples = ceiling(T_final/overkill_time_step), n_blocks = unique(c(error_n_blocks,
-    10, 100, 1000, 10000, 1e+05, 1e+06)), n_solver_steps = vapply(time_grids, function(grid) grid$N,
-    numeric(1)))
-print(error_memory, digits = 3, row.names = FALSE)
 reference_grid <- make_time_grid(T_final = T_final, target_step = overkill_time_step)
 overkill_time_step <- reference_grid$time_step
 overkill_time_seq <- reference_grid$time_seq
@@ -130,8 +122,7 @@ exact_basis <- overkill_EIGENFUN[, active_modes, drop = FALSE]
 exact_initial <- coeff_U_0[active_modes]
 exact_forcing <- coeff_FF[active_modes]
 spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
-error_projection <- if (error_method == "compressed")
-    prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
+error_projection <- prepare_reference_error(Psi, overkill_C, exact_basis)
 m_values <- c()
 # Loop over the refinement values and fractional exponents.
 errors_projected <- matrix(NA_real_, length(tau_vector), length(alpha_vector))
@@ -141,7 +132,7 @@ for (j in seq_along(alpha_vector)) {
     exact_rates <- diffusion * reference_eigenvalues[active_modes]^beta
     coefficients_at_time <- function(t) exact_modal_coefficients(t, exact_rates, exact_initial, exact_forcing,
         A = AAA, omega = OMEGA)
-    exact_at_time <- function(t) exact_basis %*% coefficients_at_time(t)
+
     cases <- run_reference_cases(seq_along(tau_vector), function(i) {
         time_grid <- time_grids[[i]]
         time_step <- time_grid$time_step
@@ -151,8 +142,7 @@ for (j in seq_along(alpha_vector)) {
         my_op_frac <- my.fractional.operators.frac(L = L, beta = beta, C = C, scale.factor = kappa^2,
             m = m, time_step = time_step, diffusion = diffusion)
         solve_fractional_evolution_error(my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
-            Psi, overkill_C, overkill_time_seq, exact_at_time, n_blocks = error_n_blocks, verbose = error_verbose,
-            error_method = error_method, coefficients_at_time = coefficients_at_time, error_projection = error_projection)
+            overkill_time_seq, coefficients_at_time, error_projection, verbose = error_verbose)
     }, workers = workers)
     errors_projected[, j] <- vapply(cases, base::identity, numeric(1))
 }

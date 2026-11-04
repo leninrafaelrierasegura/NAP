@@ -45,6 +45,33 @@ for(alpha in c(.5,2/3,1.9,2)) {
   }
 }
 
+# Independently integrate the full reference-grid error, including reference
+# times on solver boundaries, nonuniform weights, and skipped solver intervals.
+coarse_C <- Matrix::Diagonal(2L)
+coarse_L <- Matrix::Diagonal(x=c(4,9))
+Psi <- Matrix::Matrix(rbind(c(1,0),c(.5,.5),c(0,1)),sparse=TRUE)
+reference_C <- Matrix::Diagonal(x=c(1,2,1))
+reference_basis <- rbind(c(1,0),c(0,1),c(0,.5))
+projection <- e$prepare_reference_error(Psi,reference_C,reference_basis)
+solver_times <- c(0,.1,.2,.3)
+initial <- c(.3,-.1);load <- c(.2,-.1);forcing <- c(0,1,.7,.5)
+op <- e$my.fractional.operators.frac(coarse_L,.35,coarse_C,4,4L,.1,.2)
+coefficients <- function(t) rbind(exp(-t),sin(2*t))
+history <- matrix(0,2L,length(solver_times));history[,1L] <- initial
+for(k in seq_len(length(solver_times)-1L))
+  history[,k+1L] <- as.numeric(e$my.solver.frac(op,
+    coarse_C%*%history[,k]+.1*load*forcing[k+1L]))
+for(reference_times in list(c(0,.02,.07,.1,.18,.2,.24,.3),c(0,.05,.3),c(0,.3))) {
+  times <- reference_times[-1L]
+  steps <- vapply(times,function(t)which(solver_times[-1L]>=t)[1L],integer(1))
+  difference <- reference_basis%*%coefficients(times)-Psi%*%history[,steps+1L,drop=FALSE]
+  expected <- sqrt(sum(diff(reference_times)*Matrix::colSums(difference*(reference_C%*%difference))))
+  actual <- e$solve_fractional_evolution_error(op,.1,solver_times,initial,load,forcing,
+    reference_times,coefficients,projection)
+  stopifnot(abs(actual-expected)<1e-12*max(1,expected))
+}
+cat('Reference-grid errors agree with independent direct integration.\n')
+
 # Check the saved results retained for publication.
 h <- readRDS('data_files/rough_h_as_in_mat_results.rds')
 iso <- readRDS('data_files/isolated_m_results.rds')

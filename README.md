@@ -44,7 +44,7 @@ shows the existing saved results, even after you edit settings for a future
 run. Displayed parameter tables are read from the saved result metadata.
 No experiment parameter changes are needed in `brasilfunc.Rmd`.
 
-Recomputation needs Matrix, MetricGraph, rSPDE, ggplot2, statmod and sp;
+Recomputation needs Matrix, MetricGraph, rSPDE, ggplot2 and sp;
 the rough matrix kernel additionally needs Rcpp, RcppEigen and a C++ compiler.
 The installed rSPDE must provide the requested `m_brasil<m>t` tables.
 Invalid signed coefficient rows are rejected, not altered. The shared graph

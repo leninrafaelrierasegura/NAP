@@ -402,8 +402,6 @@ forcing_amplitude &lt;- 10
 AAA &lt;- 1
 OMEGA &lt;- pi
 workers &lt;- 1L
-error_method &lt;- &quot;compressed&quot;
-error_n_blocks &lt;- 1L
 error_verbose &lt;- FALSE</code></pre>
 <pre class="r"><code># Saved files overwritten by this computation.
 output_file &lt;- &quot;data_files/errors_projected_h_mat.RData&quot;
@@ -428,11 +426,6 @@ stopifnot(length(coeff_FF) &gt;= 7L, all(coeff_FF[-7] == 0))
 overkill_graph &lt;- gets.graph.tadpole(h = overkill_h)
 overkill_graph$compute_fem()
 overkill_C &lt;- overkill_graph$mesh$C
-error_memory &lt;- estimate_error_memory(n_reference_nodes = nrow(overkill_C), n_exact_modes = if (error_method ==
-    &quot;compressed&quot;)
-    sum(coeff_U_0 != 0 | coeff_FF != 0) else NULL, n_reference_samples = ceiling(T_final/overkill_time_step), n_blocks = unique(c(error_n_blocks,
-    10, 100, 1000, 10000, 1e+05, 1e+06)), n_solver_steps = time_grid$N)
-print(error_memory, digits = 3, row.names = FALSE)
 reference_grid &lt;- make_time_grid(T_final = T_final, target_step = overkill_time_step)
 overkill_time_step &lt;- reference_grid$time_step
 overkill_time_seq &lt;- reference_grid$time_seq
@@ -456,20 +449,18 @@ for (i in seq_along(h_vector)) {
     Psi &lt;- graph$fem_basis(overkill_graph$get_mesh_locations())
     U_0 &lt;- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
     spatial_load &lt;- coeff_FF[7] * assemble_e7_load_tadpole(graph)
-    error_projection &lt;- if (error_method == &quot;compressed&quot;)
-        prepare_reference_error(Psi, overkill_C, exact_basis) else NULL
+    error_projection &lt;- prepare_reference_error(Psi, overkill_C, exact_basis)
     cases &lt;- run_reference_cases(seq_along(alpha_vector), function(j) {
         alpha &lt;- alpha_vector[j]
         beta &lt;- alpha/2
         exact_rates &lt;- diffusion * reference_eigenvalues[active_modes]^beta
         coefficients_at_time &lt;- function(t) exact_modal_coefficients(t, exact_rates, exact_initial,
             exact_forcing, A = AAA, omega = OMEGA)
-        exact_at_time &lt;- function(t) exact_basis %*% coefficients_at_time(t)
+
         my_op_frac &lt;- my.fractional.operators.frac(L = L, beta = beta, C = C, scale.factor = kappa^2,
             m = m_fixed, time_step = time_step, diffusion = diffusion)
         solve_fractional_evolution_error(my_op_frac, time_step, time_seq, U_0, spatial_load, g_average,
-            Psi, overkill_C, overkill_time_seq, exact_at_time, n_blocks = error_n_blocks, verbose = error_verbose,
-            error_method = error_method, coefficients_at_time = coefficients_at_time, error_projection = error_projection)
+            overkill_time_seq, coefficients_at_time, error_projection, verbose = error_verbose)
     }, workers = workers)
     errors_projected[i, ] &lt;- vapply(cases, base::identity, numeric(1))
 }

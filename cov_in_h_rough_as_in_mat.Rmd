@@ -112,8 +112,8 @@ metric, a projected reference basis, and a residual Gram matrix. The
 compiled kernel evaluates that same sampled norm and advances every
 shifted-solve FEM time step. It uses no analytic time-integrated error
 formula and adds no infinite-tail error. Small-case diagnostics compare it
-with both the direct and compressed R error routines used by the smooth
-notebook.
+with direct reference-grid integration and the R error routine used by the
+smooth notebook.
 
 To save memory and work, the matrices and reference mesh represent the
 invariant quarter-loop $[0,1/2]$. Signed reflections reconstruct the full
@@ -326,7 +326,8 @@ same solver settings, doubling the reference spatial resolution, increasing
 the series cutoff, halving the reference-time step, and checking solver-time
 refinement. A complete numerical spectrum bounds the isolated rational
 contribution. Small cases compare the sampled kernel with the smooth
-notebook's direct and compressed routines and with full-graph mass integration.
+notebook's error routine, direct reference-grid integration, and full-graph mass
+integration.
 
 The selected parameters keep those discrepancies below the documented
 diagnostic thresholds. They do not turn the sampled norm into an exact
