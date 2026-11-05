@@ -6,8 +6,18 @@ navbar:
   left:
     - text: "Experiments"
       href: index.html
+    - text: "Contents"
+      href: about.html
     - text: "Theory and functions"
       href: brasilfunc.html
+    - text: "Convergence in 𝘩"
+      href: cov_in_h_mat.html
+    - text: "Convergence in τ"
+      href: conv_in_tau_mat.html
+    - text: "Convergence in 𝑚"
+      href: conv_in_m_isolated.html
+    - text: "Convergence in 𝘩, rough"
+      href: cov_in_h_rough_as_in_mat.html
 output:
   html_document:
     theme: flatly
