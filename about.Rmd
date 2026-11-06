@@ -67,16 +67,25 @@ __________
 
 ## Rational and spatial convergence
 
-The left panel shows the isolated rational-order study. The right panel shows
+The left panel shows the isolated rational-order study with $K=16$ and
+$u_0=(10/\sqrt{16})(e_5+e_6+e_8+\cdots+e_{21})$. The forcing remains
+$10\sin(\pi t)e_7$. The right panel shows
 the logarithmically corrected rough spatial errors. Colors identify the same
 alpha in both panels; dashed curves retain the prescribed reference rates.
 
-Run the creation chunk manually after changing the figure. Knitting only
-displays the saved PNG.
+First run the recompute chunk in `conv_in_m_isolated.Rmd` to save the K=16
+results. Then run the creation chunk below manually to regenerate the combined
+figure. Knitting only displays the saved K=16 PNG.
 
 ```{r combined-convergence-figure, eval=FALSE}
 library(ggplot2)
-isolated <- readRDS(file.path("data_files", "isolated_m_results.rds"))
+library(gridExtra)
+isolated_file <- file.path("data_files", "isolated_m_results_K16.rds")
+if (!file.exists(isolated_file))
+    stop("Run the recompute chunk in conv_in_m_isolated.Rmd first to generate K=16 results.")
+isolated <- readRDS(isolated_file)
+stopifnot(identical(isolated$parameters$K, 16L),
+    identical(isolated$parameters$initial_modes, c(5L, 6L, 8:21)))
 rough <- readRDS(file.path("data_files", "rough_h_as_in_mat_results.rds"))
 alpha_vector <- rough$parameters$alpha
 J_vector <- rough$parameters$J
@@ -142,7 +151,7 @@ right_panel <- ggplot(spatial_data,
         subtitle=sprintf("$m_0=%d,\\quad\\tau_0=%s$", m_fixed, latex_scientific(time_step))) + panel_theme
 
 # Build the layout on the TikZ device so LaTeX measures every label.
-figure_stem <- file.path(figure_dir, "rational-and-spatial-convergence")
+figure_stem <- file.path(figure_dir, "rational-and-spatial-convergence_K16")
 tex_file <- paste0(figure_stem, ".tex")
 tikz_options <- options(tikzMetricsDictionary=file.path(tempdir(), "nap-tikz-metrics"))
 tikzDevice::tikz(tex_file, standAlone=TRUE, width=10, height=4,
@@ -182,7 +191,10 @@ unlink(paste0(figure_stem, c(".aux", ".log", "-build.log")))
 ```
 
 ```{r combined-convergence-display, echo=FALSE, out.width="100%"}
-knitr::include_graphics(file.path("data_files", "rough_h_as_in_mat",
-    "rational-and-spatial-convergence.png"))
+combined_figure <- file.path("data_files", "rough_h_as_in_mat",
+    "rational-and-spatial-convergence_K16.png")
+if (!file.exists(combined_figure))
+    stop("Run the combined-convergence-figure chunk manually to create the K=16 figure before knitting.")
+knitr::include_graphics(combined_figure)
 ```
 

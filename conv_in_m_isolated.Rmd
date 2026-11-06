@@ -328,7 +328,7 @@ Neither plot alone certifies a uniform approximation bound.
 h <- 0.02
 tau <- 0.005
 m_min <- 2L
-m_max <- 8L
+m_max <- 16L
 alpha_vector <- seq(0.9,1.7,0.1)
 T_final <- 1
 kappa <- 4
