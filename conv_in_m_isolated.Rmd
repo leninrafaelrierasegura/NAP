@@ -14,14 +14,16 @@ output:
 
 Knit loads the saved results and redraws the plots. The heavy computation
 chunk has `eval=FALSE` and runs only when you execute it manually.
-Run the chunks from top to bottom to generate new results. Keep the parameters
-below consistent with the errors you load.
+Run the chunks from top to bottom, including the recompute chunk, before
+knitting this K=16 version. Its result files are separate from the earlier
+single-mode results. Keep the parameters consistent with the errors you load.
 
 ```{r setup}
 # Initialize the R engine before purl() for interactive sessions.
 knitr::opts_chunk$set(engine="R")
 knitr::purl("brasilfunc.Rmd", output="brasilfunc.R", quiet=TRUE)
 source("brasilfunc.R")
+source("initial_modes_tadpole.R")
 ```
 
 ```{r chunk-options}
@@ -37,9 +39,11 @@ library(ggplot2)
 The smooth data on the length-$(1,2)$ tadpole are
 $$
 u_t+\nu L^\beta u=f(t),\qquad
-u_0=a_0e_5,\qquad f(t)=a_f A\sin(\omega t)e_7,
+u_0=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J_K}e_j,\qquad f(t)=a_f A\sin(\omega t)e_7,
 \qquad \beta=\alpha/2,\quad L=\kappa^2-\Delta_\Gamma.
 $$
+Here $K=16$ and $\mathcal J_K=\{5,6,8,\ldots,21\}$, excluding the forced mode $7$.
+The normalization preserves $\|u_0\|_{L_2}=|a_0|$.
 The amplitudes and frequency are `initial_amplitude`,
 `forcing_amplitude`, `AAA`, and `OMEGA`. These finite eigenfunction
 sums have arbitrarily high spectral spatial regularity. This study
@@ -56,7 +60,7 @@ $$
 Writing $(\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}$, both
 evolutions start from the same $L_2$ projection and use the same load:
 $$
-\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5,\qquad
+\mathbf C\mathbf U^0=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J_K}\boldsymbol\ell_j,\qquad
 \mathbf F^{k+1}=a_f\overline g_{k+1}\boldsymbol\ell_7,
 \qquad
 \overline g_{k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}A\sin(\omega t)\,dt.
@@ -79,8 +83,8 @@ $$
 $$
 All $N_h$ numerical eigenvectors are retained. This diagonalizes the
 FEM operator, up to eigensolver and arithmetic errors. It is not a
-truncation to the two continuum eigenfunctions: their projections can
-excite more than two discrete modes.
+truncation to the active continuum eigenfunctions: their projections can
+excite additional discrete modes.
 
 Backward Euler for the discrete fractional operator is
 $$
@@ -329,6 +333,9 @@ alpha_vector <- seq(0.9,1.7,0.1)
 T_final <- 1
 kappa <- 4
 diffusion <- 1
+K <- 16L
+initial_modes <- c(5L, 6L, 8:21)
+stopifnot(length(initial_modes) == K, !(7L %in% initial_modes))
 initial_amplitude <- 10
 forcing_amplitude <- 10
 AAA <- 1
@@ -341,7 +348,7 @@ The rational orders are $m=$ `r m_min`, ..., `r m_max`.
 
 ```{r recompute, eval=FALSE}
 # Saved files overwritten by this computation.
-output_file <- "data_files/isolated_m_results.rds"
+output_file <- "data_files/isolated_m_results_K16.rds"
 
 # Assemble the common FEM system and its complete numerical eigensystem.
 coefficient_source <- "brasil"
@@ -360,7 +367,23 @@ if (!is.finite(N) || N < 1 || N > 1e+06 || abs(T_final/tau - N) > 64 * .Machine$
 time_seq <- (0:N) * tau
 if (3/h > 1200)
     stop("Choose h >= 0.0025 for this complete-eigensystem notebook.")
-data <- isolated_tadpole_data(h, kappa, initial_amplitude, forcing_amplitude)
+# Assemble the matrices, initial projection, and forcing on one graph.
+graph <- gets.graph.tadpole(h)
+graph$compute_fem()
+C <- graph$mesh$C
+L <- kappa^2 * C + graph$mesh$G
+edge_lengths <- graph$get_edge_lengths()
+PtE <- graph$mesh$PtE
+element_lengths <- unlist(lapply(1:2, function(edge) {
+    coordinates <- c(0, sort(edge_lengths[edge] * PtE[PtE[, 1L] == edge, 2L]),
+        edge_lengths[edge])
+    diff(coordinates)
+}))
+data <- list(C = C, L = L,
+    initial = project_initial_modes_tadpole(graph, initial_modes, initial_amplitude),
+    spatial_load = forcing_amplitude * assemble_e7_load_tadpole(graph),
+    kappa = kappa, h_requested = h,
+    h_min = min(element_lengths), h_max = max(element_lengths))
 spectrum <- isolated_discrete_spectrum(data$C, data$L)
 # Compare sparse rational evolution with exact-discrete backward Euler.
 rows <- list()
@@ -409,7 +432,8 @@ unit_max_errors <- if (length(unit_rows))
 if (!is.null(unit_max_errors))
     unit_max_errors$alpha_label <- factor(unit_max_errors$alpha, levels=unit_alpha_vector)
 result <- list(parameters = list(h = h, tau = tau, m_min = m_min, m_max = m_max, alpha_vector = alpha_vector, T_final = T_final,
-    kappa = kappa, diffusion = diffusion, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
+    kappa = kappa, diffusion = diffusion, K = K, initial_modes = initial_modes,
+    initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
     AAA = AAA, OMEGA = OMEGA), results = results, errors = errors, slopes = slopes, diagnostics = spectrum$diagnostics,
     control = control, unit_max_errors = unit_max_errors)
 dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
@@ -419,12 +443,15 @@ saveRDS(result, output_file)
 ## Matrix results
 
 ```{r load-results}
-r <- readRDS("data_files/isolated_m_results.rds")
+result_file <- "data_files/isolated_m_results_K16.rds"
+if (!file.exists(result_file)) stop("Run the recompute chunk first to generate K=16 results.")
+r <- readRDS(result_file)
+stopifnot(identical(r$parameters$K, K), identical(r$parameters$initial_modes, initial_modes))
 results <- r$results
 errors <- r$errors
 m_vector <- seq.int(m_min, m_max)
 coefficient_source <- "brasil"
-figure_dir <- "data_files/isolated_m"
+figure_dir <- "data_files/isolated_m_K16"
 dir.create(figure_dir, recursive=TRUE, showWarnings=FALSE)
 ```
 

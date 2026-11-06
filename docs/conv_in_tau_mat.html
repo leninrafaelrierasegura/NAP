@@ -13,7 +13,7 @@
 
 <title>Convergence in τ with smooth data</title>
 
-<script src="site_libs/header-attrs-2.31/header-attrs.js"></script>
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
 <script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
@@ -373,14 +373,16 @@ div.tocify {
 href="brasilfunc.html">Theory and functions</a></p>
 <p>Knit loads the saved results and redraws the plots. The heavy
 computation chunk has <code>eval=FALSE</code> and runs only when you
-execute it manually. Run the chunks from top to bottom to generate new
-results. Keep the parameters below consistent with the errors you
-load.</p>
+execute it manually. Run the chunks from top to bottom, including the
+recompute chunk, before knitting this K=16 version. Its result files are
+separate from the earlier single-mode results. Keep the parameters
+consistent with the errors you load.</p>
 <pre class="r"><code># Initialize the R engine before purl() for interactive sessions.
 knitr::opts_chunk$set(engine=&quot;R&quot;)
 knitr::purl(&quot;brasilfunc.Rmd&quot;, output=&quot;brasilfunc.R&quot;, quiet=TRUE)</code></pre>
 <pre><code>## [1] &quot;brasilfunc.R&quot;</code></pre>
-<pre class="r"><code>source(&quot;brasilfunc.R&quot;)</code></pre>
+<pre class="r"><code>source(&quot;brasilfunc.R&quot;)
+source(&quot;initial_modes_tadpole.R&quot;)</code></pre>
 <pre class="r"><code>knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, cache=FALSE)</code></pre>
 <pre class="r"><code>library(ggplot2)</code></pre>
 <div id="problem-and-matrix-method" class="section level2">
@@ -391,10 +393,13 @@ class="math inline">\(2\)</span>, let <span
 class="math inline">\(L=\kappa^2-\Delta_\Gamma\)</span> be the shifted
 Kirchhoff–Laplacian. We solve <span class="math display">\[
 u_t+\nu L^\beta u=a_f A\sin(\omega t)e_7,
-\qquad u(0)=a_0e_5,\qquad \beta=\alpha/2.
-\]</span> Here <span class="math inline">\(Le_j=\lambda_j e_j\)</span>
-and the <span class="math inline">\(e_j\)</span> are orthonormal in
-<span class="math inline">\(L_2(\Gamma)\)</span>. The amplitudes <span
+\qquad u(0)=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J_K}e_j,\qquad
+\beta=\alpha/2.
+\]</span> Here <span class="math inline">\(K=16\)</span>, <span
+class="math inline">\(\mathcal J_K=\{5,6,8,\ldots,21\}\)</span>, and
+<span class="math inline">\(Le_j=\lambda_j e_j\)</span>. The <span
+class="math inline">\(e_j\)</span> are orthonormal in <span
+class="math inline">\(L_2(\Gamma)\)</span>. The amplitudes <span
 class="math inline">\(a_0,a_f,A\)</span> and frequency <span
 class="math inline">\(\omega\)</span> are
 <code>initial_amplitude</code>, <code>forcing_amplitude</code>,
@@ -407,11 +412,14 @@ and taking the inner product with <span
 class="math inline">\(e_j\)</span> reduces the equation to <span
 class="math display">\[
 c_j&#39;(t)+\gamma_j c_j(t)=a_f A\sin(\omega t)\,\mathbf{1}_{\{j=7\}},
-\qquad c_j(0)=a_0\mathbf{1}_{\{j=5\}},
+\qquad c_j(0)=\frac{a_0}{\sqrt K}\mathbf{1}_{\{j\in\mathcal J_K\}},
 \qquad \gamma_j=\nu\lambda_j^\beta.
-\]</span> Only two coefficients are nonzero. The initial mode decays as
-<span class="math inline">\(c_5(t)=a_0e^{-\gamma_5t}\)</span>. Variation
-of constants gives <span class="math display">\[
+\]</span> The <span class="math inline">\(K\)</span> initial
+coefficients decay as <span
+class="math inline">\(c_j(t)=a_0e^{-\gamma_jt}/\sqrt K\)</span> for
+<span class="math inline">\(j\in\mathcal J_K\)</span>. Mode <span
+class="math inline">\(7\)</span> is excluded from the initial data.
+Variation of constants gives <span class="math display">\[
 \begin{aligned}
 c_7(t)
 &amp;=a_f A\int_0^t e^{-\gamma_7(t-r)}\sin(\omega r)\,dr\\
@@ -421,14 +429,15 @@ c_7(t)
 \end{aligned}
 \]</span> Therefore the reference solution is exactly <span
 class="math display">\[
-u(s,t)=c_5(t)e_5(s)+c_7(t)e_7(s).
+u(s,t)=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal
+J_K}e^{-\gamma_jt}e_j(s)+c_7(t)e_7(s).
 \]</span> <code>exact_modal_coefficients()</code> evaluates these
 coefficients at the reference times. The reference eigenfunctions
 evaluate the continuum solution; the computed FEM solution is advanced
-by sparse matrix solves. Increasing <code>N_finite</code> does not add
-active solution modes for these data: all initial and forcing
-coefficients outside modes <span class="math inline">\(5\)</span> and
-<span class="math inline">\(7\)</span> are zero.</p>
+by sparse matrix solves. <code>N_finite=14</code> includes every initial
+mode through <span class="math inline">\(e_{21}\)</span> and the forced
+mode <span class="math inline">\(e_7\)</span>. All 17 active
+coefficients are included in the reference.</p>
 </div>
 <div id="step-2-identify-the-regularity-of-the-data"
 class="section level3">
@@ -436,7 +445,8 @@ class="section level3">
 <p>For any finite <span class="math inline">\(r\ge0\)</span>, the
 spectral Sobolev norm of the initial data is <span
 class="math display">\[
-\|u_0\|_{\dot H^r(\Gamma)}^2=a_0^2\lambda_5^r&lt;\infty.
+\|u_0\|_{\dot H^r(\Gamma)}^2=\frac{a_0^2}{K}\sum_{j\in\mathcal
+J_K}\lambda_j^r&lt;\infty.
 \]</span> Likewise, <span class="math display">\[
 \|f\|_{L_2(0,T;\dot H^r(\Gamma))}^2
 =a_f^2 A^2\lambda_7^r\int_0^T\sin^2(\omega t)\,dt&lt;\infty.
@@ -461,9 +471,11 @@ class="math inline">\((\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}\)</span>.
 The initial coefficient vector represents the orthogonal projection
 <span class="math inline">\(P_hu_0\)</span>: <span
 class="math display">\[
-\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5.
-\]</span> <code>project_u0_tadpole()</code> computes this mass-matrix
-solve. The initial vector is a projection, rather than the vector of
+\mathbf C\mathbf U^0=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal
+J_K}\boldsymbol\ell_j.
+\]</span> <code>project_initial_modes_tadpole()</code> computes this
+mass-matrix solve for the normalized sum, using analytic sine/cosine–hat
+integrals. The initial vector is a projection, rather than the vector of
 nodal samples.</p>
 <p>On <span class="math inline">\(I_{k+1}=(t_k,t_{k+1}]\)</span>, with
 <span class="math inline">\(t_k=k\tau\)</span>, the forcing is averaged:
@@ -479,10 +491,8 @@ class="math inline">\(A\sin(\omega(t_k+\tau/2))\operatorname{sinc}(\omega\tau/2)
 where <span
 class="math inline">\(\operatorname{sinc}(z)=\sin(z)/z\)</span> and
 <span class="math inline">\(\operatorname{sinc}(0)=1\)</span>. The
-sine–hat integrals defining <span
-class="math inline">\(\boldsymbol\ell_5\)</span> and <span
-class="math inline">\(\boldsymbol\ell_7\)</span> are evaluated
-analytically on the solver mesh.</p>
+sine/cosine–hat integrals for every initial mode and the forcing mode
+are evaluated analytically on the solver mesh.</p>
 </div>
 <div id="step-4-advance-the-fractional-backward-euler-scheme"
 class="section level3">
@@ -552,7 +562,7 @@ E_{\rm sampled}^2
 \]</span> The quadratic form is the exact mass norm of the P1
 interpolant on the reference mesh. Together with the right-endpoint time
 sum, it approximates the continuum norm. No reference PDE is solved, and
-the two-mode exact solution has no omitted spectral tail.</p>
+the 17-mode exact solution has no omitted spectral tail.</p>
 </div>
 <div id="step-6-connect-the-implemented-error-evaluation-to-this-norm"
 class="section level3">
@@ -703,7 +713,10 @@ tau_vector &lt;- T_final/c(200L,63L,20L,6L,2L)
 h_fixed &lt;- 1e-3
 overkill_h &lt;- 1e-5
 overkill_time_step &lt;- 1e-5
-N_finite &lt;- 4L
+N_finite &lt;- 14L
+K &lt;- 16L
+initial_modes &lt;- c(5L, 6L, 8:21)
+stopifnot(length(initial_modes) == K, !(7L %in% initial_modes))
 initial_amplitude &lt;- 10
 forcing_amplitude &lt;- 10
 AAA &lt;- 1
@@ -714,17 +727,18 @@ error_verbose &lt;- FALSE</code></pre>
 <div id="computation" class="section level2">
 <h2>Computation</h2>
 <pre class="r"><code># Saved files overwritten by this computation.
-output_file &lt;- &quot;data_files/errors_projected_tau_mat.RData&quot;
+output_file &lt;- &quot;data_files/errors_projected_tau_mat_K16.RData&quot;
 
 # Assemble FEM matrices and advance every backward Euler step.
-stopifnot(N_finite &gt;= 4, N_finite%%2 == 0, length(alpha_vector) &gt; 0, all(is.finite(alpha_vector)),
+stopifnot(N_finite &gt;= 14, N_finite%%2 == 0, length(alpha_vector) &gt; 0, all(is.finite(alpha_vector)),
     all(alpha_vector &gt; 0 &amp; alpha_vector &lt;= 2), length(m_fixed) == 1, m_fixed == floor(m_fixed))
 for (alpha in alpha_vector[alpha_vector != 2]) brasil_coefficients(m_fixed, alpha/2)
 # Compile once in the parent session before any parallel cases start.
 smooth_compile_solver()
 adjusted_N_finite &lt;- N_finite + N_finite/2 + 1
 coeff_U_0 &lt;- numeric(adjusted_N_finite)
-coeff_U_0[5] &lt;- initial_amplitude
+stopifnot(max(initial_modes) &lt;= adjusted_N_finite)
+coeff_U_0[initial_modes] &lt;- initial_amplitude/sqrt(K)
 coeff_FF &lt;- numeric(adjusted_N_finite)
 coeff_FF[7] &lt;- forcing_amplitude
 tau_targets &lt;- tau_vector
@@ -748,8 +762,8 @@ graph$compute_fem()
 C &lt;- graph$mesh$C
 L &lt;- kappa^2 * C + graph$mesh$G
 Psi &lt;- graph$fem_basis(overkill_graph$get_mesh_locations())
-stopifnot(all(coeff_U_0[-5] == 0))
-U_0 &lt;- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
+stopifnot(sum(coeff_U_0 != 0) == K, abs(sum(coeff_U_0^2) - initial_amplitude^2) &lt; 1e-10)
+U_0 &lt;- project_initial_modes_tadpole(graph, initial_modes, initial_amplitude)
 reference_eigen_params &lt;- gets.eigen.params(N_finite = N_finite, kappa = kappa, alpha = alpha_vector[1],
     graph = overkill_graph)
 reference_eigenvalues &lt;- reference_eigen_params$EIGENVAL
@@ -783,17 +797,23 @@ errors_projected &lt;- do.call(cbind, cases)
 attr(errors_projected, &quot;coefficient_source&quot;) &lt;- &quot;rSPDE BRASIL&quot;
 attr(errors_projected, &quot;parameters&quot;) &lt;- list(study = &quot;tau&quot;, axis = tau_vector, alpha = alpha_vector,
     m = m_fixed, diffusion = diffusion, kappa = kappa, T = T_final, reference_h = overkill_h, reference_tau = overkill_time_step,
-    N_finite = N_finite, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
+    N_finite = N_finite, K = K, initial_modes = initial_modes,
+    initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
     AAA = AAA, OMEGA = OMEGA, fixed = list(h = h_fixed))
 dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
 save(errors_projected, file = output_file)</code></pre>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>
-<pre class="r"><code>load(&quot;data_files/errors_projected_tau_mat.RData&quot;)</code></pre>
+<pre class="r"><code>result_file &lt;- &quot;data_files/errors_projected_tau_mat_K16.RData&quot;
+if (!file.exists(result_file)) stop(&quot;Run the recompute chunk first to generate K=16 results.&quot;)
+load(result_file)
+saved_parameters &lt;- attr(errors_projected, &quot;parameters&quot;)
+stopifnot(identical(saved_parameters$K, K), identical(saved_parameters$initial_modes, initial_modes),
+          isTRUE(all.equal(saved_parameters$axis, tau_vector)))</code></pre>
 <p>The reference temporal rate is one; the spatial mesh and rational
 order remain fixed throughout each refinement curve.</p>
-<pre class="r"><code>figure_file &lt;- &quot;data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png&quot;
+<pre class="r"><code>figure_file &lt;- &quot;data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo_K16.png&quot;
 # Average reference curves anchored at every error point, keeping the prescribed slope.
 errors &lt;- errors_projected
 axis &lt;- tau_vector
@@ -818,7 +838,7 @@ dir.create(dirname(figure_file), recursive = TRUE, showWarnings = FALSE)
 ggplot2::ggsave(figure_file, plot, width = 4, height = 5, dpi = 300, bg = &quot;white&quot;)
 
 knitr::include_graphics(figure_file)</code></pre>
-<p><img src="data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo.png" alt="" width="650px" /></p>
+<p><img src="data_files/tikzpic/p_tau_nicer_tadpole_mat_with_mathpazo_K16.png" width="650px" /></p>
 <pre class="r"><code>observed &lt;- apply(errors_projected, 2, function(e)
     unname(coef(lm(log10(e) ~ log10(tau_vector)))[2]))
 knitr::kable(data.frame(alpha=alpha_vector, reference=1, observed=observed), digits=5)</code></pre>
@@ -839,7 +859,7 @@ knitr::kable(data.frame(alpha=alpha_vector, reference=1, observed=observed), dig
 <tr class="even">
 <td align="right">1.0</td>
 <td align="right">1</td>
-<td align="right">0.98846</td>
+<td align="right">0.98847</td>
 </tr>
 <tr class="odd">
 <td align="right">1.1</td>
@@ -849,32 +869,32 @@ knitr::kable(data.frame(alpha=alpha_vector, reference=1, observed=observed), dig
 <tr class="even">
 <td align="right">1.2</td>
 <td align="right">1</td>
-<td align="right">0.98827</td>
+<td align="right">0.98828</td>
 </tr>
 <tr class="odd">
 <td align="right">1.3</td>
 <td align="right">1</td>
-<td align="right">0.98814</td>
+<td align="right">0.98816</td>
 </tr>
 <tr class="even">
 <td align="right">1.4</td>
 <td align="right">1</td>
-<td align="right">0.98798</td>
+<td align="right">0.98801</td>
 </tr>
 <tr class="odd">
 <td align="right">1.5</td>
 <td align="right">1</td>
-<td align="right">0.98779</td>
+<td align="right">0.98784</td>
 </tr>
 <tr class="even">
 <td align="right">1.6</td>
 <td align="right">1</td>
-<td align="right">0.98756</td>
+<td align="right">0.98764</td>
 </tr>
 <tr class="odd">
 <td align="right">1.7</td>
 <td align="right">1</td>
-<td align="right">0.98728</td>
+<td align="right">0.98739</td>
 </tr>
 </tbody>
 </table>
@@ -911,63 +931,63 @@ knitr::kable(data.frame(alpha=alpha_vector, reference=1, observed=observed), dig
 <tbody>
 <tr class="odd">
 <td align="right">5.0000e-03</td>
-<td align="right">2.0316e-02</td>
-<td align="right">2.0297e-02</td>
-<td align="right">2.0273e-02</td>
-<td align="right">2.0245e-02</td>
-<td align="right">2.0210e-02</td>
+<td align="right">2.0318e-02</td>
+<td align="right">2.0301e-02</td>
+<td align="right">2.0280e-02</td>
+<td align="right">2.0257e-02</td>
+<td align="right">2.0232e-02</td>
+<td align="right">2.0206e-02</td>
+<td align="right">2.0183e-02</td>
 <td align="right">2.0168e-02</td>
-<td align="right">2.0117e-02</td>
-<td align="right">2.0056e-02</td>
-<td align="right">1.9982e-02</td>
+<td align="right">2.0171e-02</td>
 </tr>
 <tr class="even">
 <td align="right">1.5873e-02</td>
-<td align="right">6.4518e-02</td>
-<td align="right">6.4456e-02</td>
-<td align="right">6.4381e-02</td>
-<td align="right">6.4291e-02</td>
-<td align="right">6.4180e-02</td>
-<td align="right">6.4046e-02</td>
-<td align="right">6.3884e-02</td>
-<td align="right">6.3687e-02</td>
-<td align="right">6.3450e-02</td>
+<td align="right">6.4524e-02</td>
+<td align="right">6.4468e-02</td>
+<td align="right">6.4403e-02</td>
+<td align="right">6.4328e-02</td>
+<td align="right">6.4247e-02</td>
+<td align="right">6.4164e-02</td>
+<td align="right">6.4089e-02</td>
+<td align="right">6.4041e-02</td>
+<td align="right">6.4048e-02</td>
 </tr>
 <tr class="odd">
 <td align="right">5.0000e-02</td>
-<td align="right">2.0307e-01</td>
-<td align="right">2.0288e-01</td>
-<td align="right">2.0264e-01</td>
-<td align="right">2.0234e-01</td>
-<td align="right">2.0199e-01</td>
-<td align="right">2.0156e-01</td>
-<td align="right">2.0104e-01</td>
-<td align="right">2.0041e-01</td>
-<td align="right">1.9965e-01</td>
+<td align="right">2.0309e-01</td>
+<td align="right">2.0291e-01</td>
+<td align="right">2.0270e-01</td>
+<td align="right">2.0246e-01</td>
+<td align="right">2.0220e-01</td>
+<td align="right">2.0193e-01</td>
+<td align="right">2.0169e-01</td>
+<td align="right">2.0152e-01</td>
+<td align="right">2.0153e-01</td>
 </tr>
 <tr class="even">
 <td align="right">1.6667e-01</td>
-<td align="right">6.7257e-01</td>
-<td align="right">6.7187e-01</td>
-<td align="right">6.7102e-01</td>
-<td align="right">6.6998e-01</td>
-<td align="right">6.6872e-01</td>
-<td align="right">6.6719e-01</td>
-<td align="right">6.6535e-01</td>
-<td align="right">6.6311e-01</td>
-<td align="right">6.6042e-01</td>
+<td align="right">6.7264e-01</td>
+<td align="right">6.7199e-01</td>
+<td align="right">6.7124e-01</td>
+<td align="right">6.7038e-01</td>
+<td align="right">6.6943e-01</td>
+<td align="right">6.6843e-01</td>
+<td align="right">6.6749e-01</td>
+<td align="right">6.6679e-01</td>
+<td align="right">6.6662e-01</td>
 </tr>
 <tr class="odd">
 <td align="right">5.0000e-01</td>
-<td align="right">1.9073e+00</td>
-<td align="right">1.9048e+00</td>
-<td align="right">1.9017e+00</td>
-<td align="right">1.8980e+00</td>
-<td align="right">1.8935e+00</td>
+<td align="right">1.9075e+00</td>
+<td align="right">1.9052e+00</td>
+<td align="right">1.9024e+00</td>
+<td align="right">1.8992e+00</td>
+<td align="right">1.8957e+00</td>
+<td align="right">1.8918e+00</td>
 <td align="right">1.8880e+00</td>
-<td align="right">1.8814e+00</td>
-<td align="right">1.8733e+00</td>
-<td align="right">1.8637e+00</td>
+<td align="right">1.8847e+00</td>
+<td align="right">1.8826e+00</td>
 </tr>
 </tbody>
 </table>

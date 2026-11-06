@@ -14,14 +14,16 @@ output:
 
 Knit loads the saved results and redraws the plots. The heavy computation
 chunk has `eval=FALSE` and runs only when you execute it manually.
-Run the chunks from top to bottom to generate new results. Keep the parameters
-below consistent with the errors you load.
+Run the chunks from top to bottom, including the recompute chunk, before
+knitting this K=16 version. Its result files are separate from the earlier
+single-mode results. Keep the parameters consistent with the errors you load.
 
 ```{r setup}
 # Initialize the R engine before purl() for interactive sessions.
 knitr::opts_chunk$set(engine="R")
 knitr::purl("brasilfunc.Rmd", output="brasilfunc.R", quiet=TRUE)
 source("brasilfunc.R")
+source("initial_modes_tadpole.R")
 ```
 
 ```{r chunk-options}
@@ -38,9 +40,10 @@ On the tadpole graph with stem length $1$ and loop length $2$, let
 $L=\kappa^2-\Delta_\Gamma$ be the shifted Kirchhoff--Laplacian. We solve
 $$
 u_t+\nu L^\beta u=a_f A\sin(\omega t)e_7,
-\qquad u(0)=a_0e_5,\qquad \beta=\alpha/2.
+\qquad u(0)=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J_K}e_j,\qquad \beta=\alpha/2.
 $$
-Here $Le_j=\lambda_j e_j$ and the $e_j$ are orthonormal in
+Here $K=16$, $\mathcal J_K=\{5,6,8,\ldots,21\}$, and $Le_j=\lambda_j e_j$.
+The $e_j$ are orthonormal in
 $L_2(\Gamma)$. The amplitudes $a_0,a_f,A$ and frequency $\omega$ are
 `initial_amplitude`, `forcing_amplitude`, `AAA`, and `OMEGA`.
 
@@ -50,11 +53,12 @@ Writing $u(t)=\sum_j c_j(t)e_j$ and taking the inner product with $e_j$
 reduces the equation to
 $$
 c_j'(t)+\gamma_j c_j(t)=a_f A\sin(\omega t)\,\mathbf{1}_{\{j=7\}},
-\qquad c_j(0)=a_0\mathbf{1}_{\{j=5\}},
+\qquad c_j(0)=\frac{a_0}{\sqrt K}\mathbf{1}_{\{j\in\mathcal J_K\}},
 \qquad \gamma_j=\nu\lambda_j^\beta.
 $$
-Only two coefficients are nonzero. The initial mode decays as
-$c_5(t)=a_0e^{-\gamma_5t}$. Variation of constants gives
+The $K$ initial coefficients decay as $c_j(t)=a_0e^{-\gamma_jt}/\sqrt K$
+for $j\in\mathcal J_K$. Mode $7$ is excluded from the initial data.
+Variation of constants gives
 $$
 \begin{aligned}
 c_7(t)
@@ -66,19 +70,19 @@ c_7(t)
 $$
 Therefore the reference solution is exactly
 $$
-u(s,t)=c_5(t)e_5(s)+c_7(t)e_7(s).
+u(s,t)=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J_K}e^{-\gamma_jt}e_j(s)+c_7(t)e_7(s).
 $$
 `exact_modal_coefficients()` evaluates these coefficients at the reference
 times. The reference eigenfunctions evaluate the continuum solution;
 the computed FEM solution is advanced by sparse matrix solves.
-Increasing `N_finite` does not add active solution modes for these data:
-all initial and forcing coefficients outside modes $5$ and $7$ are zero.
+`N_finite=14` includes every initial mode through $e_{21}$ and the forced
+mode $e_7$. All 17 active coefficients are included in the reference.
 
 ### Step 2: Identify the regularity of the data
 
 For any finite $r\ge0$, the spectral Sobolev norm of the initial data is
 $$
-\|u_0\|_{\dot H^r(\Gamma)}^2=a_0^2\lambda_5^r<\infty.
+\|u_0\|_{\dot H^r(\Gamma)}^2=\frac{a_0^2}{K}\sum_{j\in\mathcal J_K}\lambda_j^r<\infty.
 $$
 Likewise,
 $$
@@ -102,9 +106,10 @@ and $(\boldsymbol\ell_j)_i=(e_j,\psi_i)_{L_2(\Gamma)}$.
 The initial coefficient vector represents the orthogonal projection
 $P_hu_0$:
 $$
-\mathbf C\mathbf U^0=a_0\boldsymbol\ell_5.
+\mathbf C\mathbf U^0=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J_K}\boldsymbol\ell_j.
 $$
-`project_u0_tadpole()` computes this mass-matrix solve. The initial
+`project_initial_modes_tadpole()` computes this mass-matrix solve for the
+normalized sum, using analytic sine/cosine--hat integrals. The initial
 vector is a projection, rather than the vector of nodal samples.
 
 On $I_{k+1}=(t_k,t_{k+1}]$, with $t_k=k\tau$, the forcing is averaged:
@@ -118,8 +123,8 @@ The quotient formula applies when $\omega\ne0$. The code uses the
 equivalent stable expression
 $A\sin(\omega(t_k+\tau/2))\operatorname{sinc}(\omega\tau/2)$, where
 $\operatorname{sinc}(z)=\sin(z)/z$ and $\operatorname{sinc}(0)=1$.
-The sine--hat integrals defining $\boldsymbol\ell_5$ and
-$\boldsymbol\ell_7$ are evaluated analytically on the solver mesh.
+The sine/cosine--hat integrals for every initial mode and the forcing
+mode are evaluated analytically on the solver mesh.
 
 ### Step 4: Advance the fractional backward Euler scheme
 
@@ -186,7 +191,7 @@ $$
 The quadratic form is the exact mass norm of the P1 interpolant on the
 reference mesh. Together with the right-endpoint time sum, it
 approximates the continuum norm. No reference PDE is solved, and the
-two-mode exact solution has no omitted spectral tail.
+17-mode exact solution has no omitted spectral tail.
 
 ### Step 6: Connect the implemented error evaluation to this norm
 
@@ -252,7 +257,7 @@ proof of the complete evolution error estimate.
 
 The experiment varies $h$ while fixing $\tau$ and $m$. For the displayed
 settings, $\tau=2\cdot10^{-5}$, $m=8$, and $\nu=10^{-3}$, while
-$h\in\{1/128,1/64,1/32,1/16,1/8\}$. The reference mesh and time step
+$h\in\{1/512,1/256,1/128,1/64,1/32\}$. The reference mesh and time step
 are both $10^{-5}$. The parameter chunk specifies these values for a
 new run; saved results should be interpreted with their saved settings.
 
@@ -303,11 +308,14 @@ kappa <- 4
 diffusion <- 1e-3
 alpha_vector <- seq(0.9,1.7,0.1)
 m_fixed <- 8L
-h_vector <- 2^seq(-7,-3)
+h_vector <- 2^seq(-9,-5)
 time_step <- 2e-5
 overkill_h <- 1e-5
 overkill_time_step <- 1e-5
-N_finite <- 4L
+N_finite <- 14L
+K <- 16L
+initial_modes <- c(5L, 6L, 8:21)
+stopifnot(length(initial_modes) == K, !(7L %in% initial_modes))
 initial_amplitude <- 10
 forcing_amplitude <- 10
 AAA <- 1
@@ -320,24 +328,25 @@ error_verbose <- FALSE
 
 ```{r recompute, eval=FALSE}
 # Saved files overwritten by this computation.
-output_file <- "data_files/errors_projected_h_mat.RData"
+output_file <- "data_files/errors_projected_h_mat_K16.RData"
 
 # Assemble FEM matrices and advance every backward Euler step.
-stopifnot(N_finite >= 4, N_finite%%2 == 0, length(alpha_vector) > 0, all(is.finite(alpha_vector)),
+stopifnot(N_finite >= 14, N_finite%%2 == 0, length(alpha_vector) > 0, all(is.finite(alpha_vector)),
     all(alpha_vector > 0 & alpha_vector <= 2), length(m_fixed) == 1, m_fixed == floor(m_fixed))
 for (alpha in alpha_vector[alpha_vector != 2]) brasil_coefficients(m_fixed, alpha/2)
 # Compile once in the parent session before any parallel cases start.
 smooth_compile_solver()
 adjusted_N_finite <- N_finite + N_finite/2 + 1
 coeff_U_0 <- numeric(adjusted_N_finite)
-coeff_U_0[5] <- initial_amplitude
+stopifnot(max(initial_modes) <= adjusted_N_finite)
+coeff_U_0[initial_modes] <- initial_amplitude/sqrt(K)
 coeff_FF <- numeric(adjusted_N_finite)
 coeff_FF[7] <- forcing_amplitude
 time_grid <- make_time_grid(T_final = T_final, target_step = time_step)
 time_step <- time_grid$time_step
 time_seq <- time_grid$time_seq
 g_average <- average_sine_forcing(time_seq, A = AAA, omega = OMEGA)
-stopifnot(all(coeff_U_0[-5] == 0))
+stopifnot(sum(coeff_U_0 != 0) == K, abs(sum(coeff_U_0^2) - initial_amplitude^2) < 1e-10)
 stopifnot(length(coeff_FF) >= 7L, all(coeff_FF[-7] == 0))
 # Assemble the reference-mesh mass matrix.
 overkill_graph <- gets.graph.tadpole(h = overkill_h)
@@ -363,7 +372,7 @@ for (i in seq_along(h_vector)) {
     C <- graph$mesh$C
     L <- kappa^2 * C + graph$mesh$G
     Psi <- graph$fem_basis(overkill_graph$get_mesh_locations())
-    U_0 <- project_u0_tadpole(graph, amplitude = coeff_U_0[5])
+    U_0 <- project_initial_modes_tadpole(graph, initial_modes, initial_amplitude)
     spatial_load <- coeff_FF[7] * assemble_e7_load_tadpole(graph)
     error_projection <- prepare_reference_error(Psi, overkill_C, exact_basis)
     cases <- run_reference_cases(seq_along(alpha_vector), function(j) {
@@ -384,7 +393,8 @@ for (i in seq_along(h_vector)) {
 attr(errors_projected, "coefficient_source") <- "rSPDE BRASIL"
 attr(errors_projected, "parameters") <- list(study = "h", axis = h_vector, alpha = alpha_vector,
     m = m_fixed, diffusion = diffusion, kappa = kappa, T = T_final, reference_h = overkill_h, reference_tau = overkill_time_step,
-    N_finite = N_finite, initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
+    N_finite = N_finite, K = K, initial_modes = initial_modes,
+    initial_amplitude = initial_amplitude, forcing_amplitude = forcing_amplitude,
     AAA = AAA, OMEGA = OMEGA, fixed = list(tau = time_step))
 dir.create(dirname(output_file), recursive = TRUE, showWarnings = FALSE)
 save(errors_projected, file = output_file)
@@ -393,14 +403,19 @@ save(errors_projected, file = output_file)
 ## Results
 
 ```{r load-results}
-load("data_files/errors_projected_h_mat.RData")
+result_file <- "data_files/errors_projected_h_mat_K16.RData"
+if (!file.exists(result_file)) stop("Run the recompute chunk first to generate K=16 results.")
+load(result_file)
+saved_parameters <- attr(errors_projected, "parameters")
+stopifnot(identical(saved_parameters$K, K), identical(saved_parameters$initial_modes, initial_modes),
+          isTRUE(all.equal(saved_parameters$axis, h_vector)))
 ```
 
 For smooth finite-mode data, the spatial reference slope is two. Temporal
 and rational error floors can mask this rate.
 
 ```{r plot-results, fig.width=4, fig.height=5, out.width="650px"}
-figure_file <- "data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo.png"
+figure_file <- "data_files/tikzpic/p_h_nicer_tadpole_mat_with_mathpazo_K16.png"
 # Average reference curves anchored at every error point, keeping the prescribed slope.
 errors <- errors_projected
 axis <- h_vector
