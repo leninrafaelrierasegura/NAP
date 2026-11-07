@@ -1,8 +1,9 @@
 # Gaussian diffusion on MetricGraph's logo, using the notebooks' matrix solver.
 # Run from RStudio with source("diff_anim.R"), or from a terminal with:
 #   /usr/bin/Rscript --vanilla diff_anim.R
-# The last block writes introductory ordinary diffusion and a separate
-# fractional BRASIL animation as self-contained HTML files. Set options(NAP.diff_anim.run = FALSE) to load only functions.
+# The last block writes ordinary and fractional BRASIL animations, each with
+# either one or five initial Gaussian pulses, as self-contained HTML files.
+# Set options(NAP.diff_anim.run = FALSE) to load only functions.
 
 .diff_anim_dir <- local({
   source_file <- sys.frame(1)$ofile
@@ -27,9 +28,10 @@ solve_gaussian_diffusion <- function(graph, h = 0.1, T_final = 10,
             length(alpha) == 1L, is.finite(alpha), alpha > 0, alpha <= 2,
             length(kappa) == 1L, is.finite(kappa), kappa >= 0,
             length(diffusion) == 1L, is.finite(diffusion), diffusion > 0,
-            length(center_vertex) == 1L, is.finite(center_vertex),
-            center_vertex == as.integer(center_vertex),
-            center_vertex >= 1L, center_vertex <= nrow(graph$V),
+            length(center_vertex) >= 1L, all(is.finite(center_vertex)),
+            all(center_vertex == as.integer(center_vertex)),
+            all(center_vertex >= 1L), all(center_vertex <= nrow(graph$V)),
+            !anyDuplicated(center_vertex),
             length(sigma) == 1L, is.finite(sigma), sigma > 0,
             length(amplitude) == 1L, is.finite(amplitude), amplitude > 0,
             length(projection_refinement) == 1L,
@@ -44,24 +46,29 @@ solve_gaussian_diffusion <- function(graph, h = 0.1, T_final = 10,
   L <- kappa^2 * C + G
   grid <- .diff_anim_solver$make_time_grid(T_final, time_step)
 
-  # Intrinsic Gaussian: u0(s) = amplitude * exp(-d_Gamma(s,v0)^2/(2*sigma^2)),
-  # where d_Gamma is shortest-path arclength on the metric graph. sigma is in
-  # graph-length units. Coordinates do not enter this initial condition.
+  # Sum of intrinsic Gaussians, one per entry of center_vertex:
+  # u0(s) = amplitude * sum_v exp(-d_Gamma(s,v)^2/(2*sigma^2)).
+  # d_Gamma is shortest-path arclength; sigma is in graph-length units and
+  # amplitude is the height of each Gaussian before they are summed.
+  # Coordinates do not enter this initial condition.
   # Approximate its L2 projection using MetricGraph's finer mesh, consistent
   # mass matrix and coarse FEM basis, as in the reference-mesh notebooks.
   quadrature_graph <- graph$clone(deep = TRUE)
   quadrature_graph$build_mesh(h = h / projection_refinement)
   quadrature_graph$compute_fem()
   graph$compute_geodist(obs = FALSE)
-  vertex_distance <- graph$geo_dist[[".vertices"]][center_vertex, ]
   locations <- quadrature_graph$get_mesh_locations()
   edge <- locations[, 1L]
   arclength <- locations[, 2L] * graph$edge_lengths[edge]
-  # A path from v0 to an edge interior enters through one of its endpoints.
-  distance <- pmin(vertex_distance[graph$E[edge, 1L]] + arclength,
-                   vertex_distance[graph$E[edge, 2L]] + graph$edge_lengths[edge] - arclength)
-  # Unreachable components have distance Inf and hence exactly zero initial data.
-  gaussian <- amplitude * exp(-distance^2 / (2 * sigma^2))
+  gaussian <- numeric(nrow(locations))
+  for (vertex in center_vertex) {
+    vertex_distance <- graph$geo_dist[[".vertices"]][vertex, ]
+    # A path to an edge interior enters through one of its endpoints.
+    distance <- pmin(vertex_distance[graph$E[edge, 1L]] + arclength,
+                     vertex_distance[graph$E[edge, 2L]] + graph$edge_lengths[edge] - arclength)
+    # Unreachable components have distance Inf and contribute zero.
+    gaussian <- gaussian + amplitude * exp(-distance^2 / (2 * sigma^2))
+  }
   Psi <- graph$fem_basis(locations)
   initial_load <- Matrix::crossprod(Psi, quadrature_graph$mesh$C %*% gaussian)
   initial <- as.numeric(Matrix::solve(C, initial_load))
@@ -99,7 +106,20 @@ solve_gaussian_diffusion <- function(graph, h = 0.1, T_final = 10,
                          projection_refinement = projection_refinement))
 }
 
-animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 80) {
+# Reuse the same physical parameters and an equally fine initial-projection
+# mesh when changing the solver mesh. This isolates the effect of spatial h.
+solve_coarse_diffusion <- function(result, h = 1) {
+  stopifnot(length(h) == 1L, is.finite(h), h > 0)
+  parameters <- result$parameters
+  projection_h <- parameters$h / parameters$projection_refinement
+  parameters$projection_refinement <- as.integer(max(1, ceiling(h / projection_h)))
+  parameters$h <- h
+  do.call(solve_gaussian_diffusion,
+          c(list(graph = result$graph$clone(deep = TRUE)), parameters))
+}
+
+animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 80,
+                                    comparison = NULL) {
   stopifnot(length(max_frames) == 1L, is.finite(max_frames), max_frames >= 2,
             length(frame_duration) == 1L, is.finite(frame_duration), frame_duration > 0)
   graph <- result$graph
@@ -109,10 +129,21 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
                                         length.out = min(max_frames, ncol(U))))))
   times <- result$time[columns]
   U <- U[, columns, drop = FALSE]
+  comparison_U <- NULL
+  if (!is.null(comparison)) {
+    stopifnot(isTRUE(all.equal(result$time, comparison$time)),
+              identical(graph$E, comparison$graph$E),
+              isTRUE(all.equal(graph$V, comparison$graph$V)))
+    # Reconstruct the independently computed coarse P1 solution at the fine
+    # plotting locations. It is still solved only on its own h=1 mesh; using
+    # common locations follows the curved graph geometry for both traces.
+    comparison_U <- as.matrix(comparison$graph$fem_basis(graph$get_mesh_locations()) %*%
+                                comparison$solution[, columns, drop = FALSE])
+  }
 
   # Draw each actual mesh segment separately: an NA separates segments, so
   # neither branches nor disconnected components acquire artificial lines.
-  edge_nodes <- as.vector(t(cbind(graph$mesh$E, NA_integer_)))
+  edge_nodes <- head(as.vector(t(cbind(graph$mesh$E, NA_integer_))), -1L)
   xy <- graph$mesh$V[, 1:2, drop = FALSE]
   x <- xy[edge_nodes, 1L]
   y <- xy[edge_nodes, 2L]
@@ -120,19 +151,39 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
                            round(seq(1L, nrow(xy), length.out = min(120L, nrow(xy))))))
   support_x <- as.vector(t(cbind(xy[support_nodes, 1L], xy[support_nodes, 1L], NA_real_)))
   support_y <- as.vector(t(cbind(xy[support_nodes, 2L], xy[support_nodes, 2L], NA_real_)))
-  support_z <- function(u) as.vector(t(cbind(0, u[support_nodes], NA_real_)))
+  # Omit trailing separators, which plotly_build otherwise removes from the
+  # initial traces but not from our manually supplied animation frames.
+  support_x <- head(support_x, -1L)
+  support_y <- head(support_y, -1L)
+  support_z <- function(u) head(as.vector(t(cbind(0, u[support_nodes], NA_real_))), -1L)
   ordinary <- result$parameters$alpha == 2
   conserving <- ordinary && result$parameters$kappa == 0
   heading <- if (conserving) "Ordinary diffusion on a graph" else if (ordinary)
     "Ordinary diffusion with decay" else "Fractional diffusion with decay"
-  explanation <- if (conserving)
-    "A pulse spreads along edges and through junctions. Its total amount stays constant." else
-    "A pulse spreads along the graph while its total amount decreases."
-  title_at <- function(i) sprintf(
-    "%s | t = %.3f<br><sup>%s<br>Total amount: %.4f (%.1f%% of initial)</sup>",
-    heading, times[i], explanation, result$diagnostics$mass[columns[i]],
-    100 * result$diagnostics$mass_fraction[columns[i]])
-  z_range <- range(c(0, U))
+  pulse_count <- length(result$parameters$center_vertex)
+  if (pulse_count > 1L) heading <- paste0(heading, " | ", pulse_count, " Gaussian pulses")
+  explanation <- if (conserving) {
+    if (pulse_count == 1L)
+      "A pulse spreads along edges and through junctions. Its total amount stays constant." else
+      "Pulses spread along edges and through junctions. Their total amount stays constant."
+  } else {
+    if (pulse_count == 1L)
+      "A pulse spreads along the graph while its total amount decreases." else
+      "Pulses spread along the graph while their total amount decreases."
+  }
+  title_at <- function(i) {
+    amount <- if (is.null(comparison)) sprintf(
+      "Total amount: %.4f (%.1f%% of initial)", result$diagnostics$mass[columns[i]],
+      100 * result$diagnostics$mass_fraction[columns[i]]) else sprintf(
+      "Total amount: h = %g: %.4f (%.1f%%); h = %g: %.4f (%.1f%%)",
+      result$parameters$h, result$diagnostics$mass[columns[i]],
+      100 * result$diagnostics$mass_fraction[columns[i]],
+      comparison$parameters$h, comparison$diagnostics$mass[columns[i]],
+      100 * comparison$diagnostics$mass_fraction[columns[i]])
+    sprintf("%s | t = %.3f<br><sup>%s<br>%s</sup>",
+            heading, times[i], explanation, amount)
+  }
+  z_range <- range(c(0, U, comparison_U))
   z_range <- z_range + c(-0.03, 0.08) * max(diff(z_range), 1e-6)
   frame_names <- sprintf("time_%04d", seq_along(times))
   animation_options <- list(mode = "immediate", fromcurrent = TRUE,
@@ -149,13 +200,23 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
                          connectgaps = FALSE, hoverinfo = "skip",
                          line = list(color = "#30343b", width = 3))
   p <- plotly::add_trace(p, x = x, y = y, z = U[edge_nodes, 1L],
-                         type = "scatter3d", mode = "lines", name = "Concentration",
+                         type = "scatter3d", mode = "lines",
+                         name = if (is.null(comparison)) "Concentration" else
+                           sprintf("h = %g", result$parameters$h),
                          connectgaps = FALSE, line = list(color = "#cb432f", width = 5),
                          hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>u: %{z:.4f}<extra></extra>")
   p <- plotly::add_trace(p, x = support_x, y = support_y, z = support_z(U[, 1L]),
                          type = "scatter3d", mode = "lines", showlegend = FALSE,
                          connectgaps = FALSE, hoverinfo = "skip",
                          line = list(color = "#b0b7c3", width = 1))
+  if (!is.null(comparison_U)) {
+    p <- plotly::add_trace(p, x = x, y = y, z = comparison_U[edge_nodes, 1L],
+                           type = "scatter3d", mode = "lines",
+                           name = sprintf("h = %g", comparison$parameters$h),
+                           connectgaps = FALSE,
+                           line = list(color = "#1769aa", width = 5),
+                           hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>u: %{z:.4f}<extra></extra>")
+  }
   p <- plotly::layout(p,
     title = list(text = title_at(1L), x = 0.03, font = list(size = 17)),
     margin = list(t = 115, b = 90),
@@ -177,13 +238,19 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
                                      frame = list(duration = 0, redraw = FALSE),
                                      transition = list(duration = 0))))))))
   p <- plotly::plotly_build(p)
-  # Plotly uses zero-based trace indices. Only the solution and its vertical
+  # Plotly uses zero-based trace indices. Both solutions and the fine-solution
   # supports change; the graph stays in the plane z=0. WebGL needs redraw=TRUE.
-  p$x$frames <- lapply(seq_along(times), function(i) list(
-    name = frame_names[i], traces = c(1L, 2L),
-    data = list(list(type = "scatter3d", z = U[edge_nodes, i]),
-                list(type = "scatter3d", z = support_z(U[, i]))),
-    layout = list(title = list(text = title_at(i)))))
+  p$x$frames <- lapply(seq_along(times), function(i) {
+    traces <- c(1L, 2L)
+    data <- list(list(type = "scatter3d", z = U[edge_nodes, i]),
+                 list(type = "scatter3d", z = support_z(U[, i])))
+    if (!is.null(comparison_U)) {
+      traces <- c(traces, 3L)
+      data[[3L]] <- list(type = "scatter3d", z = comparison_U[edge_nodes, i])
+    }
+    list(name = frame_names[i], traces = traces, data = data,
+         layout = list(title = list(text = title_at(i))))
+  })
   plotly::config(p, displaylogo = FALSE)
 }
 
@@ -242,5 +309,50 @@ if (isTRUE(getOption("NAP.diff_anim.run", TRUE))) {
   fractional_output_file <- file.path(.diff_anim_dir, "data_files", "logo_diffusion_fractional.html")
   save_diffusion_animation(logo_fractional_diffusion_animation, fractional_output_file,
                            "Fractional BRASIL diffusion on the MetricGraph logo")
-  if (interactive()) print(logo_diffusion_animation)
+  # Two additional experiments: equal-width, unit-amplitude Gaussians on
+  # A, M, C, R and H. M uses its downward-pointing notch, and R uses the
+  # straight-segment junction in GRAPH. All centers are vertices; coordinates
+  # below only identify them, and distances remain intrinsic.
+  gaussian_centers <- data.frame(
+    letter = c("A", "M", "C", "R", "H"),
+    x = c(5, 1.5, 8, 2, 8),
+    y = c(4, 5, 6, 2, 2))
+  gaussian_center_vertices <- vapply(seq_len(nrow(gaussian_centers)), function(i) {
+    vertex <- which(logo_graph$V[, 1L] == gaussian_centers$x[i] &
+                      logo_graph$V[, 2L] == gaussian_centers$y[i])
+    stopifnot(length(vertex) == 1L)
+    as.integer(vertex)
+  }, integer(1))
+  names(gaussian_center_vertices) <- gaussian_centers$letter
+
+  logo_five_diffusion <- solve_gaussian_diffusion(
+    logo_graph$clone(deep = TRUE), h = h, T_final = T_final, time_step = time_step,
+    alpha = alpha, kappa = kappa, diffusion = diffusion,
+    center_vertex = gaussian_center_vertices, sigma = gaussian_sigma)
+  # Overlay an independent h=1 solve, with the same time grid and Gaussian
+  # quadrature resolution, on each red h=0.1 solution.
+  coarse_h <- 1
+  logo_five_coarse_diffusion <- solve_coarse_diffusion(logo_five_diffusion, h = coarse_h)
+  logo_five_diffusion_animation <- animate_graph_diffusion(
+    logo_five_diffusion, comparison = logo_five_coarse_diffusion)
+  five_output_file <- file.path(.diff_anim_dir, "data_files", "logo_diffusion_five_gaussians.html")
+  save_diffusion_animation(logo_five_diffusion_animation, five_output_file,
+                           "Ordinary graph diffusion: five Gaussian pulses")
+  message(sprintf("Five-pulse diffusion: relative mass drift %.3g.",
+                  max(abs(logo_five_diffusion$diagnostics$mass_fraction - 1))))
+
+  logo_five_fractional_diffusion <- solve_gaussian_diffusion(
+    logo_graph$clone(deep = TRUE), h = h, T_final = fractional_T_final,
+    time_step = time_step, alpha = fractional_alpha, m = fractional_m,
+    kappa = fractional_kappa, diffusion = diffusion,
+    center_vertex = gaussian_center_vertices, sigma = gaussian_sigma)
+  logo_five_coarse_fractional_diffusion <- solve_coarse_diffusion(
+    logo_five_fractional_diffusion, h = coarse_h)
+  logo_five_fractional_diffusion_animation <- animate_graph_diffusion(
+    logo_five_fractional_diffusion, comparison = logo_five_coarse_fractional_diffusion)
+  five_fractional_output_file <- file.path(
+    .diff_anim_dir, "data_files", "logo_diffusion_fractional_five_gaussians.html")
+  save_diffusion_animation(logo_five_fractional_diffusion_animation, five_fractional_output_file,
+                           "Fractional BRASIL graph diffusion: five Gaussian pulses")
+  if (interactive()) print(logo_five_diffusion_animation)
 }
