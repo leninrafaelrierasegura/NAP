@@ -160,6 +160,18 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
   support_z <- function(u) head(as.vector(t(cbind(0, u[support_nodes], NA_real_))), -1L)
   z_range <- range(c(0, U, comparison_U))
   z_range <- z_range + c(-0.03, 0.08) * max(diff(z_range), 1e-6)
+  # One fixed scale for both meshes and every frame: blue is cold, yellow
+  # intermediate, and red hot. Units are relative to the initial amplitude.
+  temperature_colors <- list(list(0, "#2166ac"), list(0.5, "#ffe34d"),
+                             list(1, "#d7191c"))
+  temperature_max <- max(c(0, U, comparison_U))
+  temperature_line <- function(values, width, showscale = FALSE) list(
+    color = values, colorscale = temperature_colors,
+    cmin = 0, cmax = temperature_max, cauto = FALSE,
+    width = width, showscale = showscale,
+    colorbar = list(title = list(text = "Temperature<br>(relative units)", side = "right"),
+                    x = 1.01, y = 0.55, len = 0.75, thickness = 12,
+                    outlinewidth = 0, tickfont = list(size = 11)))
   frame_names <- sprintf("time_%04d", seq_along(times))
   animation_options <- list(mode = "immediate", fromcurrent = TRUE,
                             frame = list(duration = frame_duration, redraw = TRUE),
@@ -176,10 +188,11 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
                          line = list(color = "#30343b", width = 3))
   p <- plotly::add_trace(p, x = x, y = y, z = U[edge_nodes, 1L],
                          type = "scatter3d", mode = "lines",
-                         name = if (is.null(comparison)) "Concentration" else
+                         name = if (is.null(comparison)) "Temperature" else
                            sprintf("h = %g", result$parameters$h),
-                         connectgaps = FALSE, line = list(color = "#cb432f", width = 5),
-                         hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>u: %{z:.4f}<extra></extra>")
+                         legendgroup = "fine", connectgaps = FALSE,
+                         line = temperature_line(U[edge_nodes, 1L], width = 7, showscale = TRUE),
+                         hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>Temperature: %{z:.4f}<extra></extra>")
   p <- plotly::add_trace(p, x = support_x, y = support_y, z = support_z(U[, 1L]),
                          type = "scatter3d", mode = "lines", showlegend = FALSE,
                          connectgaps = FALSE, hoverinfo = "skip",
@@ -187,20 +200,37 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
   if (!is.null(comparison_U)) {
     p <- plotly::add_trace(p, x = x, y = y, z = comparison_U[edge_nodes, 1L],
                            type = "scatter3d", mode = "lines",
-                           name = sprintf("h = %g", comparison$parameters$h),
-                           connectgaps = FALSE,
-                           line = list(color = "#1769aa", width = 5),
-                           hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>u: %{z:.4f}<extra></extra>")
+                           name = sprintf("h = %g (nodes marked)", comparison$parameters$h),
+                           legendgroup = "coarse", connectgaps = FALSE,
+                           line = temperature_line(comparison_U[edge_nodes, 1L], width = 3),
+                           hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>Temperature: %{z:.4f}<extra></extra>")
+    # Temperature determines color for both curves. Mark the actual coarse
+    # FEM nodes so the h=1 solution remains identifiable without using dashes.
+    p <- plotly::add_trace(p, x = comparison$graph$mesh$V[, 1L],
+                           y = comparison$graph$mesh$V[, 2L],
+                           z = comparison$solution[, columns[1L]],
+                           type = "scatter3d", mode = "markers",
+                           legendgroup = "coarse", showlegend = FALSE,
+                           marker = list(size = 3, color = comparison$solution[, columns[1L]],
+                             colorscale = temperature_colors, cmin = 0, cmax = temperature_max,
+                             cauto = FALSE, showscale = FALSE,
+                             line = list(color = "#202124", width = 1)),
+                           hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>Temperature: %{z:.4f}<extra>coarse node</extra>")
   }
   p <- plotly::layout(p,
-    # Fill the available slide area: no heading/caption space, a closer camera,
-    # and a horizontal legend that does not reserve a wide side margin.
-    margin = list(l = 0, r = 0, t = 0, b = 80),
+    # Keep the close view and compact legend; reserve space for the colorbar.
+    margin = list(l = 0, r = 95, t = 0, b = 80),
+    annotations = list(list(
+      x = 0.98, y = 0.98, xref = "paper", yref = "paper", showarrow = FALSE,
+      xanchor = "right", yanchor = "top",
+      text = sprintf("\u03ba = %g &nbsp;&nbsp; \u03b1 = %g", result$parameters$kappa, result$parameters$alpha),
+      font = list(size = 17, color = "#202124"),
+      bgcolor = "rgba(255,255,255,0.85)", borderpad = 4)),
     legend = list(orientation = "h", x = 0.02, y = 0.99,
                   xanchor = "left", yanchor = "top"),
     scene = list(xaxis = list(title = "x", range = range(xy[, 1L]), autorange = FALSE),
                  yaxis = list(title = "y", range = range(xy[, 2L]), autorange = FALSE),
-                 zaxis = list(title = "Concentration", range = z_range, autorange = FALSE),
+                 zaxis = list(title = "Temperature", range = z_range, autorange = FALSE),
                  aspectmode = "manual", aspectratio = list(x = 1.25, y = 1, z = 0.6),
                  camera = list(eye = list(x = 1.0, y = -1.3, z = 0.92),
                                center = list(x = 0, y = 0, z = -0.05)),
@@ -222,11 +252,15 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
   # supports change; the graph stays in the plane z=0. WebGL needs redraw=TRUE.
   p$x$frames <- lapply(seq_along(times), function(i) {
     traces <- c(1L, 2L)
-    data <- list(list(type = "scatter3d", z = U[edge_nodes, i]),
+    data <- list(list(type = "scatter3d", z = U[edge_nodes, i],
+                      line = list(color = U[edge_nodes, i])),
                  list(type = "scatter3d", z = support_z(U[, i])))
     if (!is.null(comparison_U)) {
-      traces <- c(traces, 3L)
-      data[[3L]] <- list(type = "scatter3d", z = comparison_U[edge_nodes, i])
+      traces <- c(traces, 3L, 4L)
+      data[[3L]] <- list(type = "scatter3d", z = comparison_U[edge_nodes, i],
+                        line = list(color = comparison_U[edge_nodes, i]))
+      data[[4L]] <- list(type = "scatter3d", z = comparison$solution[, columns[i]],
+                        marker = list(color = comparison$solution[, columns[i]]))
     }
     list(name = frame_names[i], traces = traces, data = data)
   })
@@ -334,7 +368,7 @@ if (isTRUE(getOption("NAP.diff_anim.run", TRUE))) {
     alpha = alpha, kappa = kappa, diffusion = diffusion,
     center_vertex = gaussian_center_vertices, sigma = gaussian_sigma)
   # Overlay an independent h=1 solve, with the same time grid and Gaussian
-  # quadrature resolution, on each red h=0.1 solution.
+  # quadrature resolution, on each h=0.1 solution. Both use temperature colors.
   coarse_h <- 1
   logo_five_coarse_diffusion <- solve_coarse_diffusion(logo_five_diffusion, h = coarse_h)
   logo_five_diffusion_animation <- animate_graph_diffusion(
