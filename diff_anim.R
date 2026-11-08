@@ -3,6 +3,8 @@
 #   /usr/bin/Rscript --vanilla diff_anim.R
 # The last block writes ordinary and fractional BRASIL animations, each with
 # either one or five initial Gaussian pulses, as self-contained HTML files.
+# Named Plotly objects are also saved as .RData here and in the presentation
+# project's data_files/ directory, ready for load() in an R Markdown slide.
 # Set options(NAP.diff_anim.run = FALSE) to load only functions.
 
 .diff_anim_dir <- local({
@@ -156,33 +158,6 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
   support_x <- head(support_x, -1L)
   support_y <- head(support_y, -1L)
   support_z <- function(u) head(as.vector(t(cbind(0, u[support_nodes], NA_real_))), -1L)
-  ordinary <- result$parameters$alpha == 2
-  conserving <- ordinary && result$parameters$kappa == 0
-  heading <- if (conserving) "Ordinary diffusion on a graph" else if (ordinary)
-    "Ordinary diffusion with decay" else "Fractional diffusion with decay"
-  pulse_count <- length(result$parameters$center_vertex)
-  if (pulse_count > 1L) heading <- paste0(heading, " | ", pulse_count, " Gaussian pulses")
-  explanation <- if (conserving) {
-    if (pulse_count == 1L)
-      "A pulse spreads along edges and through junctions. Its total amount stays constant." else
-      "Pulses spread along edges and through junctions. Their total amount stays constant."
-  } else {
-    if (pulse_count == 1L)
-      "A pulse spreads along the graph while its total amount decreases." else
-      "Pulses spread along the graph while their total amount decreases."
-  }
-  title_at <- function(i) {
-    amount <- if (is.null(comparison)) sprintf(
-      "Total amount: %.4f (%.1f%% of initial)", result$diagnostics$mass[columns[i]],
-      100 * result$diagnostics$mass_fraction[columns[i]]) else sprintf(
-      "Total amount: h = %g: %.4f (%.1f%%); h = %g: %.4f (%.1f%%)",
-      result$parameters$h, result$diagnostics$mass[columns[i]],
-      100 * result$diagnostics$mass_fraction[columns[i]],
-      comparison$parameters$h, comparison$diagnostics$mass[columns[i]],
-      100 * comparison$diagnostics$mass_fraction[columns[i]])
-    sprintf("%s | t = %.3f<br><sup>%s<br>%s</sup>",
-            heading, times[i], explanation, amount)
-  }
   z_range <- range(c(0, U, comparison_U))
   z_range <- z_range + c(-0.03, 0.08) * max(diff(z_range), 1e-6)
   frame_names <- sprintf("time_%04d", seq_along(times))
@@ -218,15 +193,20 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
                            hovertemplate = "x: %{x:.2f}<br>y: %{y:.2f}<br>u: %{z:.4f}<extra></extra>")
   }
   p <- plotly::layout(p,
-    title = list(text = title_at(1L), x = 0.03, font = list(size = 17)),
-    margin = list(t = 115, b = 90),
+    # Fill the available slide area: no heading/caption space, a closer camera,
+    # and a horizontal legend that does not reserve a wide side margin.
+    margin = list(l = 0, r = 0, t = 0, b = 80),
+    legend = list(orientation = "h", x = 0.02, y = 0.99,
+                  xanchor = "left", yanchor = "top"),
     scene = list(xaxis = list(title = "x", range = range(xy[, 1L]), autorange = FALSE),
                  yaxis = list(title = "y", range = range(xy[, 2L]), autorange = FALSE),
                  zaxis = list(title = "Concentration", range = z_range, autorange = FALSE),
                  aspectmode = "manual", aspectratio = list(x = 1.25, y = 1, z = 0.6),
-                 camera = list(eye = list(x = 1.3, y = -1.7, z = 1.2)),
+                 camera = list(eye = list(x = 1.0, y = -1.3, z = 0.92),
+                               center = list(x = 0, y = 0, z = -0.05)),
                  uirevision = "keep-camera"),
-    sliders = list(list(active = 0, currentvalue = list(prefix = "Time: "),
+    sliders = list(list(active = 0, x = 0.1, len = 0.87, xanchor = "left",
+                        currentvalue = list(prefix = "Time: "),
                         pad = list(t = 25), steps = steps)),
     updatemenus = list(list(type = "buttons", direction = "left", showactive = FALSE,
                             x = 0, y = 0, yanchor = "top", pad = list(t = 65),
@@ -248,10 +228,32 @@ animate_graph_diffusion <- function(result, max_frames = 151L, frame_duration = 
       traces <- c(traces, 3L)
       data[[3L]] <- list(type = "scatter3d", z = comparison_U[edge_nodes, i])
     }
-    list(name = frame_names[i], traces = traces, data = data,
-         layout = list(title = list(text = title_at(i))))
+    list(name = frame_names[i], traces = traces, data = data)
   })
   plotly::config(p, displaylogo = FALSE)
+}
+
+# Same named-object workflow as NAFDEMG's save_dual_for_presentation(),
+# without sourcing its unrelated plotting/Python setup. The project path is
+# anchored to this script so it is independent of the current working directory.
+save_dual_for_presentation <- function(obj,
+                                       project_dir = file.path(.diff_anim_dir, "data_files"),
+                                       presentation_dir = file.path(dirname(.diff_anim_dir),
+                                                                    "leninPresentations", "data_files")) {
+  object_name <- deparse(substitute(obj))
+  stopifnot(inherits(obj, "plotly"), length(object_name) == 1L)
+  dir.create(project_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(presentation_dir, recursive = TRUE, showWarnings = FALSE)
+  filename <- paste0(object_name, ".RData")
+  project_file <- file.path(project_dir, filename)
+  presentation_file <- file.path(presentation_dir, filename)
+  objects <- new.env(parent = emptyenv())
+  assign(object_name, obj, envir = objects)
+  save(list = object_name, file = project_file, envir = objects)
+  if (!file.copy(project_file, presentation_file, overwrite = TRUE))
+    stop("Could not copy the Plotly object to: ", presentation_file)
+  message("Saved Plotly object in:\n - ", project_file, "\n - ", presentation_file)
+  invisible(c(project = project_file, presentation = presentation_file))
 }
 
 # Save only the HTML; temporary dependency copies are removed after embedding.
@@ -290,6 +292,7 @@ if (isTRUE(getOption("NAP.diff_anim.run", TRUE))) {
   output_file <- file.path(.diff_anim_dir, "data_files", "logo_diffusion.html")
   save_diffusion_animation(logo_diffusion_animation, output_file,
                            "Ordinary diffusion on the MetricGraph logo")
+  save_dual_for_presentation(logo_diffusion_animation)
   message(sprintf("Ordinary diffusion: %d unknowns, %d time steps; relative mass drift %.3g.",
                   nrow(logo_diffusion$solution), ncol(logo_diffusion$solution) - 1L,
                   max(abs(logo_diffusion$diagnostics$mass_fraction - 1))))
@@ -309,6 +312,7 @@ if (isTRUE(getOption("NAP.diff_anim.run", TRUE))) {
   fractional_output_file <- file.path(.diff_anim_dir, "data_files", "logo_diffusion_fractional.html")
   save_diffusion_animation(logo_fractional_diffusion_animation, fractional_output_file,
                            "Fractional BRASIL diffusion on the MetricGraph logo")
+  save_dual_for_presentation(logo_fractional_diffusion_animation)
   # Two additional experiments: equal-width, unit-amplitude Gaussians on
   # A, M, C, R and H. M uses its downward-pointing notch, and R uses the
   # straight-segment junction in GRAPH. All centers are vertices; coordinates
@@ -338,6 +342,7 @@ if (isTRUE(getOption("NAP.diff_anim.run", TRUE))) {
   five_output_file <- file.path(.diff_anim_dir, "data_files", "logo_diffusion_five_gaussians.html")
   save_diffusion_animation(logo_five_diffusion_animation, five_output_file,
                            "Ordinary graph diffusion: five Gaussian pulses")
+  save_dual_for_presentation(logo_five_diffusion_animation)
   message(sprintf("Five-pulse diffusion: relative mass drift %.3g.",
                   max(abs(logo_five_diffusion$diagnostics$mass_fraction - 1))))
 
@@ -354,5 +359,6 @@ if (isTRUE(getOption("NAP.diff_anim.run", TRUE))) {
     .diff_anim_dir, "data_files", "logo_diffusion_fractional_five_gaussians.html")
   save_diffusion_animation(logo_five_fractional_diffusion_animation, five_fractional_output_file,
                            "Fractional BRASIL graph diffusion: five Gaussian pulses")
+  save_dual_for_presentation(logo_five_fractional_diffusion_animation)
   if (interactive()) print(logo_five_diffusion_animation)
 }
