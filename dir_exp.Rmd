@@ -1,0 +1,1014 @@
+---
+title: "Mixed Dirichlet–Kirchhoff diffusion: derivation of the matrix solvers"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: show
+    self_contained: true
+    css: visual.css
+---
+
+[Experiments](index.html) · [BRASIL theory and matrix-solver functions](brasilfunc.html)
+
+This document derives the matrix schemes used in the star-graph experiments
+with prescribed Dirichlet values at selected leaves. It follows the notation
+and the step-by-step derivation in `brasilfunc.Rmd`. We first derive the
+ordinary diffusion scheme, corresponding to $\alpha=2$, and then derive the
+spectral fractional scheme and its rational matrix solver. The latter uses
+a harmonic lifting to specify the meaning of nonhomogeneous Dirichlet data.
+Knitting this document explains the schemes; it does not run the experiments
+or modify their scripts. The companion file `dir_exp.tex` is retained.
+
+## Diffusion equations with mixed vertex conditions
+
+Let $\Gamma=(\mathcal V,\mathcal E)$ be a compact connected metric graph.
+Partition its vertices into a nonempty set $\mathcal V_D$ of prescribed
+Dirichlet vertices and the remaining Kirchhoff vertices
+$\mathcal V_K=\mathcal V\setminus\mathcal V_D$. We write
+\[
+    L_D=\kappa^2-\Delta_{\Gamma,D},\qquad
+    \beta=\alpha/2,\qquad \nu>0,\qquad \kappa\ge0.
+\]
+Here $\Delta_{\Gamma,D}$ is the Laplacian with **homogeneous** Dirichlet
+conditions on $\mathcal V_D$ and Kirchhoff conditions on $\mathcal V_K$.
+Its domain is
+\[
+\begin{aligned}
+\mathcal D(\Delta_{\Gamma,D})
+=\bigl\{\phi\in C(\Gamma):\;&\phi|_e\in H^2(e)
+    \text{ for every }e\in\mathcal E,\quad
+    \phi(v)=0\text{ for }v\in\mathcal V_D,\\
+ &\sum_{e\in\mathcal E_v}\partial_e\phi(v)=0
+    \text{ for }v\in\mathcal V_K\bigr\}.
+\end{aligned}
+\]
+The derivatives are directed from each vertex into its incident edges.
+Every endpoint incidence is counted. At an unprescribed leaf, the
+Kirchhoff condition reduces to a homogeneous Neumann condition.
+
+For $\alpha=2$, the state equation is
+\begin{equation}
+\label{dir:eq:ordinary}
+\tag{1}
+\left\{
+\begin{aligned}
+ \partial_tu+\nu(\kappa^2u-u'')&=f,
+       &&\text{on each edge, }0<t<T,\\
+ u(v,t)&=g_v(t),&&v\in\mathcal V_D,\\
+ \sum_{e\in\mathcal E_v}\partial_eu(v,t)&=0,
+       &&v\in\mathcal V_K,\\
+ u(s,0)&=u_0(s),&&s\in\Gamma.
+\end{aligned}
+\right.
+\end{equation}
+The state is continuous at graph vertices. With $\nu=1$ and
+$\kappa^2=c_0$, this is the state equation (5.2) in
+[Stoll and Winkler (2021)](https://doi.org/10.1553/etna_vol54s392).
+Only the state equation is used here; the values $g_v$ are given functions.
+
+Unlike the all-Kirchhoff setting in `brasilfunc.Rmd`, we may use
+$\kappa=0$: the nonempty Dirichlet set removes the constant nullspace.
+The scripts use $c_0=0$, $\nu=1$, and the matrix named `K` in the scripts
+is the matrix denoted by $\mathbf L$ below.
+
+### Function spaces and weak formulation
+
+Define
+\[
+\begin{aligned}
+ V&=\{v\in C(\Gamma):v|_e\in H^1(e)
+                       \text{ for every }e\in\mathcal E\},\\
+ V_D&=\{v\in V:v(v_D)=0\text{ for every }v_D\in\mathcal V_D\},
+\end{aligned}
+\]
+and introduce the unscaled bilinear form
+\[
+ \mathfrak a(u,v)=\kappa^2(u,v)_{L_2(\Gamma)}
+                         +(u',v')_{L_2(\Gamma)}.
+\]
+All integrals are sums of arclength integrals over the edges.
+Multiplication of the edge equation by $\phi\in V_D$ and integration by
+parts gives
+\begin{equation}
+\label{dir:eq:weak}
+\tag{2}
+ (\partial_tu,\phi)_{L_2(\Gamma)}
+       +\nu\mathfrak a(u,\phi)=(f,\phi)_{L_2(\Gamma)},
+ \qquad \phi\in V_D,
+ \qquad u|_{\mathcal V_D}=g.
+\end{equation}
+Indeed, the endpoint terms at a Kirchhoff vertex combine into its flux
+sum and vanish. The endpoint terms at a Dirichlet vertex vanish because
+the test function is zero there. The Kirchhoff condition is therefore
+incorporated naturally through the weak formulation.
+
+We assume the smooth boundary functions used by the experiments. In
+particular, $\dot g$ is meaningful in the lifting formulas below. The
+arbitrary $L_2$ boundary data considered in the control paper require a
+very weak formulation and additional analysis.
+
+## Numerical scheme for ordinary diffusion: $\alpha=2$
+
+### Step 1: Introduce the finite element basis and matrices
+
+Let $V_h\subset V$ be the continuous piecewise linear finite element
+space on a graph mesh indexed by $h$, and set $V_{h,D}=V_h\cap V_D$.
+Using the same basis notation as in `brasilfunc.Rmd`, write
+\[
+ U_h(s,t)=\sum_{i=1}^{N_h}u_i(t)\psi_h^i(s).
+\]
+The mass and stiffness matrices are
+\begin{equation}
+\label{dir:eq:matrices}
+\tag{3}
+ \mathbf C_{i,j}=(\psi_h^j,\psi_h^i)_{L_2(\Gamma)},\qquad
+ \mathbf G_{i,j}=({\psi_h^j}',{\psi_h^i}')_{L_2(\Gamma)},\qquad
+ \mathbf L=\kappa^2\mathbf C+\mathbf G.
+\end{equation}
+The coefficient $\nu$ remains outside $\mathbf L$, as it does in
+`brasilfunc.Rmd`. On a mesh interval of length $h_e$, the local matrices
+are
+\[
+ \mathbf C_e=\frac{h_e}{6}
+       \begin{pmatrix}2&1\\1&2\end{pmatrix},\qquad
+ \mathbf G_e=\frac1{h_e}
+       \begin{pmatrix}1&-1\\-1&1\end{pmatrix}.
+\]
+Their assembled matrices share one degree of freedom at each common
+vertex. Consequently the finite element state is continuous there.
+We use the consistent mass matrix, without mass lumping.
+
+### Step 2: Separate free coefficients from prescribed coefficients
+
+Let $D$ be the set of mesh indices corresponding to $\mathcal V_D$,
+and let $F$ contain all other mesh indices. In particular, $F$ contains
+the edge-interior nodes, the center of the star, and the unprescribed
+leaves. Conceptually reorder the coefficient vector and matrices as
+\[
+ \mathbf U=\begin{pmatrix}\mathbf U_F\\\mathbf U_D\end{pmatrix},
+ \qquad
+ \mathbf C=\begin{pmatrix}
+ \mathbf C_{FF}&\mathbf C_{FD}\\
+ \mathbf C_{DF}&\mathbf C_{DD}
+ \end{pmatrix},\qquad
+ \mathbf L=\begin{pmatrix}
+ \mathbf L_{FF}&\mathbf L_{FD}\\
+ \mathbf L_{DF}&\mathbf L_{DD}
+ \end{pmatrix}.
+\]
+Because the basis is nodal, imposing the boundary condition means
+\[
+    \mathbf U_D(t)=\mathbf g(t),
+    \qquad \mathbf g(t)=(g_v(t))_{v\in\mathcal V_D}.
+\]
+Thus the solution is sought in an affine finite element space, while
+the test functions belong to the homogeneous space $V_{h,D}$. There
+are equations only for the free indices.
+
+Define the forcing load by
+\[
+    \mathbf F_i(t)=(f(t),\psi_h^i)_{L_2(\Gamma)}.
+\]
+Choosing $\phi=\psi_h^i$, $i\in F$, in (2) gives
+\[
+ \sum_{j\in F}C_{ij}\dot u_j
+ +\sum_{j\in D}C_{ij}\dot g_j
+ +\nu\sum_{j\in F}L_{ij}u_j
+ +\nu\sum_{j\in D}L_{ij}g_j=F_i.
+\]
+Collecting the free coefficients on the left yields
+\begin{equation}
+\label{dir:eq:freeode}
+\tag{4}
+ \mathbf C_{FF}\dot{\mathbf U}_F
+       +\nu\mathbf L_{FF}\mathbf U_F
+ =\mathbf F_F-\mathbf C_{FD}\dot{\mathbf g}
+                   -\nu\mathbf L_{FD}\mathbf g.
+\end{equation}
+This is the consequence of substituting the prescribed coefficients.
+It explains why overwriting boundary entries after an unconstrained
+solve is insufficient: their contributions must also enter the free
+node equations.
+
+### Step 3: Discretize time and derive the boundary corrections
+
+Let $t_k=k\tau$, $k=0,\ldots,N$, with $\tau=T/N$, and write
+\[
+ \delta\mathbf U_F^{k+1}
+      =\frac{\mathbf U_F^{k+1}-\mathbf U_F^k}{\tau},\qquad
+ \delta\mathbf g^{k+1}
+      =\frac{\mathbf g^{k+1}-\mathbf g^k}{\tau}.
+\]
+As in `brasilfunc.Rmd`, use the time-averaged forcing
+\[
+ f^{k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}f(t)\,dt,\qquad
+ F_i^{k+1}=(f^{k+1},\psi_h^i)_{L_2(\Gamma)}.
+\]
+Backward Euler applied to (4) gives
+\[
+ \mathbf C_{FF}\delta\mathbf U_F^{k+1}
+       +\nu\mathbf L_{FF}\mathbf U_F^{k+1}
+ =\mathbf F_F^{k+1}
+       -\mathbf C_{FD}\delta\mathbf g^{k+1}
+       -\nu\mathbf L_{FD}\mathbf g^{k+1}.
+\]
+Multiply by $\tau$ and move the old free state to the right:
+\begin{equation}
+\label{dir:eq:ordinarybe}
+\tag{5}
+\boxed{\begin{aligned}
+ (\mathbf C_{FF}+\tau\nu\mathbf L_{FF})\mathbf U_F^{k+1}
+   ={}&\mathbf C_{FF}\mathbf U_F^k+\tau\mathbf F_F^{k+1}\\
+      &-\mathbf C_{FD}(\mathbf g^{k+1}-\mathbf g^k)
+       -\tau\nu\mathbf L_{FD}\mathbf g^{k+1}.
+\end{aligned}}
+\end{equation}
+The first correction accounts for the time variation of the prescribed
+values through the mass matrix. The second correction accounts for their
+contribution to the spatial operator. When $\mathbf g$ is constant, the
+first vanishes, but the second remains.
+
+### Step 4: Factor the reduced system and reconstruct the full state
+
+The matrix $\mathbf C_{FF}$ is symmetric positive definite. The matrix
+$\mathbf L_{FF}$ is also positive definite even if $\kappa=0$.
+To see this, for a coefficient vector $\mathbf v$ let $v_h\in V_{h,D}$
+be its associated function. Then
+\[
+ \mathbf v^\top\mathbf L_{FF}\mathbf v
+       =\kappa^2\|v_h\|_{L_2(\Gamma)}^2
+                              +\|v_h'\|_{L_2(\Gamma)}^2.
+\]
+If this is zero, $v_h$ is constant on the connected graph. Since its
+trace vanishes at at least one Dirichlet vertex, the constant is zero.
+
+Consequently $\mathbf C_{FF}+\tau\nu\mathbf L_{FF}$ admits a sparse
+Cholesky factorization. For a fixed graph, mesh, and time step, this
+factorization is reused at every step. After solving (5), insert the
+prescribed entries:
+\[
+    \mathbf U_D^{k+1}=\mathbf g^{k+1}.
+\]
+This is the `beta = 1` branch of `my.fractional.operators.frac` and
+`my.solver.frac`. Here `C = C[F,F]`, `L = K[F,F]`, and
+`diffusion = 1` in the present scripts. No rational approximation is
+needed for this branch.
+
+## Harmonic lifting of the prescribed Dirichlet data
+
+### Step 5: Define a lifting independently of the fractional power
+
+The homogeneous operator $L_D$ acts on functions satisfying zero
+Dirichlet conditions. To introduce nonzero data, let $\mathcal H g$
+be the solution of
+\[
+ (\mathcal H g)|_{\mathcal V_D}=g,\qquad
+ \mathfrak a(\mathcal H g,\phi)=0,\qquad \phi\in V_D.
+\]
+Equivalently, the lifting solves $\kappa^2\mathcal H g-(\mathcal H g)''=0$
+on each edge, with the prescribed trace and the free Kirchhoff conditions.
+For $\kappa=0$ it is linear on each edge.
+
+The discrete lifting $\mathbf H\mathbf g$ satisfies
+\[
+ (\mathbf H\mathbf g)_D=\mathbf g,\qquad
+ \mathbf L_{FF}(\mathbf H\mathbf g)_F+\mathbf L_{FD}\mathbf g=0.
+\]
+Since this holds for every boundary vector, its matrix is
+\begin{equation}
+\label{dir:eq:lift}
+\tag{6}
+ \mathbf H_D=\mathbf I,\qquad
+ \mathbf H_F=-\mathbf L_{FF}^{-1}\mathbf L_{FD}.
+\end{equation}
+The inverse denotes a solve with $\mathbf L_{FF}$, not a dense inverse
+formed in the implementation. One solves for one column of $\mathbf H$
+per prescribed vertex.
+
+Write the full coefficient vector as
+\[
+    \mathbf U_F=\mathbf W+\mathbf H_F\mathbf g,\qquad
+    \mathbf U_D=\mathbf g.
+\]
+Here $\mathbf W$ contains the coefficients of a function $W_h\in V_{h,D}$;
+its missing Dirichlet coefficients are zero. Differentiating and inserting
+this representation into (4) gives
+\[
+\begin{aligned}
+ \mathbf C_{FF}\dot{\mathbf W}
+ +\mathbf C_{FF}\mathbf H_F\dot{\mathbf g}
+ +\nu\mathbf L_{FF}\mathbf W
+ +\nu\mathbf L_{FF}\mathbf H_F\mathbf g
+ =\mathbf F_F-\mathbf C_{FD}\dot{\mathbf g}
+                    -\nu\mathbf L_{FD}\mathbf g.
+\end{aligned}
+\]
+Since $\mathbf L_{FF}\mathbf H_F+\mathbf L_{FD}=0$, the spatial lifting
+terms cancel. Introduce
+\begin{equation}
+\label{dir:eq:J}
+\tag{7}
+ \mathbf J=(\mathbf C\mathbf H)_F
+           =\mathbf C_{FF}\mathbf H_F+\mathbf C_{FD}.
+\end{equation}
+We obtain the equivalent ordinary diffusion equation
+\begin{equation}
+\label{dir:eq:liftordinary}
+\tag{8}
+ \mathbf C_{FF}\dot{\mathbf W}+\nu\mathbf L_{FF}\mathbf W
+       =\mathbf F_F-\mathbf J\dot{\mathbf g}.
+\end{equation}
+The full mass product in (7) matters: keeping only
+$\mathbf C_{FF}\mathbf H_F$ would omit the Dirichlet-basis contribution.
+
+## Fractional diffusion with the lifted boundary model
+
+### Step 6: Specify the continuous spectral problem
+
+For $0<\alpha<2$, put $\beta=\alpha/2$. The positive self-adjoint
+operator $L_D$ has $L_2(\Gamma)$-orthonormal eigenfunctions $e_j$ and
+positive eigenvalues $\lambda_j$:
+\[
+    L_De_j=\lambda_je_j,\qquad
+    L_D^\beta w=\sum_j\lambda_j^\beta(w,e_j)_{L_2(\Gamma)}e_j.
+\]
+The domain of $L_D^\beta$ consists of the functions for which
+$\sum_j\lambda_j^{2\beta}|(w,e_j)_{L_2(\Gamma)}|^2<\infty$.
+
+The fractional experiments use the following extension of (1):
+\begin{equation}
+\label{dir:eq:fracmodel}
+\tag{9}
+\boxed{\begin{aligned}
+ u&=w+\mathcal H g,\\
+ \partial_tw+\nu L_D^\beta w&=f-\mathcal H\dot g,\\
+ w(0)&=u_0-\mathcal H g(0).
+\end{aligned}}
+\end{equation}
+Thus the homogeneous spectral power acts on the remainder $w$.
+The harmonic lifting carries the prescribed boundary values. This is a
+choice of nonhomogeneous spectral model, following the lifting approach
+discussed by
+[Antil, Pfefferer, and Rogovs](https://arxiv.org/abs/1703.05256), here
+applied to a metric graph. It specifies what the fractional equation means
+at nonzero boundary data. It is not obtained by taking the all-Kirchhoff
+fractional power and then overwriting selected entries.
+
+The mixed vertex conditions enter through the realization of $L_D$.
+Fractional solutions need not have enough regularity for every classical
+vertex derivative to exist; the spectral formulation remains meaningful
+without imposing pointwise flux equations afterwards. For $\beta=1$,
+the weak harmonic property of $\mathcal H g$ reduces (9) to (1).
+
+### Step 7: Represent the reduced discrete operator in the finite element basis
+
+Define $L_{h,D}:V_{h,D}\to V_{h,D}$ by
+\[
+    (L_{h,D}v_h,\phi_h)_{L_2(\Gamma)}
+       =\mathfrak a(v_h,\phi_h),\qquad v_h,\phi_h\in V_{h,D}.
+\]
+Write its input and output as
+\[
+ v_h=\sum_{j\in F}v_j\psi_h^j,\qquad
+ L_{h,D}v_h=\sum_{j\in F}z_j\psi_h^j.
+\]
+Testing with $\psi_h^i$, $i\in F$, gives
+\[
+    \sum_{j\in F}C_{ij}z_j=\sum_{j\in F}L_{ij}v_j.
+\]
+In matrix notation,
+\[
+    \mathbf C_{FF}\mathbf z=\mathbf L_{FF}\mathbf v,\qquad
+    \mathbf z=\mathbf C_{FF}^{-1}\mathbf L_{FF}\mathbf v.
+\]
+Therefore the analogue of $\mathbf B$ in `brasilfunc.Rmd` is
+\begin{equation}
+\label{dir:eq:B}
+\tag{10}
+    \mathbf B=\mathbf C_{FF}^{-1}\mathbf L_{FF}.
+\end{equation}
+It represents the operator on the homogeneous, reduced space. One first
+forms this reduced operator and then takes its fractional power. Taking
+a block of a fractional power of the full matrix would generally give a
+different operator.
+
+### Step 8: Represent the reduced fractional bilinear form
+
+The finite element inner product is
+\[
+    (v_h,w_h)_{L_2(\Gamma)}
+       =\mathbf w^\top\mathbf C_{FF}\mathbf v.
+\]
+The identity
+\[
+ \mathbf B=\mathbf C_{FF}^{-1/2}
+      (\mathbf C_{FF}^{-1/2}\mathbf L_{FF}\mathbf C_{FF}^{-1/2})
+       \mathbf C_{FF}^{1/2}
+\]
+shows that $\mathbf B$ is similar to a symmetric positive definite
+matrix. Hence its eigenvalues are positive, and its spectral fractional
+power is well-defined. Moreover,
+\[
+    \mathbf B^\top\mathbf C_{FF}
+       =\mathbf C_{FF}\mathbf B=\mathbf L_{FF},
+\]
+so it is self-adjoint in the finite element mass inner product.
+
+Define, as in `brasilfunc.Rmd`, the discrete fractional form by
+\[
+ \mathfrak a_{h,\alpha}(v_h,w_h)
+   =(L_{h,D}^{\alpha/4}v_h,L_{h,D}^{\alpha/4}w_h)_{L_2(\Gamma)}.
+\]
+Since $\alpha/4=\beta/2$ and $L_{h,D}$ is self-adjoint,
+\[
+\begin{aligned}
+ \mathfrak a_{h,\alpha}(v_h,w_h)
+   &=(L_{h,D}^\beta v_h,w_h)_{L_2(\Gamma)}\\
+   &=\mathbf w^\top\mathbf C_{FF}\mathbf B^\beta\mathbf v.
+\end{aligned}
+\]
+Consequently the fractional bilinear-form matrix is
+$\mathbf C_{FF}\mathbf B^\beta$, and the diffusion matrix is
+$\nu\mathbf C_{FF}\mathbf B^\beta$. In general,
+\[
+ \mathbf C_{FF}(\mathbf C_{FF}^{-1}\mathbf L_{FF})^\beta
+       \ne\mathbf L_{FF}^\beta.
+\]
+The operator is discretized first and its fractional power is taken on
+$V_{h,D}$, exactly as in the original notebook but with the homogeneous
+Dirichlet space replacing the all-Kirchhoff space.
+
+### Step 9: Assemble the exact discrete fractional time step
+
+Discretize the harmonic lifting in (9) by (6). The semidiscrete equation
+for its homogeneous remainder is
+\[
+ \mathbf C_{FF}\dot{\mathbf W}
+       +\nu\mathbf C_{FF}\mathbf B^\beta\mathbf W
+       =\mathbf F_F-\mathbf J\dot{\mathbf g}.
+\]
+Define the boundary-corrected load
+\begin{equation}
+\label{dir:eq:load}
+\tag{11}
+ \widetilde{\mathbf F}^{k+1}
+    =\mathbf F_F^{k+1}
+       -\frac1\tau\mathbf J(\mathbf g^{k+1}-\mathbf g^k).
+\end{equation}
+Backward Euler gives
+\begin{equation}
+\label{dir:eq:fracbe}
+\tag{12}
+ (\mathbf C_{FF}+\tau\nu\mathbf C_{FF}\mathbf B^\beta)
+       \mathbf W^{k+1}
+    =\mathbf C_{FF}\mathbf W^k
+                      +\tau\widetilde{\mathbf F}^{k+1}.
+\end{equation}
+The initial remainder is
+$\mathbf W^0=\mathbf U_F^0-\mathbf H_F\mathbf g^0$.
+Equation (12) has exactly the structure of the fully discrete matrix
+scheme in `brasilfunc.Rmd`: replace the full mass and spatial matrices
+by their $FF$ blocks and replace the original load by (11).
+
+### Step 10: Remove the mass matrix and normalize the operator
+
+Multiply (12) by $\mathbf C_{FF}^{-1}$:
+\[
+ (\mathbf I+\tau\nu\mathbf B^\beta)\mathbf W^{k+1}
+    =\mathbf W^k
+            +\tau\mathbf C_{FF}^{-1}\widetilde{\mathbf F}^{k+1}.
+\]
+For the all-Kirchhoff operator with $\kappa>0$, the original notebook
+normalizes by $\kappa^2$. Here $\kappa$ may be zero, while the mixed
+operator remains positive. Choose a positive spectral lower bound
+$\sigma\le\lambda_{1,h}$, where
+\[
+    \mathbf L_{FF}\mathbf v_j
+          =\lambda_{j,h}\mathbf C_{FF}\mathbf v_j.
+\]
+Define
+\begin{equation}
+\label{dir:eq:A}
+\tag{13}
+    \mathbf A=\frac{\mathbf B}{\sigma}
+          =\frac{\mathbf C_{FF}^{-1}\mathbf L_{FF}}{\sigma}.
+\end{equation}
+Then $\mathbf B^\beta=\sigma^\beta\mathbf A^\beta$, so
+\[
+ (\mathbf I+\tau\nu\sigma^\beta\mathbf A^\beta)\mathbf W^{k+1}
+    =\mathbf W^k
+            +\tau\mathbf C_{FF}^{-1}\widetilde{\mathbf F}^{k+1}.
+\]
+The parameter $\sigma$ plays the role of $\kappa^2$ in the rational
+normalization only. It does not change $\mathbf L_{FF}$ and does not add
+a reaction term to the PDE. The factor $\nu$ remains outside all spatial
+fractional powers.
+
+### Step 11: Justify the positive scale used by the scripts
+
+Let $\ell_\Gamma=\sum_{e\in\mathcal E}|e|$ be the total graph length.
+For $v\in V_D$, choose a path from a Dirichlet vertex to any point $s$.
+The path has length at most $\ell_\Gamma$. Since $v$ vanishes at its
+starting vertex, Cauchy–Schwarz gives
+\[
+    |v(s)|^2\le\ell_\Gamma\|v'\|_{L_2(\Gamma)}^2.
+\]
+Integrating over the graph gives
+\[
+    \|v\|_{L_2(\Gamma)}^2
+          \le\ell_\Gamma^2\|v'\|_{L_2(\Gamma)}^2.
+\]
+Thus, for every nonzero $v_h\in V_{h,D}$,
+\[
+ \frac{\mathfrak a(v_h,v_h)}{\|v_h\|_{L_2(\Gamma)}^2}
+      =\kappa^2+
+          \frac{\|v_h'\|_{L_2(\Gamma)}^2}{\|v_h\|_{L_2(\Gamma)}^2}
+      \ge\kappa^2+\ell_\Gamma^{-2}.
+\]
+We may therefore choose
+\begin{equation}
+\label{dir:eq:scale}
+\tag{14}
+    \sigma=\kappa^2+\ell_\Gamma^{-2}>0.
+\end{equation}
+In the scripts this is `operator_scale = c0 + 1 / total_length^2`.
+The generalized eigenvalues imply
+\[
+ \mathbf A^{-1}\mathbf v_j
+       =\frac{\sigma}{\lambda_{j,h}}\mathbf v_j,\qquad
+ \operatorname{spec}(\mathbf A^{-1})\subset
+ J_h=\left[\frac{\sigma}{\lambda_{N_F,h}},
+           \frac{\sigma}{\lambda_{1,h}}\right]\subset(0,1],
+\]
+where $N_F=|F|$. The upper endpoint need not equal $1$: $\sigma$ is a
+lower bound, not necessarily the exact smallest eigenvalue.
+
+### Step 12: Rewrite the step using an inverse fractional power
+
+Multiply the normalized equation by $\mathbf A^{-\beta}$ and use
+$\mathbf A^{-\beta}\mathbf A^\beta=\mathbf I$:
+\begin{equation}
+\label{dir:eq:inverse}
+\tag{15}
+ (\mathbf A^{-\beta}+\tau\nu\sigma^\beta\mathbf I)\mathbf W^{k+1}
+   =\mathbf A^{-\beta}
+       (\mathbf W^k
+          +\tau\mathbf C_{FF}^{-1}\widetilde{\mathbf F}^{k+1}).
+\end{equation}
+Every step so far is an exact rearrangement of the spatially and
+temporally discrete lifted problem. The rational approximation enters
+only when we replace $\mathbf A^{-\beta}$.
+
+## BRASIL rational approximation
+
+### Step 13: Approximate the scalar power on $[0,1]$
+
+Use the notation from `brasilfunc.Rmd`. Let $B_m$ be the best uniform
+rational approximation of type $(m,m)$ to $x^\beta$ on $[0,1]$:
+\[
+    B_m(x)=\frac{q_1(x)}{q_2(x)}\approx x^\beta,
+    \qquad
+    q_1(x)=\sum_{i=0}^m c_ix^i,\quad
+    q_2(x)=\sum_{i=0}^m b_ix^i.
+\]
+Because $J_h\subset[0,1]$, the same scalar approximation can be used on
+every mesh. At the matrix level,
+\[
+    \mathbf A^{-\beta}=(\mathbf A^{-1})^\beta
+                       \approx B_m(\mathbf A^{-1}).
+\]
+On an eigenvector whose $\mathbf A^{-1}$ eigenvalue is $x$, these two
+operators multiply by $x^\beta$ and $B_m(x)$, respectively. This is why
+a scalar approximation gives a matrix approximation here.
+
+The implementation reads numerical BRASIL coefficients from the installed
+`rSPDE` tables, interpolating coefficients between tabulated exponents
+when needed. The best-approximation statements describe the theoretical
+rational function; tabulation and interpolation are numerical realizations.
+
+### Step 14: Change to the normalized operator variable
+
+Set $y=1/x$. Multiplying numerator and denominator by $y^m$ gives
+\[
+    S_m(y)=B_m(y^{-1})
+       =\frac{y^m q_1(y^{-1})}{y^m q_2(y^{-1})}
+       =\frac{p_r(y)}{p_\ell(y)}\approx y^{-\beta},
+\]
+where
+\[
+    p_r(y)=y^m q_1(y^{-1}),\qquad
+    p_\ell(y)=y^m q_2(y^{-1}).
+\]
+The factors $y^m$ remove all negative powers. Thus
+\[
+    \mathbf A^{-\beta}\approx S_m(\mathbf A)
+             =p_\ell(\mathbf A)^{-1}p_r(\mathbf A).
+\]
+The source partial fractions have the same notation as in the original
+notebook:
+\begin{equation}
+\label{dir:eq:source}
+\tag{16}
+ S_m(y)=d_m+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j},\qquad
+ \eta_1<\cdots<\eta_m<0,\quad \rho_j>0,\quad d_m>0.
+\end{equation}
+The underlying structure is discussed in
+[Bolin, Mehandiratta, and Simas (2025), Proposition 3 and Appendix B](https://jmlr.org/papers/volume26/24-1779/24-1779.pdf).
+In particular,
+\[
+    d_m=B_m(0)=\lim_{y\to\infty}S_m(y).
+\]
+The source constant $d_m$ must be retained. It will determine the
+constant term of the time-step map.
+
+### Step 15: Substitute the rational approximation and distinguish the rational state
+
+Replace $\mathbf A^{-\beta}$ in (15) by $S_m(\mathbf A)$:
+\[
+ (S_m(\mathbf A)+\tau\nu\sigma^\beta\mathbf I)\mathbf W_m^{k+1}
+   =S_m(\mathbf A)
+       (\mathbf W_m^k
+          +\tau\mathbf C_{FF}^{-1}\widetilde{\mathbf F}^{k+1}).
+\]
+The subscript $m$ distinguishes the rational solution from the exact
+discrete fractional solution. Define the scalar time-step function
+\begin{equation}
+\label{dir:eq:Hm}
+\tag{17}
+ H_m(y)=\frac{S_m(y)}{S_m(y)+\tau\nu\sigma^\beta}
+       =\frac{p_r(y)}{p_r(y)+\tau\nu\sigma^\beta p_\ell(y)}.
+\end{equation}
+Since both polynomials are functions of the same matrix, their matrix
+versions commute. Solving for the new state therefore gives
+\[
+ \mathbf W_m^{k+1}=H_m(\mathbf A)
+       (\mathbf W_m^k
+          +\tau\mathbf C_{FF}^{-1}\widetilde{\mathbf F}^{k+1}).
+\]
+The exact scalar map would be $(1+\tau\nu\sigma^\beta y^\beta)^{-1}$.
+Equation (17) approximates this map through the inverse-power approximation.
+
+### Step 16: Introduce the transposed operator as in the original derivation
+
+Define
+\[
+    \mathbf D=\mathbf A^\top
+              =\frac{\mathbf L_{FF}\mathbf C_{FF}^{-1}}{\sigma}.
+\]
+Here the **matrix** $\mathbf D$ is distinct from the index set $D$ of
+prescribed nodes. From
+$\mathbf A^\top\mathbf C_{FF}=\mathbf C_{FF}\mathbf A$, we have
+\[
+    \mathbf D=\mathbf C_{FF}\mathbf A\mathbf C_{FF}^{-1}.
+\]
+For a polynomial, the similarity factors cancel between consecutive
+powers, so $p(\mathbf D)=\mathbf C_{FF}p(\mathbf A)\mathbf C_{FF}^{-1}$.
+The same holds for the rational function $H_m$ because its denominator
+has no zero on the positive spectrum. Hence
+\[
+    H_m(\mathbf A)\mathbf C_{FF}^{-1}
+              =\mathbf C_{FF}^{-1}H_m(\mathbf D).
+\]
+Set
+\begin{equation}
+\label{dir:eq:rhs}
+\tag{18}
+ \mathbf b_m^{k+1}
+    =\mathbf C_{FF}\mathbf W_m^k
+         +\tau\widetilde{\mathbf F}^{k+1}
+    =\mathbf C_{FF}\mathbf W_m^k+\tau\mathbf F_F^{k+1}
+                -\mathbf J(\mathbf g^{k+1}-\mathbf g^k).
+\end{equation}
+We obtain the analogue of the transposed-operator formula in
+`brasilfunc.Rmd`:
+\begin{equation}
+\label{dir:eq:transposed}
+\tag{19}
+ \mathbf W_m^{k+1}
+       =\mathbf C_{FF}^{-1}H_m(\mathbf D)\mathbf b_m^{k+1}.
+\end{equation}
+This identity preserves the order of the factors. It does not assume
+that $\mathbf L_{FF}$ and $\mathbf C_{FF}^{-1}$ commute.
+
+## Partial fractions, poles, and residues
+
+### Step 17: Determine the constant term of the time-step map
+
+Use the original notation $z_n$, $a_n$, and $r_\tau$ for the time-step
+poles, residues, and remainder:
+\begin{equation}
+\label{dir:eq:pf}
+\tag{20}
+ H_m(y)=\sum_{n=1}^m\frac{a_n}{y-z_n}+r_\tau.
+\end{equation}
+Each simple fraction tends to zero at infinity. Since $S_m(y)\to d_m$,
+\[
+ \begin{aligned}
+ r_\tau&=\lim_{y\to\infty}
+             \frac{S_m(y)}{S_m(y)+\tau\nu\sigma^\beta}\\
+       &=\frac{d_m}{d_m+\tau\nu\sigma^\beta}.
+ \end{aligned}
+\]
+Thus the constant remainder is
+\begin{equation}
+\label{dir:eq:remainder}
+\tag{21}
+    r_\tau=\frac{d_m}{d_m+\tau\nu\sigma^\beta},\qquad 0<r_\tau<1.
+\end{equation}
+It is not the source constant $d_m$ itself, and it does not disappear
+when the boundary values are homogeneous.
+
+### Step 18: Identify the time-step poles
+
+Set $s_\tau=\tau\nu\sigma^\beta>0$, and define
+\[
+    F_m(y)=S_m(y)+s_\tau
+          =d_m+s_\tau+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j}.
+\]
+Then
+\[
+    H_m(y)=1-\frac{s_\tau}{F_m(y)}.
+\]
+Consequently the time-step poles solve
+\begin{equation}
+\label{dir:eq:poles}
+\tag{22}
+    F_m(z_n)=d_m+s_\tau
+                   +\sum_{j=1}^m\frac{\rho_j}{z_n-\eta_j}=0.
+\end{equation}
+At such a root, $S_m(z_n)=-s_\tau\ne0$, so the numerator of $H_m$ does
+not cancel its zero denominator. In contrast, as $y\to\eta_j$,
+$S_m(y)$ becomes unbounded and $H_m(y)\to1$. Thus the source poles are
+removable singularities of $H_m$, not its time-step poles.
+
+### Step 19: Locate the poles and prove that they are simple
+
+Differentiate away from the source poles:
+\[
+    F_m'(y)=-\sum_{j=1}^m\frac{\rho_j}{(y-\eta_j)^2}<0.
+\]
+Therefore $F_m$ is strictly decreasing on each interval between its
+source poles. On the leftmost interval,
+\[
+    \lim_{y\to-\infty}F_m(y)=d_m+s_\tau>0,
+    \qquad \lim_{y\to\eta_1^-}F_m(y)=-\infty,
+\]
+so it has exactly one zero there. On each interval
+$(\eta_{n-1},\eta_n)$, $n=2,\ldots,m$, the endpoint limits are
+$+\infty$ and $-\infty$, giving exactly one zero. To the right of
+$\eta_m$, every denominator $y-\eta_j$ is positive and $F_m(y)>0$,
+so there is no additional real zero.
+
+There are exactly $m$ zeros: after multiplication by
+$\prod_j(y-\eta_j)$ the numerator has degree $m$, and the $m$ real
+zeros already found exhaust its zeros. They are simple because
+$F_m'(z_n)<0$. Their ordering is
+\[
+    z_1<\eta_1<z_2<\eta_2<\cdots<z_m<\eta_m<0.
+\]
+This justifies the simple-pole expansion (20) and the negative shifts
+used by the matrix solver.
+
+### Step 20: Compute the residues
+
+At a simple root $z_n$, the Taylor expansion gives
+\[
+    F_m(y)=F_m'(z_n)(y-z_n)+o(y-z_n).
+\]
+Using $H_m(y)=1-s_\tau/F_m(y)$, the residue is
+\[
+\begin{aligned}
+    a_n&=\lim_{y\to z_n}(y-z_n)H_m(y)
+          =-\frac{s_\tau}{F_m'(z_n)}\\
+       &=\frac{\tau\nu\sigma^\beta}
+                {\displaystyle\sum_{j=1}^m
+                           \rho_j/(z_n-\eta_j)^2}>0.
+\end{aligned}
+\]
+The source coefficients $(\eta_j,\rho_j,d_m)$ depend on $(m,\beta)$;
+the time-step coefficients $(z_n,a_n,r_\tau)$ additionally depend on
+$\tau\nu\sigma^\beta$. The boundary data affect the right-hand side,
+not these factorization matrices.
+
+### Step 21: Evaluate the partial fractions at the matrix argument
+
+Substitute the matrix $\mathbf D$ into (20):
+\[
+    H_m(\mathbf D)=r_\tau\mathbf I
+              +\sum_{n=1}^ma_n(\mathbf D-z_n\mathbf I)^{-1}.
+\]
+Equation (19) becomes
+\[
+ \mathbf W_m^{k+1}=\mathbf C_{FF}^{-1}
+     \left(r_\tau\mathbf I
+       +\sum_{n=1}^ma_n
+          (\mathbf L_{FF}\mathbf C_{FF}^{-1}/\sigma
+                  -z_n\mathbf I)^{-1}\right)\mathbf b_m^{k+1}.
+\]
+Factor each shifted matrix as
+\[
+ \mathbf L_{FF}\mathbf C_{FF}^{-1}/\sigma-z_n\mathbf I
+      =(\mathbf L_{FF}/\sigma-z_n\mathbf C_{FF})
+                              \mathbf C_{FF}^{-1}.
+\]
+Inverting a product reverses its order, so
+\[
+ (\mathbf L_{FF}\mathbf C_{FF}^{-1}/\sigma-z_n\mathbf I)^{-1}
+      =\mathbf C_{FF}
+            (\mathbf L_{FF}/\sigma-z_n\mathbf C_{FF})^{-1}.
+\]
+The outer mass inverse cancels this factor in each shifted term. For
+the constant term, the mass inverse remains. The final solver is
+\begin{equation}
+\label{dir:eq:solver}
+\tag{23}
+\boxed{\begin{aligned}
+ \mathbf W_m^{k+1}&=\mathbf R_{m,\tau}\mathbf b_m^{k+1},\\
+ \mathbf R_{m,\tau}
+    &=r_\tau\mathbf C_{FF}^{-1}
+       +\sum_{n=1}^ma_n
+          (\mathbf L_{FF}/\sigma-z_n\mathbf C_{FF})^{-1}.
+\end{aligned}}
+\end{equation}
+This is the same rational matrix solver as in `brasilfunc.Rmd`, with
+$\mathbf C_{FF}$, $\mathbf L_{FF}$, and $\sigma$ replacing the full
+matrices and their original normalization scale.
+
+### Step 22: Apply the solver using sparse factorizations
+
+For each time step, first form (18). Then solve
+\[
+    \mathbf C_{FF}\mathbf x_0=\mathbf b_m^{k+1},\qquad
+    (\mathbf L_{FF}/\sigma-z_n\mathbf C_{FF})\mathbf x_n
+                                     =\mathbf b_m^{k+1},
+       \quad n=1,\ldots,m,
+\]
+and combine
+\[
+    \mathbf W_m^{k+1}=r_\tau\mathbf x_0
+                              +\sum_{n=1}^ma_n\mathbf x_n.
+\]
+All shifted matrices are symmetric positive definite: for a nonzero
+vector $\mathbf v$,
+\[
+ \mathbf v^\top(\mathbf L_{FF}/\sigma-z_n\mathbf C_{FF})\mathbf v
+ =\frac1\sigma\mathbf v^\top\mathbf L_{FF}\mathbf v
+                +(-z_n)\mathbf v^\top\mathbf C_{FF}\mathbf v>0.
+\]
+Their sparse Cholesky factorizations are computed once and reused for
+all time steps. The mass solve is reused in the same way. No dense
+fractional matrix or dense inverse is formed.
+
+The scripts call the existing functions with the following correspondence:
+
+| Solver argument | Mathematical quantity |
+|:--|:--|
+| `C = C_FF` | $\mathbf C_{FF}$ |
+| `L = K_FF` | $\mathbf L_{FF}$ |
+| `beta = alpha / 2` | $\beta=\alpha/2$ |
+| `scale.factor = operator_scale` | $\sigma$ from (14) |
+| `diffusion = 1` | $\nu=1$ |
+| `time_step = tau` | $\tau$ |
+| `m = m` | rational approximation order $m$ |
+| `rhs` | $\mathbf b_m^{k+1}$ from (18) |
+
+For positive $y$, $S_m(y)>0$, so $0<H_m(y)<1$. In particular the
+homogeneous rational evolution is contractive in the
+$\mathbf C_{FF}$-norm. This does not preclude changes caused by forcing
+or time-dependent boundary values. The rational approximation error is
+separate from the spatial finite element and time-discretization errors.
+
+### Step 23: Reconstruct the state and verify the $\alpha=2$ limit
+
+After each fractional step, reconstruct
+\begin{equation}
+\label{dir:eq:reconstruction}
+\tag{24}
+    \mathbf U_{m,F}^{k+1}
+          =\mathbf W_m^{k+1}+\mathbf H_F\mathbf g^{k+1},\qquad
+    \mathbf U_{m,D}^{k+1}=\mathbf g^{k+1}.
+\end{equation}
+Hence the prescribed nodal values hold exactly at every stored time.
+
+When $\alpha=2$, $\beta=1$ and
+$\mathbf C_{FF}\mathbf B=\mathbf L_{FF}$. The solver bypasses the
+rational approximation and the lifted backward Euler equation becomes
+\[
+ (\mathbf C_{FF}+\tau\nu\mathbf L_{FF})\mathbf W^{k+1}
+   =\mathbf C_{FF}\mathbf W^k+\tau\mathbf F_F^{k+1}
+                   -\mathbf J(\mathbf g^{k+1}-\mathbf g^k).
+\]
+Substitute $\mathbf W^k=\mathbf U_F^k-\mathbf H_F\mathbf g^k$:
+\[
+\begin{aligned}
+ (\mathbf C_{FF}+\tau\nu\mathbf L_{FF})\mathbf U_F^{k+1}
+ ={}&\mathbf C_{FF}\mathbf U_F^k+\tau\mathbf F_F^{k+1}
+         -\mathbf J(\mathbf g^{k+1}-\mathbf g^k)\\
+    &+\mathbf C_{FF}\mathbf H_F(\mathbf g^{k+1}-\mathbf g^k)
+         +\tau\nu\mathbf L_{FF}\mathbf H_F\mathbf g^{k+1}.
+\end{aligned}
+\]
+Use $\mathbf J=\mathbf C_{FF}\mathbf H_F+\mathbf C_{FD}$ and
+$\mathbf L_{FF}\mathbf H_F=-\mathbf L_{FD}$. This gives
+\[
+\begin{aligned}
+ (\mathbf C_{FF}+\tau\nu\mathbf L_{FF})\mathbf U_F^{k+1}
+ ={}&\mathbf C_{FF}\mathbf U_F^k+\tau\mathbf F_F^{k+1}\\
+    &-\mathbf C_{FD}(\mathbf g^{k+1}-\mathbf g^k)
+         -\tau\nu\mathbf L_{FD}\mathbf g^{k+1},
+\end{aligned}
+\]
+which is exactly (5). Thus the ordinary and lifted fractional derivations
+agree at $\alpha=2$.
+
+## Initial data, forcing, and the star-graph experiments
+
+### Compatible initial conditions
+
+For time-dependent data $\mathbf g(t)=(1,1/2)^\top\sin t$,
+$\mathbf g(0)=0$. Therefore the zero initial state gives
+$\mathbf W^0=0$. The same holds for homogeneous Dirichlet data.
+
+For fixed data $\mathbf g=(1,1/2)^\top$, a completely zero initial
+state would disagree with the prescribed trace. The fixed-boundary
+experiments instead use
+\[
+    \mathbf U^0=\mathbf H\mathbf g,\qquad \mathbf W^0=0.
+\]
+The boundary values are then present at time zero, and the initial
+profile satisfies the free stationary equations
+\[
+    \mathbf L_{FF}\mathbf U_F^0+\mathbf L_{FD}\mathbf g=0.
+\]
+This removes the imposed startup jump while allowing the interior to
+evolve under the nonzero forcing.
+
+On an equal-length star with $\kappa=0$, let $c$ be the central value.
+The harmonic profile is constant, equal to $c$, on every unprescribed
+spoke, and on prescribed spoke $j$ it is
+\[
+    u_{0,j}(s)=c+(g_j-c)\frac{s}{\ell},\qquad 0\le s\le\ell.
+\]
+At the center its derivative sum is
+\[
+    \sum_{j\in D}\frac{g_j-c}{\ell}=0,
+    \qquad c=\frac1{|D|}\sum_{j\in D}g_j.
+\]
+For the prescribed values $1$ and $1/2$, $c=3/4$. This describes the
+initial profile used by both fixed-boundary scripts.
+
+### Exact time average of the forcing
+
+For $f(s,t)=a_f\sin t$, the full spatial load is
+\[
+    \mathbf F(t)=a_f\sin t\,\mathbf C\boldsymbol1,
+\]
+where $\boldsymbol1$ includes all mesh nodes. Integrating in time gives
+\[
+    \tau\mathbf F_F^{k+1}
+      =a_f(\cos t_k-\cos t_{k+1})(\mathbf C\boldsymbol1)_F.
+\]
+The load is assembled on the full mesh before restriction to $F$.
+In general $(\mathbf C\boldsymbol1)_F$ is not
+$\mathbf C_{FF}\boldsymbol1_F$, because the former also includes the
+Dirichlet-basis contribution near the prescribed leaves. The scripts
+use `average_sine_forcing(..., omega = 1)` to evaluate the time average.
+
+### Parameters and files
+
+All six scripts use $n=6$ spokes of length $\ell=10$, mesh target
+$h=0.1$, $T=2\pi$, and Dirichlet leaves $1$ and $3$. Leaf $j$ has
+angle $2\pi(j-1)/n$ in the supplied embedding. The time grid has
+$N=\lceil T/0.04\rceil$ steps and $\tau=T/N$, so it ends exactly at $T$.
+The reaction parameter is $\kappa^2=c_0=0$ and $\nu=1$.
+
+| Ordinary script | Fractional script | $\mathbf g(t)$ | $f(s,t)$ | Initial state |
+|:--|:--|:--|:--|:--|
+| `star_dirichlet.R` | `star_dirichlet_rat.R` | $(1,1/2)^\top\sin t$ | $0$ | $0$ |
+| `star_hom_dirichlet.R` | `star_hom_dirichlet_rat.R` | $0$ | $\sin t$ | $0$ |
+| `star_fixed_dirichlet.R` | `star_fixed_dirichlet_rat.R` | $(1,1/2)^\top$ | $\sin t$ | $\mathcal H g$ |
+
+The ordinary files set $\alpha=2$. The `_rat.R` files set $\alpha=1$
+and $m=12$. In all fractional experiments, the evolved homogeneous
+remainder starts from $\mathbf W_m^0=0$.
+
+The following commands run the experiments when executed manually. They
+are not evaluated when knitting this derivation.
+
+```{r run-dirichlet-experiments, eval=FALSE}
+source("star_dirichlet.R")
+source("star_hom_dirichlet.R")
+source("star_fixed_dirichlet.R")
+
+source("star_dirichlet_rat.R")
+source("star_hom_dirichlet_rat.R")
+source("star_fixed_dirichlet_rat.R")
+```
+
+Each script stores all computed states and displays a simple Plotly
+animation in interactive R. The animation shows the state as height above
+the embedded star and marks the prescribed leaves. It samples $81$ stored
+states; this visualization sampling does not change the numerical time
+step or the matrix solver.

@@ -1,0 +1,429 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=27mm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs,array}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\newcommand{\R}{\mathbb R}
+\newcommand{\G}{\Gamma}
+\newcommand{\ip}[2]{\left(#1,#2\right)_{L^2(\G)}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\dd}{\,\mathrm d}
+\newcommand{\trans}{^{\mathsf T}}
+\DeclareMathOperator{\spec}{spec}
+\title{Mixed Dirichlet--Kirchhoff diffusion on a star graph\\
+\large Finite element discretization, boundary lifting, and rational matrix solvers}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+
+\section{Graph, boundary data, and the ordinary diffusion problem}
+Let $\G$ be a connected metric star with $n$ edges of length $\ell$.
+Each edge is parametrized by arclength $s\in[0,\ell]$, with $s=0$
+at the common central vertex. Its planar embedding is
+\[
+ x_j(s)=s\bigl(\cos(2\pi(j-1)/n),\sin(2\pi(j-1)/n)\bigr),
+ \qquad j=1,\ldots,n.
+\]
+The embedding is used for visualization; derivatives and integrals use
+intrinsic arclength. Let $V_D$ be a nonempty set of selected leaves,
+and let $V_K=V\setminus V_D$. Prescribed values are collected in
+$g(t)\in\R^{|V_D|}$. The state is continuous at every vertex.
+
+For $\alpha=2$, we consider the state equation from (5.2) of
+\cite{stoll}, with the boundary data regarded as given functions:
+\begin{equation}\label{eq:ordinary}
+\begin{cases}
+ \partial_t y_e-\partial_s^2 y_e+c_0y_e=f_e,
+       &s\in(0,\ell),\quad t\in(0,T),\\
+ y(v,t)=g_v(t),&v\in V_D,\\
+ \displaystyle\sum_{e\sim v}\partial_e y_e(v,t)=0,&v\in V_K,\\
+ y(\cdot,0)=y_0.&
+\end{cases}
+\end{equation}
+Here $c_0\geq0$ is constant, and $\partial_e$ denotes the derivative
+directed from a vertex into the incident edge. At an unprescribed leaf,
+the Kirchhoff condition is a homogeneous Neumann condition. The experiments
+use unit diffusion coefficient and $c_0=0$.
+
+\section{Weak form and finite element matrices}
+Define
+\begin{align*}
+ V&=\{v:\ v_e\in H^1(e)\text{ on each edge and }v
+       \text{ is continuous at vertices}\},\\
+ V_0&=\{v\in V:\ v|_{V_D}=0\},
+\end{align*}
+and the bilinear form
+\[
+ a(u,v)=\sum_e\int_e\bigl(u'_e v'_e+c_0u_ev_e\bigr)\dd s.
+\]
+For sufficiently regular data, integration by parts in
+\eqref{eq:ordinary} gives
+\begin{equation}\label{eq:weak}
+ \ip{\partial_t y}{v}+a(y,v)=\ip{f}{v},\qquad v\in V_0,
+ \qquad y|_{V_D}=g.
+\end{equation}
+Vertex contributions cancel at $V_K$ by the Kirchhoff condition, and
+the test functions vanish at $V_D$. Thus the Kirchhoff conditions are
+natural conditions in the variational formulation. We assume smooth
+boundary data in time, as in the experiments; arbitrary $L^2$ boundary
+data require a weaker solution framework, as discussed in \cite{stoll}.
+
+Let $V_h\subset V$ be the space of continuous piecewise linear functions
+on the edge mesh, with nodal basis $\{\phi_i\}_{i=1}^{N_h}$. Write
+$y_h=\sum_iY_i\phi_i$ and assemble
+\begin{equation}\label{eq:matrices}
+ C_{ij}=\ip{\phi_j}{\phi_i},\qquad
+ G_{ij}=\sum_e\int_e\phi'_j\phi'_i\dd s,\qquad
+ K=G+c_0C,\qquad b_i(t)=\ip{f(t)}{\phi_i}.
+\end{equation}
+On a mesh interval of length $h_e$, the local mass and derivative
+matrices are
+\[
+ C_e=\frac{h_e}{6}\begin{pmatrix}2&1\\1&2\end{pmatrix},
+ \qquad
+ G_e=\frac1{h_e}\begin{pmatrix}1&-1\\-1&1\end{pmatrix}.
+\]
+Shared graph vertices have one shared degree of freedom.
+The consistent mass matrix $C$ is retained throughout.
+
+Split the degrees of freedom into prescribed nodes $D$ and free nodes
+$F$. The latter include all edge-interior nodes, the center, and the
+unprescribed leaves. Conceptually reorder the coefficients as
+\[
+ Y=\begin{pmatrix}Y_F\\g\end{pmatrix},\qquad
+ C=\begin{pmatrix}C_{FF}&C_{FD}\\C_{DF}&C_{DD}\end{pmatrix},
+ \qquad
+ K=\begin{pmatrix}K_{FF}&K_{FD}\\K_{DF}&K_{DD}\end{pmatrix}.
+\]
+Actual reordering is unnecessary: the scripts extract these blocks by
+indexing. There are no evolution equations tested at the Dirichlet nodes.
+Testing \eqref{eq:weak} only with free basis functions yields
+\begin{equation}\label{eq:freeode}
+ C_{FF}\dot Y_F+K_{FF}Y_F
+   =b_F-C_{FD}\dot g-K_{FD}g.
+\end{equation}
+Both boundary terms matter. Prescribing $Y_D=g$ after solving the
+unconstrained full system would not satisfy \eqref{eq:freeode}.
+
+\section{Backward Euler and the matrix solver for \texorpdfstring{$\alpha=2$}{alpha=2}}
+Let $t_k=k\tau$, $k=0,\ldots,N$, and define
+\[
+ g^k=g(t_k),\qquad
+ \overline b^{\,k+1}=\frac1\tau\int_{t_k}^{t_{k+1}}b(t)\dd t.
+\]
+Integrating the forcing exactly and using backward Euler for the state
+and the boundary increment gives
+\begin{equation}\label{eq:ordinaryBE}
+\boxed{\begin{aligned}
+ (C_{FF}+\tau K_{FF})Y_F^{k+1}
+   ={}&C_{FF}Y_F^k+\tau\overline b_F^{\,k+1}\\
+     &-C_{FD}(g^{k+1}-g^k)-\tau K_{FD}g^{k+1}.
+\end{aligned}}
+\end{equation}
+Set $Y_D^{k+1}=g^{k+1}$ to reconstruct the state.
+In particular, time-independent boundary values remove the mass
+increment term, but the term $-\tau K_{FD}g$ remains.
+
+Let $M=C_{FF}$ and $S=K_{FF}$. The matrix $M$ is positive definite.
+Since the graph is connected and $D\ne\varnothing$, $S$ is positive
+definite even when $c_0=0$: zero derivative energy forces a constant
+function, and its zero trace on $D$ forces that constant to vanish.
+Consequently $M+\tau S$ admits a Cholesky factorization. The ordinary
+branch of \texttt{my.fractional.operators.frac} constructs this
+factorization once; \texttt{my.solver.frac} applies it to the
+right-hand side at every step. No rational approximation is used when
+$\alpha=2$.
+
+\section{Harmonic lifting of the Dirichlet data}
+To define the fractional model, first separate the boundary values from
+the evolving homogeneous component. At the continuous level, let
+$\mathcal H g$ be the harmonic lifting characterized by
+\begin{equation}\label{eq:continuouslift}
+ (\mathcal H g)|_{V_D}=g,\qquad
+ a(\mathcal H g,v)=0\quad\text{for every }v\in V_0.
+\end{equation}
+For $c_0=0$, this is linear on each edge, with Kirchhoff conditions at
+the free vertices.
+
+Its discrete counterpart is the matrix $H\in\R^{N_h\times |D|}$ defined by
+\begin{equation}\label{eq:H}
+ H_D=I,\qquad H_F=-S^{-1}K_{FD}.
+\end{equation}
+Thus $Y=E_FW+Hg$, where $E_F$ embeds a free coefficient vector in the
+full vector by inserting zeros at $D$. Define the lifting load matrix
+\begin{equation}\label{eq:J}
+ J=(CH)_F=MH_F+C_{FD}.
+\end{equation}
+The product uses the \emph{full} mass matrix, including coupling to the
+Dirichlet basis functions. Substitution into \eqref{eq:freeode}, using
+$SH_F+K_{FD}=0$, gives
+\begin{equation}\label{eq:liftordinary}
+ M\dot W+SW=b_F-J\dot g.
+\end{equation}
+This is an equivalent formulation of ordinary diffusion, with
+$W^0=Y_F^0-H_Fg^0$.
+
+\section{The spectral fractional model}
+\subsection{Continuous interpretation and modeling choice}
+Let $\mathcal A_D$ be the positive self-adjoint realization of
+$-\Delta_\G+c_0$ in $L^2(\G)$ associated with the form $a$ on $V_0$.
+Its operator domain consists of edgewise $H^2$ functions, continuous at
+vertices, zero on $V_D$, and satisfying Kirchhoff conditions at $V_K$.
+Let $(\lambda_j,\psi_j)$ be its $L^2$-orthonormal eigenpairs. For
+$\beta=\alpha/2\in(0,1)$, define
+\[
+ \mathcal A_D^\beta w=\sum_j\lambda_j^\beta\ip{w}{\psi_j}\psi_j,
+ \qquad
+ \mathcal D(\mathcal A_D^\beta)=
+ \left\{w:\ \sum_j\lambda_j^{2\beta}
+                  |\ip{w}{\psi_j}|^2<\infty\right\}.
+\]
+The fractional experiments use the affine, lifted model
+\begin{equation}\label{eq:fraccontinuous}
+ \boxed{y=w+\mathcal H g,\qquad
+ \partial_t w+\mathcal A_D^\beta w
+          =f-\mathcal H\dot g.}
+\end{equation}
+The homogeneous realization carries the mixed vertex conditions through
+its spectral definition. Pointwise flux conditions for fractional
+solutions require enough regularity; they are not extra equations
+imposed on each fractional solution after computing a matrix power.
+
+Equation \eqref{eq:fraccontinuous} \emph{specifies} how nonzero boundary
+values enter the fractional model. Nonhomogeneous fractional boundary
+problems require such a choice. Harmonic lifting for spectral operators
+is discussed in \cite{antil}; here it is applied to the metric-graph
+operator. In particular, applying a fractional power to the
+all-Kirchhoff operator and subsequently overwriting some nodal values
+would define a different, generally inconsistent procedure.
+For $\beta=1$, \eqref{eq:continuouslift} implies that
+\eqref{eq:fraccontinuous} reduces to \eqref{eq:ordinary} in weak form.
+
+\subsection{Discrete operator and fractional backward Euler}
+The experiments discretize the local operator first and then take its
+fractional power. Define
+\begin{equation}\label{eq:B}
+ B=M^{-1}S.
+\end{equation}
+Although $B$ need not be symmetric in the Euclidean inner product, it
+is self-adjoint in $\langle u,v\rangle_M=v\trans Mu$, since
+$MB=S=S\trans$. It is similar to the symmetric positive definite
+matrix $M^{-1/2}SM^{-1/2}$.
+Equivalently, if
+\[
+ S\Phi=M\Phi\Lambda,\qquad \Phi\trans M\Phi=I,
+\]
+then
+\[
+ B^\beta=\Phi\Lambda^\beta\Phi\trans M.
+\]
+The discrete fractional bilinear-form matrix is $MB^\beta$;
+it is not the ordinary Euclidean matrix power $S^\beta$.
+
+The semidiscrete lifted system and its backward Euler step are
+\begin{align}
+ M\dot W+MB^\beta W&=b_F-J\dot g,\label{eq:fracsemidiscrete}\\
+ (M+\tau MB^\beta)W^{k+1}&=r^{k+1},\label{eq:fracBE}\\
+ r^{k+1}&=MW^k+\tau\overline b_F^{\,k+1}
+                      -J(g^{k+1}-g^k).\label{eq:rhs}
+\end{align}
+Finally,
+\begin{equation}\label{eq:reconstruct}
+ Y_F^{k+1}=W^{k+1}+H_Fg^{k+1},\qquad Y_D^{k+1}=g^{k+1}.
+\end{equation}
+For constant $g$, the lifting is stationary and the boundary increment
+in \eqref{eq:rhs} vanishes. Its effect is retained in the reconstructed
+state and in the compatible initial condition.
+
+\section{BRASIL rational approximation and sparse shifted solves}
+\subsection{Normalization without changing the equation}
+Choose $0<\sigma\leq\lambda_{\min}(B)$ and let
+\[
+ A=\frac{B}{\sigma},\qquad a_\tau=\tau\sigma^\beta.
+\]
+Here $\sigma$ is the normalization parameter named
+\texttt{scale.factor}, not a new reaction coefficient. Multiplying
+\eqref{eq:fracBE} by $M^{-1}$ gives
+\begin{equation}\label{eq:normalized}
+ (I+a_\tau A^\beta)W^{k+1}=M^{-1}r^{k+1}.
+\end{equation}
+The spectrum of $A$ lies in $[1,\infty)$, so that of $A^{-1}$ lies in
+$(0,1]$.
+
+In the scripts, if $L_\G=\sum_e\ell_e$, we use
+\begin{equation}\label{eq:scale}
+ \sigma=c_0+L_\G^{-2}.
+\end{equation}
+Indeed, for any $v\in V_0$ choose a path from a prescribed vertex to
+$x\in\G$. Its length is at most $L_\G$, and Cauchy--Schwarz gives
+$|v(x)|^2\leq L_\G\norm{v'}_{L^2(\G)}^2$. Integration over the graph
+implies
+\[
+ \norm{v}_{L^2(\G)}^2\leq L_\G^2\norm{v'}_{L^2(\G)}^2,
+ \qquad
+ \frac{a(v,v)}{\norm{v}_{L^2(\G)}^2}\geq c_0+L_\G^{-2}.
+\]
+The same bound holds on the conforming finite element subspace. This
+justifies \eqref{eq:scale} even when $c_0=0$.
+
+\subsection{From an inverse-power approximation to a time-step approximation}
+The BRASIL tables used by \texttt{brasilfunc.Rmd} supply a rational
+approximation to $x^\beta$ on $[0,1]$. In the inverse variable $z=1/x$,
+write it as
+\begin{equation}\label{eq:source}
+ S_m(z)=d_m+\sum_{j=1}^m\frac{\rho_j}{z-\eta_j}
+          \simeq z^{-\beta},\qquad z\geq1,
+ \qquad d_m>0,\quad\rho_j>0,\quad\eta_j<0.
+\end{equation}
+These are the \emph{source} coefficients; they are distinct from the
+coefficients of the time-step map. The installed tables are read at the
+requested exponent, with coefficient interpolation when necessary.
+
+Multiplication of \eqref{eq:normalized} by $A^{-\beta}$ yields
+\[
+ (A^{-\beta}+a_\tau I)W^{k+1}=A^{-\beta}M^{-1}r^{k+1}.
+\]
+Replace $A^{-\beta}$ by $S_m(A)$ to obtain
+\begin{equation}\label{eq:rationalstep}
+ W^{k+1}=R_{m,\tau}(A)M^{-1}r^{k+1},\qquad
+ R_{m,\tau}(z)=\frac{S_m(z)}{S_m(z)+a_\tau}.
+\end{equation}
+Thus it is the resolvent $(1+a_\tau z^\beta)^{-1}$ that is
+approximated at each time step.
+
+\subsection{Poles, residues, and the constant remainder}
+The source poles cancel in the quotient in \eqref{eq:rationalstep}.
+The time-step poles $\xi_i$ are the real negative roots of
+\[
+ S_m(\xi_i)+a_\tau=0.
+\]
+With ordered source poles $\eta_1<\cdots<\eta_m<0$, there is one such
+root in $(-\infty,\eta_1)$ and one in each
+$(\eta_{i-1},\eta_i)$. Since
+$S_m'(z)=-\sum_j\rho_j/(z-\eta_j)^2$, their residues are
+\begin{equation}\label{eq:residues}
+ \omega_i=-\frac{a_\tau}{S_m'(\xi_i)}
+     =\frac{a_\tau}{\displaystyle\sum_j
+                      \rho_j/(\xi_i-\eta_j)^2}>0.
+\end{equation}
+The limit at infinity determines the constant term:
+\begin{equation}\label{eq:timepf}
+ R_{m,\tau}(z)=q_\tau+\sum_{i=1}^m\frac{\omega_i}{z-\xi_i},
+ \qquad q_\tau=\frac{d_m}{d_m+a_\tau}.
+\end{equation}
+The implementation retains $q_\tau$; dropping it would change the
+rational approximation.
+
+Because
+\[
+ (A-\xi_iI)^{-1}M^{-1}=(S/\sigma-\xi_iM)^{-1},
+\]
+the actual matrix solver is
+\begin{equation}\label{eq:actualsolver}
+ \boxed{
+ W^{k+1}=q_\tau M^{-1}r^{k+1}
+           +\sum_{i=1}^m\omega_i
+               (S/\sigma-\xi_iM)^{-1}r^{k+1}.}
+\end{equation}
+For each right-hand side, solve $Mz_0=r^{k+1}$ and
+$(S/\sigma-\xi_iM)z_i=r^{k+1}$, and combine
+$W^{k+1}=q_\tau z_0+\sum_i\omega_i z_i$.
+All shifted matrices are sparse positive definite because $\xi_i<0$.
+Their Cholesky factorizations and the mass factorization are computed
+once and reused for all time steps. No dense fractional matrix is formed.
+This is precisely the fractional branch of
+\texttt{my.fractional.operators.frac} and \texttt{my.solver.frac}.
+
+For $z\geq1$, $S_m(z)>0$, hence $0<R_{m,\tau}(z)<1$.
+The homogeneous rational step is therefore contractive in the
+$M$-norm. This does not preclude growth caused by forcing or by
+changing boundary data. The rational error is separate from the spatial
+finite element and backward Euler time-discretization errors.
+
+\section{Consistency with ordinary diffusion and the implemented experiments}
+At $\beta=1$, the code bypasses BRASIL and solves
+\[
+ (M+\tau S)W^{k+1}=MW^k+\tau\overline b_F^{\,k+1}-J\Delta g^k,
+ \qquad \Delta g^k=g^{k+1}-g^k.
+\]
+Substitute $W^k=Y_F^k-H_Fg^k$ and
+$J=MH_F+C_{FD}$. Terms involving $MH_F$ cancel, giving
+\[
+ (M+\tau S)Y_F^{k+1}
+ =MY_F^k+\tau\overline b_F^{\,k+1}
+       -C_{FD}\Delta g^k-\tau K_{FD}g^{k+1},
+\]
+which is exactly \eqref{eq:ordinaryBE}. Thus the lifted construction
+recovers the original mixed-boundary heat equation when $\alpha=2$.
+
+For the experiments, $n=6$, $\ell=10$, $h=0.1$, $T=2\pi$, and the
+Dirichlet leaves are $1$ and $3$ in the angular ordering above.
+With target step $0.04$, the code sets
+$N=\lceil T/0.04\rceil$ and $\tau=T/N$, so the last step reaches $T$
+exactly. The ordinary files use $\alpha=2$; their
+\texttt{\_rat.R} counterparts use $\alpha=1$ and $m=12$.
+The data are
+\begin{center}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+File stem & $g(t)$ & $f(s,t)$ & initial state\\
+\midrule
+\texttt{star\_dirichlet} & $(1,\tfrac12)\trans\sin t$ & $0$ & $0$\\
+\texttt{star\_hom\_dirichlet} & $0$ & $\sin t$ & $0$\\
+\texttt{star\_fixed\_dirichlet} & $(1,\tfrac12)\trans$ & $\sin t$
+ & $\mathcal H g$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The discrete fixed-boundary initial state is $Y^0=Hg$; in all three
+lifted experiments $W^0=0$. On an equal-length star with $c_0=0$,
+the fixed-boundary harmonic profile has central value
+$c=|D|^{-1}\sum_{j\in D}g_j$. It is constant, equal to $c$, on
+unprescribed spokes and is
+\[
+ y_{0,j}(s)=c+(g_j-c)\frac{s}{\ell}
+\]
+on a prescribed spoke. Here $c=3/4$, so the initial profile already
+matches the values $1$ and $1/2$ and satisfies the central flux balance.
+There is no imposed boundary jump at startup.
+
+For spatially uniform forcing $f(s,t)=a_f\sin t$, the full load is
+$b(t)=a_f\sin t\,C\boldsymbol 1$, where $\boldsymbol1$ includes
+\emph{all} mesh nodes. Its time average is assembled exactly:
+\[
+ \tau\overline b_F^{\,k+1}
+ =a_f\bigl(\cos t_k-\cos t_{k+1}\bigr)(C\boldsymbol1)_F.
+\]
+The forcing load is assembled before restricting to $F$; it is not
+replaced by $M\boldsymbol1_F$ near prescribed nodes.
+
+The computations store the full nodal state at every time step. The
+animation samples at most $81$ stored states, plots height $z=y_h(s,t)$
+over the embedded star, and marks the prescribed leaves. Animation
+sampling does not alter the numerical time-stepping scheme.
+
+\begin{thebibliography}{9}
+\bibitem{stoll}
+M.~Stoll and M.~Winkler,
+\emph{Optimal Dirichlet control of partial differential equations on networks},
+Electronic Transactions on Numerical Analysis \textbf{54} (2021), 392--419.
+\href{https://doi.org/10.1553/etna_vol54s392}{doi:10.1553/etna\_vol54s392}.
+
+\bibitem{antil}
+H.~Antil, J.~Pfefferer, and S.~Rogovs,
+\emph{Fractional operators with inhomogeneous boundary conditions:
+analysis, control, and discretization}, 2018.
+\url{https://arxiv.org/abs/1703.05256}.
+
+\bibitem{implementation}
+Project implementation: \texttt{brasilfunc.Rmd},
+\texttt{star\_dirichlet.R}, \texttt{star\_hom\_dirichlet.R},
+\texttt{star\_fixed\_dirichlet.R}, and their
+\texttt{\_rat.R} counterparts.
+The BRASIL source coefficients are read from the installed
+\texttt{rSPDE} coefficient tables.
+\end{thebibliography}
+\end{document}
