@@ -1,0 +1,285 @@
+---
+title: "Zero-shift spatial convergence: smooth data"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: show
+    self_contained: true
+    css: visual.css
+---
+
+[Zero-shift theory](kappa0func.html) · [m](true_diff_conv_in_m_isolated.html) · [h](true_diff_cov_in_h_mat.html) · [tau](true_diff_conv_in_tau_mat.html) · [rough_h](true_diff_cov_in_h_rough_as_in_mat.html)
+
+## Scope and relation to the paper
+
+This is a parallel experiment using the zero-shift construction in
+`kappa0func.Rmd`. It leaves the original four positive-shift notebooks
+unchanged. The equation is
+$$
+ u_t+\nu(-\Delta_\Gamma)^{\alpha/2}u=f,\qquad\kappa=0,
+$$
+on the connected tadpole with stem length 1 and loop length 2, with
+continuity and Kirchhoff conditions. The fixed geometric gap scale is
+$\gamma_*=2/(3\cdot2)=1/3$. It is independent of $h$ and $\tau$ and
+introduces no reaction or decay of the constant mode.
+
+The paper's rational construction applies at zero shift. Its reported
+zero-shift numerical table, however, uses the **exact discrete spectral
+power**, not BRASIL, and different single-mode data. The earlier agreement
+with that table and the one-step sparse/modal check validate components
+of this implementation; they are not convergence results for these new
+studies. The tables generated here are additional zero-shift BRASIL
+experiments. They must not be quoted as the paper's published slopes.
+
+## Loading and running independently
+
+Use `/usr/bin/Rscript` or the RStudio session containing `rSPDE`, `Matrix`,
+`Rcpp`, `RcppEigen`, `knitr`, `rmarkdown`, and `ggplot2`. The system R used
+for verification is distinct from the older `/usr/local/bin/Rscript`.
+The setup extracts definitions from `kappa0func.Rmd` to a temporary file
+and loads a private environment. It does not source `brasilfunc.R`, create
+a persistent generated R library, or execute the helper notebook's demos.
+
+```{r true-diff-cov-in-h-mat-setup}
+knitr::opts_chunk$set(message=FALSE, warning=TRUE, error=FALSE, cache=FALSE,
+                      dev="png", fig.width=8, fig.height=5)
+for (package in c("Matrix","rSPDE","Rcpp","RcppEigen","ggplot2"))
+    if (!requireNamespace(package,quietly=TRUE)) stop("Missing package: ",package)
+true_diff <- local({
+    extracted <- tempfile("true_diff_functions_",fileext=".R")
+    on.exit(unlink(extracted),add=TRUE)
+    knitr::purl("kappa0func.Rmd",output=extracted,quiet=TRUE,documentation=0L)
+    functions <- new.env(parent=globalenv())
+    sys.source(extracted,envir=functions)
+    functions
+})
+```
+
+Two explicitly labeled profiles are available. **Validation** is the
+runnable default: it uses three exponents, smaller grids, and independent
+implementation checks. **Paper** uses all nine exponents and the original
+study's main mesh/time targets. Both use the same equations, solver, and
+error definition. For smooth h/tau studies, the fixed rational order is
+12 instead of the original positive-shift order 8, to reduce contamination
+under the smaller gap scale. The full settings are printed below and
+stored with results. A fitted slope alone does not certify that every
+other error contribution is negligible.
+
+To run this notebook at paper resolution, set the options before rendering:
+
+```r
+options(NAP.true_diff.profile="paper", NAP.true_diff.recompute=TRUE)
+# rmarkdown::render("true_diff_cov_in_h_mat.Rmd")
+```
+
+The paper-resolution rough study takes 1,250,000 solver steps **per case**.
+Use the validation profile first. `workers` defaults to 1; edit the
+parameter chunk or supply an explicit override to use independent forked
+cases on Unix. Neither profile silently substitutes a closed modal
+recurrence for the sparse rational evolution.
+
+## Parameters
+
+```{r true-diff-cov-in-h-mat-parameters}
+profile <- getOption("NAP.true_diff.profile","validation")
+settings <- true_diff$kappa0_study_settings("h",profile)
+# Optional named overrides; the saved settings and cache identity include them.
+overrides <- getOption("NAP.true_diff.overrides",list())
+if (length(setdiff(names(overrides),names(settings)))) stop("Unknown setting override.")
+for (name in names(overrides)) settings[[name]] <- overrides[[name]]
+# For example: settings$workers <- 3L
+settings_table <- data.frame(parameter=names(settings),
+    value=vapply(settings,function(x) paste(x,collapse=", "),character(1)))
+knitr::kable(settings_table)
+```
+
+## Data, projection, and exact continuous reference
+
+Keep the original smooth experiment's normalized eigenfunctions, with
+$\mathcal J=\{5,6,8,\ldots,21\}$, $K=16$, and use
+$$
+ u_0=\bar u_0+\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J}e_j,
+ \qquad f(s,t)=\bar f+a_f A\sin(\omega t)e_7(s).
+$$
+The defaults are $a_0=a_f=10$, $A=1$, $\omega=\pi$, and
+$\bar u_0=\bar f=1$. The added constants deliberately test nonzero mass:
+$M(t)=3(1+t)$. Set both means to zero to reproduce the original studies'
+mean-zero data at zero shift. The positive-mode initial norm remains 10;
+the full initial norm is $\sqrt{10^2+3\bar u_0^2}$.
+
+The mode table is defined in `kappa0_mode_table()`: $e_1=1/\sqrt3$,
+$e_5=\phi_3$, $e_7=\psi_4$, with unshifted eigenvalues
+$\mu_j=(k_j\pi/2)^2$. For a positive mode and
+$d_j=\nu\mu_j^{\alpha/2}$, its exact coefficient is
+$$
+ a_j(t)=a_j(0)e^{-d_jt}+b_jA
+       \int_0^t e^{-d_j(t-s)}\sin(\omega s)\,ds.
+$$
+`kappa0_decayed_sine_convolution()` evaluates the convolution stably near
+$t=0$. The constant coefficient, in the basis function one, is exactly
+$\bar u_0+t\bar f$. Continuous eigenfunctions are used to specify data
+and evaluate the reference, not as a truncation of the numerical solver.
+
+`kappa0_smooth_data()` assembles sine/cosine-hat loads analytically and
+solves the consistent mass system for $P_hu_0$. The time forcing uses
+its exact interval average, evaluated with a midpoint-sinc formula.
+At each step the solver forms
+$$
+ v=CU^k+\tau(F_{\rm sine}\overline g_{k+1}+\bar f C\mathbf1),
+ \quad q=\mathbf1^Tv/3,\quad b=v-qC\mathbf1.
+$$
+It applies the cached sparse rational update to $b$ and returns the
+centered coefficients plus $q\mathbf1$. The mean recurrence and its
+code mapping are documented in Section 4.1 of `kappa0func.Rmd`.
+
+## Space-time error and reconstruction
+
+For $t\in(t_{k-1},t_k]$, use the right-constant reconstruction
+$\widetilde U(t)=U^k$. On a fixed reference mesh with consistent mass
+$C_\star$, let $\Psi$ evaluate the solver hats at reference nodes.
+The reported quantity is
+$$
+ E^2=\tau_\star\sum_{\ell=1}^{N_\star}
+ [u_{\rm ref}(t_\ell^\star)-\Psi U^{k(\ell)}]^T C_\star
+ [u_{\rm ref}(t_\ell^\star)-\Psi U^{k(\ell)}],
+ \quad t_\ell^\star\in(t_{k(\ell)-1},t_{k(\ell)}].
+$$
+This is the same sampled norm as the original notebook. The reference
+is evaluated analytically; no fine-grid reference PDE is solved.
+`kappa0_prepare_reference_error()` compresses this quadratic form into
+its coarse metric, reference projection, and residual Gram matrix.
+The compiled kernel groups coefficient samples belonging to the same
+solver interval and accumulates their weighted means and centered
+scatter. This computes the sampled sum without storing all reference
+vectors or subtracting nearly equal norm squares. It is not exact
+continuum integration in space or time.
+
+Every solver step is advanced. Mass is checked at every step, not only
+at reference samples. The constant mode is exact at solver time nodes;
+its right-constant reconstruction can still differ from $1+t$ inside an
+interval. That temporal reconstruction error belongs in this space-time
+norm. Spatial and temporal reference refinement, rational-order
+refinement, and solver-time refinement should be used when errors
+approach a floor; implementation agreement alone does not certify these
+separate discretization budgets.
+
+## Spatial convergence and interpretation
+
+Vary $h$ while fixing $\tau$, $m$, the forcing, and the reference grids.
+Smooth finite-mode data are in every graph spectral Sobolev space, so
+the spatial reference slope is 2. Fit $\log E=s_h\log h+b$.
+The paper profile retains $h=2^{-9},\ldots,2^{-5}$,
+$\tau=2\cdot10^{-5}$, $\nu=10^{-3}$ and reference resolutions
+$h_\star=\tau_\star=10^{-5}$, with rational order increased to 12.
+The smaller validation settings are printed above and saved separately.
+
+At each mesh the hat loads, initial projection, interpolation matrix,
+error metric, and shifted factorizations are rebuilt. The exact reference
+uses unshifted continuum rates, and its positive modes are unchanged
+when constant data are added. A mesh-independent $\gamma_*$ is reused
+throughout. Temporal, rational, and reference errors can create a floor;
+the reported regression is an observation for the displayed settings,
+not a guarantee that every point lies in the asymptotic spatial regime.
+
+## Compute or load matching results
+
+This chunk runs when knitting. Existing matching results are reused;
+missing or stale results are recomputed. Filenames include the notebook
+name and profile. The result identity includes the full settings, source
+hashes, and numerical package versions, so other profiles and the
+positive-shift studies cannot be loaded accidentally.
+
+Before computation the checks compare compiled and R solutions for
+fractional and integer powers, compare compressed and direct reference
+quadratic forms, and compare the rough reduction with full-graph FEM.
+Those are implementation checks; the displayed convergence results and
+mass diagnostics provide separate evidence about the actual experiment.
+
+```{r true-diff-cov-in-h-mat-recompute-or-load}
+result <- true_diff$kappa0_execute_study(settings,"true_diff_cov_in_h_mat.Rmd",
+    recompute=isTRUE(getOption("NAP.true_diff.recompute",FALSE)))
+knitr::kable(result$validation,digits=12,caption="Independent implementation checks")
+cat("Profile:",settings$profile,"\nGenerated:",result$generated_at,
+    "\nComputation seconds:",round(result$elapsed_seconds,2),"\n")
+```
+
+## Results and fitted rates
+
+The benchmark slopes describe the theoretical rate scale. The observed
+fits use the computed data below; they are not replaced by the benchmark.
+For smooth data, `max_mass_error` is the maximum absolute discrepancy from
+the discrete mass recurrence over the entire trajectory. For the rough
+reduction the full-graph mass is zero by symmetry, validated independently.
+
+```{r true-diff-cov-in-h-mat-rates}
+knitr::kable(result$rates,digits=6)
+```
+
+```{r true-diff-cov-in-h-mat-plot-results}
+d <- result$results
+d$alpha_label <- factor(d$alpha,levels=settings$alpha)
+if (settings$study=="m") {
+    p <- ggplot2::ggplot(d,ggplot2::aes(sqrt(m),error,colour=alpha_label,group=alpha_label))+
+        ggplot2::geom_line()+ggplot2::geom_point(ggplot2::aes(shape=resolved))+
+        ggplot2::scale_y_log10()+ggplot2::labs(x="sqrt(m)",y="Isolated space-time L2 error",
+            colour="alpha",shape="Resolved",title="Zero-shift rational convergence")
+} else {
+    p <- ggplot2::ggplot(d,ggplot2::aes(axis,error,colour=alpha_label,group=alpha_label))+
+        ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::scale_x_log10()+
+        ggplot2::scale_y_log10()+ggplot2::labs(x=if(settings$study=="tau") "tau" else "h",
+            y="Sampled space-time L2 error",colour="alpha",title="Zero-shift convergence")
+}
+# Reference curves retain their prescribed slope and are geometrically
+# anchored to the data. They are guides, not additional computed errors.
+guides <- do.call(rbind,lapply(settings$alpha,function(a) {
+    x <- d[d$alpha==a,]
+    power <- if(settings$study=="m") -2*pi*sqrt(a/2) else if(settings$study=="tau") 1 else 2
+    xx <- if(settings$study=="m") sqrt(x$m) else log(x$axis)
+    if(settings$study=="rough_h") power <- a
+    x$guide <- exp(mean(log(x$error)-power*xx)+power*xx)
+    x
+}))
+guides$alpha_label <- factor(guides$alpha,levels=settings$alpha)
+p <- p+ggplot2::geom_line(data=guides,ggplot2::aes(y=guide),linetype="dashed",alpha=0.6)+
+    ggplot2::theme_minimal(base_size=12)+ggplot2::labs(subtitle=paste("kappa=0; gamma*=1/3;",settings$profile,"profile"))
+print(p)
+figure_dir <- file.path("data_files",paste0("true_diff_cov_in_h_mat_",settings$profile))
+dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
+ggplot2::ggsave(file.path(figure_dir,"convergence.pdf"),p,width=8,height=5)
+```
+
+## Sensitivity of the finest tested case
+
+The validation profile refines the fixed solver and reference settings
+one at a time at the finest tested primary axis value, for every exponent.
+The table measures the change in the sampled error. It is a sensitivity
+check, not a certified bound on an individual error contribution. The
+isolated-m study instead has the independent modal and integer-power
+controls above. Paper-resolution sensitivity runs are opt-in through
+`settings$refinement_checks <- TRUE` because they can be expensive.
+
+```{r true-diff-cov-in-h-mat-sensitivity}
+if (!is.null(result$refinement_checks)) {
+    knitr::kable(result$refinement_checks,digits=9)
+} else {
+    cat("No additional discretization sensitivity run for these settings.\n")
+}
+```
+
+## Numerical values and reproducibility
+
+```{r true-diff-cov-in-h-mat-error-table}
+knitr::kable(result$results,digits=12)
+knitr::kable(data.frame(package=names(result$package_versions),
+                        version=unname(result$package_versions)))
+```
+
+The `.rds` file contains settings, errors, rates, validation values,
+source hashes, versions, and the generation timestamp. PDF figures are
+written to a matching profile-specific directory. To force a fresh run,
+set `options(NAP.true_diff.recompute=TRUE)` before rendering. To check
+other error budgets, override only the corresponding settings and save
+that run under a separate output identity or copy its result before
+changing parameters; never compare relabeled caches from different runs.

@@ -1,10 +1,10 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.10.14)  16 NOV 2026 11:51
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.10.14)  21 NOV 2026 11:54
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**/home/rierasl/Desktop/NAP/dir_exp.tex
-(/home/rierasl/Desktop/NAP/dir_exp.tex
+**/home/rierasl/Desktop/NAP/docs/dir_exp.tex
+(/home/rierasl/Desktop/NAP/docs/dir_exp.tex
 LaTeX2e <2026-06-01>
 L3 programming layer <2026-09-09>
 (/home/rierasl/texlive/2026/texmf-dist/tex/latex/base/article.cls
@@ -418,12 +418,12 @@ Package rerunfilecheck Info: File `dir_exp.out' has not changed.
  ) 
 Here is how much of TeX's memory you used:
  11451 strings out of 467050
- 175641 string characters out of 5404725
+ 175656 string characters out of 5404725
  616942 words of memory out of 5000000
  40630 multiletter control sequences out of 15000+600000
  647347 words of font info for 92 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 74i,10n,79p,570b,458s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 74i,10n,79p,575b,458s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfbx1095.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfbx1200.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfbx1440.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfrm1095.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfrm1200.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfrm1728.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sfti1095.pfb></home/rierasl/texlive/2026/texmf-dist/fonts/type1/public/cm-super/sftt1095.pfb>
 Output written on dir_exp.pdf (6 pages, 336415 bytes).
 PDF statistics:

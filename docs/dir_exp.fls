@@ -1,8 +1,8 @@
-PWD /home/rierasl/Desktop/NAP
+PWD /home/rierasl/Desktop/NAP/docs
 INPUT /home/rierasl/texlive/2026/texmf.cnf
 INPUT /home/rierasl/texlive/2026/texmf-dist/web2c/texmf.cnf
 INPUT /home/rierasl/texlive/2026/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT /home/rierasl/Desktop/NAP/dir_exp.tex
+INPUT /home/rierasl/Desktop/NAP/docs/dir_exp.tex
 OUTPUT dir_exp.log
 INPUT /home/rierasl/texlive/2026/texmf-dist/tex/latex/base/article.cls
 INPUT /home/rierasl/texlive/2026/texmf-dist/tex/latex/base/article.cls

@@ -1,0 +1,2045 @@
+---
+title: "Zero-shift fractional diffusion: theory and matrix-solver functions"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: show
+    self_contained: true
+    css: visual.css
+---
+
+[Experiments](index.html) · [Positive-shift construction](brasilfunc.html)
+
+This notebook implements the $\kappa=0$ construction in
+`Numerical_fractional_diffusion_IMAJNA_kappa0.tex`, particularly
+`eq:gamma-scale`, `eq:rational-centered-scheme`, `eq:discrete-means`,
+`thenumericalscheme`, and Section `sec:zero-shift-test`.
+It follows the coefficient-table, partial-fraction, cached-factorization,
+and load-vector logic of `brasilfunc.Rmd`. All functions are defined here;
+this notebook neither sources nor rewrites that file or any existing
+convergence notebook. The coefficient functions below are isolated copies
+of its algorithms with a `kappa0_` prefix. The matrix routines use the
+parallel names `my.fractional.operators.kappa0()` and `my.solver.kappa0()`.
+They can coexist with the original functions in one R session.
+
+Knitting defines the functions and executes small validation experiments.
+`Matrix` is required; the rational branch additionally requires `rSPDE`
+with its internal BRASIL tables. The spectral validation uses only
+`Matrix` and base R. No MetricGraph, Rcpp, saved results, or continuous
+spectrum is required by the numerical solver. The explicit tadpole
+assembler below makes the independent check reproducible. For an existing
+MetricGraph mesh, pass its consistent `mesh$C` and unshifted `mesh$G`
+directly to the operator constructor instead.
+
+```{r setup, purl=FALSE, dev="pdf"}
+knitr::opts_chunk$set(message = FALSE, warning = TRUE, error = FALSE,
+                      cache = FALSE, dev = "pdf")
+if (!requireNamespace("Matrix", quietly = TRUE)) stop("Install Matrix first.")
+```
+
+## 1. Equation, FEM, and the constant mode
+
+We solve
+$$
+ u_t+\nu A^\beta u=f,\qquad A=-\Delta_\Gamma,\quad
+ \beta=\alpha/2\in(0,1],\quad \nu>0,\quad u(0)=u_0.
+$$
+The compact graph is connected, with continuity and Kirchhoff conditions
+at every vertex (Neumann at a vertex of degree one). Thus
+$A\mathbf1=0$. Constants are retained in the solution; imposing zero
+mean on the entire problem would solve a different equation when the
+data have nonzero mean.
+
+As in `brasilfunc.Rmd`, assemble the consistent mass matrix $C$ and
+stiffness matrix $G$. At zero shift $L=G$, and the coefficient matrix of
+$A_h$ is $B=C^{-1}G$. It is self-adjoint in the $C$ inner product, not
+necessarily symmetric in the Euclidean inner product. Fractional powers
+are powers of $B$, not ordinary powers of $G$.
+
+Put $c=C\mathbf1$ and $M=\mathbf1^Tc=|\Gamma|$. For coefficient vectors
+and load vectors, respectively, the mean and centered part are
+$$
+ \bar U=\frac{c^TU}{M},\quad V=U-\bar U\mathbf1,
+ \qquad \bar f=\frac{\mathbf1^TF}{M},\quad F_Q=F-\bar f c.
+$$
+Here $F_i=(f,\psi_i)$ is an **integrated load vector**, not nodal samples
+of $f$. Initial conditions are projected by solving $CU^0=b_0$,
+where $(b_0)_i=(u_0,\psi_i)$. In particular, $P_h$ preserves mass.
+The coefficient projector $Q_hU=U-\mathbf1 c^TU/M$ and the load
+projector $Q_h^TF=F-c\mathbf1^TF/M$ are different matrices.
+Using `mean(U)` or subtracting the arithmetic mean of a load is incorrect.
+
+For $t_k=k\tau$ and the time-averaged load
+$F^{k+1}=\tau^{-1}\int_{t_k}^{t_{k+1}}F(t)\,dt$, backward Euler splits as
+$$
+ \bar U^{k+1}=\bar U^k+\tau\bar f^{k+1},\qquad
+ (I+\tau\nu B_0^\beta)V^{k+1}
+       =V^k+\tau C^{-1}F_Q^{k+1}.
+$$
+Consequently $\int_\Gamma U^n=\int_\Gamma U^0+
+\tau\sum_{k=1}^n\mathbf1^TF^k$; zero-mean forcing conserves mass.
+The constant eigenvalue must be exactly zero before its fractional power
+is evaluated. Replacing it by a small positive shift introduces spurious
+decay and is not the method in the paper.
+
+## 2. Positive gap scale and the same BRASIL construction
+
+There is no division by $\kappa^2$. Choose a fixed, mesh-independent
+$0<\gamma_*\leq\mu_2$, where $\mu_2$ is the first positive eigenvalue
+of $A$. The paper gives $\gamma_*=2/(|\Gamma|\operatorname{diam}\Gamma)$.
+A certified upper bound $D\geq\operatorname{diam}\Gamma$ also gives the
+safe choice $2/(|\Gamma|D)$. On the length-$(1,2)$ tadpole,
+$|\Gamma|=3$, $\operatorname{diam}\Gamma=2$, so $\gamma_*=1/3$.
+Conforming FEM has $\lambda_{2,h}\geq\mu_2$, hence the eigenvalues of
+$Y_0=B_0/\gamma_*$ are at least one on the centered subspace.
+A computed discrete gap alone is not a certified lower bound for all
+meshes. The caller must provide a valid continuous gap bound when using
+other graphs; the constructor cannot certify it from $C,G$ alone.
+
+The BRASIL tables approximate $x^\beta$ on $[0,1]$. Exactly as in the
+positive-shift notebook, their inverse-variable form is
+$$
+ S_m(y)=d_m+\sum_{j=1}^m\frac{\rho_j}{y-\eta_j},\qquad
+ \eta_j<0,\quad\rho_j>0,\quad d_m\geq0.
+$$
+With $a=\tau\nu\gamma_*^\beta$, use
+$$
+ H_m(y)=\frac{S_m(y)}{S_m(y)+a}
+       =r_\tau+\sum_{n=1}^m\frac{a_n}{y-z_n},\qquad
+ r_\tau=\frac{d_m}{d_m+a},\quad
+ a_n=\frac{a}{\sum_j\rho_j/(z_n-\eta_j)^2}>0.
+$$
+The $m$ negative roots $z_n$ of $S_m(z)+a=0$ interlace the
+source poles. The copied helper brackets these real roots and checks the
+partial-fraction reconstruction; it does not expand high-degree
+polynomials. It reads an exact tabulated exponent when available and
+otherwise linearly interpolates each source-coefficient column. Interpolation
+preserves the checked signs but is not itself a new best-uniform
+approximation certificate. The installed package determines available
+orders and exponents, since these tables are internal `rSPDE` objects.
+
+For $b=CV^k+\tau F_Q^{k+1}$ the sparse centered update is
+$$
+ V^{k+1}=r_\tau C^{-1}b+
+       \sum_{n=1}^m a_n(G/\gamma_*-z_nC)^{-1}b,
+ \qquad U^{k+1}=V^{k+1}+\bar U^{k+1}\mathbf1.
+$$
+This is the same shifted-solve formula as `brasilfunc.Rmd`, with
+`scale.factor = gamma_star`, and with the mean handled exactly.
+Each matrix is SPD because $G\succeq0$ and $-z_nC\succ0$; no inverse
+of the singular stiffness matrix is formed. Factorizations are reused
+for every step at fixed $h,\tau,\nu,\alpha,m,\gamma_*$. If any of these
+changes, rebuild the operator. In exact arithmetic every solve preserves
+$\mathbf1^TCV=0$. The implementation removes its residual mean after
+combining the solves to prevent accumulated floating-point drift.
+For $\alpha=2$ the method uses $(C+\tau\nu G)^{-1}$ exactly,
+without tables or a rational approximation.
+
+The full response to a load $v=CU^k+\tau F^{k+1}$ is particularly
+convenient for the existing solver convention: compute
+$q=\mathbf1^Tv/M$, apply the centered solves to $v-qc$, and return
+$V^{k+1}+q\mathbf1$. Applying the rational transfer directly to the
+constant mode instead would multiply it by $H_m(0)$ and lose mass.
+
+## 3. Source coefficients and time-step partial fractions
+
+The following is the parallel copy of the coefficient block in
+`brasilfunc.Rmd`. Its `time_step * scaling` is now
+$\tau\nu\gamma_*^\beta$.
+
+```{r kappa0-coefficients}
+kappa0_brasil_supported_orders <- function() {
+    tables <- grep("^m_brasil[0-9]+t$", ls(asNamespace("rSPDE")), value = TRUE)
+    sort(as.integer(sub("^m_brasil([0-9]+)t$", "\\1", tables)))
+}
+
+kappa0_brasil_coefficients <- function(m, beta) {
+    stopifnot(length(m) == 1L, is.finite(m), m %in% kappa0_brasil_supported_orders(), length(beta) == 1L, is.finite(beta),
+        beta > 0, beta < 1)
+    table <- get(paste0("m_brasil", m, "t"), envir = asNamespace("rSPDE"))
+    tolerance <- 32 * .Machine$double.eps * max(1, abs(beta))
+    index <- which(abs(table$alpha - beta) <= tolerance)
+    value <- function(column) {
+        if (length(index) == 1L)
+            table[[column]][index]
+        else stats::approx(table$alpha, table[[column]], xout = beta)$y
+    }
+    poles <- vapply(paste0("p", seq_len(m)), value, numeric(1))
+    residues <- vapply(paste0("r", seq_len(m)), value, numeric(1))
+    constant <- value("k")
+    if (any(!is.finite(c(poles, residues, constant))) || any(poles >= 0) || any(residues <= 0) || constant < 0 ||
+        anyDuplicated(poles))
+        stop("BRASIL table at m = ", m, ", beta = ", beta, " requires distinct negative poles, positive residues, and a nonnegative constant.")
+    index <- order(poles)
+    list(poles = unname(poles[index]), residues = unname(residues[index]), constant = unname(constant), m = as.integer(m),
+        beta = beta)
+}
+
+kappa0_brasil_inverse <- function(y, coefficients) {
+    stopifnot(all(is.finite(y)), all(y > 0))
+    coefficients$constant + as.numeric((1/outer(y, coefficients$poles, "-")) %*% coefficients$residues)
+}
+
+kappa0_brasil_power <- function(x, coefficients) {
+    stopifnot(all(is.finite(x)), all(x >= 0))
+    coefficients$constant + as.numeric((x/(1 - outer(x, coefficients$poles))) %*% coefficients$residues)
+}
+
+kappa0_brasil_partial_fractions <- function(coefficients, time_step, scaling) {
+    strength <- time_step * scaling
+    stopifnot(length(strength) == 1L, is.finite(strength), strength > 0)
+    p <- coefficients$poles
+    r <- coefficients$residues
+    constant <- coefficients$constant
+    poles <- numeric(length(p))
+    denominator <- function(y) constant + strength + sum(r/(y - p))
+    for (i in seq_along(p)) {
+        upper <- p[i]
+        lower <- if (i == 1L)
+            2 * upper
+        else p[i - 1L]
+        if (i == 1L)
+            while (denominator(lower) <= 0) lower <- 2 * lower
+        width <- upper - lower
+        normalized <- function(t) {
+            if (t == 0 && i > 1L)
+                return(.Machine$double.xmax)
+            if (t == 1)
+                return(-.Machine$double.xmax)
+            denominator(lower + width * t)
+        }
+        root <- stats::uniroot(normalized, c(0, 1), tol = 2 * .Machine$double.eps, maxiter = 1000L)$root
+        poles[i] <- lower + width * root
+    }
+    residues <- vapply(poles, function(z) strength/sum(r/(z - p)^2), numeric(1))
+    remainder <- constant/(constant + strength)
+    stopifnot(all(is.finite(c(poles, residues, remainder))), all(poles < 0), all(residues > 0), remainder >= 0,
+        remainder < 1)
+    y <- 10^seq(0, 12, length.out = 257L)
+    inverse <- kappa0_brasil_inverse(y, coefficients)
+    expected <- inverse/(inverse + strength)
+    actual <- remainder + as.numeric((1/outer(y, poles, "-")) %*% residues)
+    reconstruction_error <- max(abs(actual - expected))
+    if (reconstruction_error > 2e-12)
+        stop("Inaccurate BRASIL time-step partial fractions: ", reconstruction_error)
+    list(p = poles, r = residues, k = remainder, reconstruction_error = reconstruction_error)
+}
+```
+
+## 4. Cached matrix operator and load-vector solver
+
+`my.fractional.operators.kappa0()` has the same parameter order as
+`my.fractional.operators.frac()`, except that its first argument is
+explicitly called `G` and its scale is the positive gap bound.
+`my.solver.kappa0(obj, v)` takes a complete load vector and returns a
+numeric nodal coefficient vector. Both rational and integer branches
+split the mean, so they share identical mass handling. Matrix inputs
+must be a conforming consistent P1 pair on a connected Kirchhoff graph;
+Dirichlet conditions, disconnected graphs, and mass-lumped inputs are
+outside this notebook's assumptions. The constructor checks symmetry,
+dimensions, positive mass, $G\mathbf1\simeq0$, and a successful mass
+Cholesky factorization. These checks do not certify the full FEM model
+or connectedness for arbitrary externally supplied matrices.
+
+```{r kappa0-matrix-functions}
+kappa0_positive_scalar <- function(x) {
+    is.numeric(x) && length(x) == 1L && is.finite(x) && x > 0
+}
+
+my.fractional.operators.kappa0 <- function(G, beta, C, scale.factor,
+                                         m = 1L, time_step, diffusion = 1) {
+    stopifnot(kappa0_positive_scalar(beta), beta <= 1,
+              kappa0_positive_scalar(scale.factor),
+              kappa0_positive_scalar(time_step),
+              kappa0_positive_scalar(diffusion))
+    C <- methods::as(Matrix::Matrix(C, sparse = TRUE), "CsparseMatrix")
+    G <- methods::as(Matrix::Matrix(G, sparse = TRUE), "CsparseMatrix")
+    stopifnot(nrow(C) >= 2L, nrow(C) == ncol(C),
+              identical(dim(C), dim(G)),
+              all(is.finite(C@x)), all(is.finite(G@x)),
+              Matrix::isSymmetric(C, tol = 1e-12),
+              Matrix::isSymmetric(G, tol = 1e-12))
+    one <- rep(1, nrow(C))
+    c_one <- as.numeric(C %*% one)
+    volume <- sum(c_one)
+    stopifnot(is.finite(volume), volume > 0, all(c_one > 0))
+    null_error <- max(abs(as.numeric(G %*% one)))
+    if (null_error > 1e-11 * max(1, Matrix::norm(G, "I")))
+        stop("G must annihilate the constant vector (Kirchhoff conditions).")
+    factorize <- function(A)
+        Matrix::Cholesky(Matrix::forceSymmetric(A), LDL = FALSE)
+    obj <- list(C = C, G = G, L = G, beta = beta, m = m,
+                scale.factor = scale.factor, time_step = time_step,
+                diffusion = diffusion, one = one, c_one = c_one,
+                volume = volume, null_error = null_error,
+                mass_factor = factorize(C))
+    if (beta == 1) {
+        obj$LHS <- C + time_step * diffusion * G
+        obj$factorization <- factorize(obj$LHS)
+        return(obj)
+    }
+    if (!requireNamespace("rSPDE", quietly = TRUE))
+        stop("The rational branch requires rSPDE with BRASIL tables.")
+    coefficients <- kappa0_brasil_coefficients(m, beta)
+    transfer <- kappa0_brasil_partial_fractions(
+        coefficients, time_step, diffusion * scale.factor^beta)
+    obj$coefficients <- coefficients
+    obj$poles <- transfer$p
+    obj$residues <- transfer$r
+    obj$remainder <- transfer$k
+    obj$reconstruction_error <- transfer$reconstruction_error
+    obj$partial_fraction_terms <- lapply(obj$poles,
+                                        function(p) G/scale.factor - p * C)
+    obj$factorizations <- lapply(obj$partial_fraction_terms, factorize)
+    obj
+}
+
+kappa0_check_vector <- function(v, n) {
+    v <- as.numeric(v)
+    if (length(v) != n || any(!is.finite(v)))
+        stop("Expected a finite vector of length ", n, ".")
+    v
+}
+
+kappa0_mean <- function(obj, u) {
+    u <- kappa0_check_vector(u, length(obj$one))
+    sum(obj$c_one * u)/obj$volume
+}
+
+kappa0_project <- function(obj, initial_load) {
+    initial_load <- kappa0_check_vector(initial_load, length(obj$one))
+    as.numeric(Matrix::solve(obj$mass_factor, initial_load, system = "A"))
+}
+
+my.solver.kappa0 <- function(obj, v) {
+    v <- kappa0_check_vector(v, length(obj$one))
+    next_mean <- sum(v)/obj$volume
+    b <- v - next_mean * obj$c_one
+    if (obj$beta == 1) {
+        centered <- as.numeric(Matrix::solve(obj$factorization, b, system = "A"))
+    } else {
+        centered <- obj$remainder * as.numeric(
+            Matrix::solve(obj$mass_factor, b, system = "A"))
+        for (i in seq_along(obj$residues)) {
+            centered <- centered + obj$residues[i] * as.numeric(
+                Matrix::solve(obj$factorizations[[i]], b, system = "A"))
+        }
+    }
+    centered <- centered - kappa0_mean(obj, centered)
+    centered + next_mean * obj$one
+}
+
+kappa0_time_grid <- function(T_final, target_step) {
+    stopifnot(kappa0_positive_scalar(T_final), kappa0_positive_scalar(target_step))
+    N <- max(1, ceiling(T_final/target_step))
+    list(N = N, time_step = T_final/N, times = seq(0, T_final, length.out = N + 1))
+}
+
+kappa0_evolution <- function(obj, initial, N, load_average,
+                             keep_history = FALSE, max_history_mib = 256) {
+    stopifnot(kappa0_positive_scalar(N), N == floor(N), is.function(load_average),
+              is.logical(keep_history), length(keep_history) == 1L,
+              !is.na(keep_history), kappa0_positive_scalar(max_history_mib))
+    u <- kappa0_check_vector(initial, length(obj$one))
+    times <- (0:N) * obj$time_step
+    expected_mass <- sum(obj$c_one * u)
+    mass <- mass_expected <- numeric(N + 1L)
+    mass[1L] <- mass_expected[1L] <- expected_mass
+    history <- NULL
+    if (keep_history) {
+        if (8 * length(u) * (N + 1)/1024^2 > max_history_mib)
+            stop("Requested coefficient history exceeds max_history_mib.")
+        history <- matrix(0, length(u), N + 1L)
+        history[, 1L] <- u
+    }
+    for (k in seq_len(N)) {
+        # Callback returns time-averaged integrated FEM loads, not nodal data.
+        F <- kappa0_check_vector(load_average(times[k], times[k + 1L]), length(u))
+        expected_mass <- expected_mass + obj$time_step * sum(F)
+        rhs <- as.numeric(obj$C %*% u) + obj$time_step * F
+        u <- my.solver.kappa0(obj, rhs)
+        mass[k + 1L] <- sum(obj$c_one * u)
+        mass_expected[k + 1L] <- expected_mass
+        if (keep_history) history[, k + 1L] <- u
+    }
+    list(final = u, times = times, history = history,
+         mass = mass, expected_mass = mass_expected,
+         max_mass_error = max(abs(mass - mass_expected)))
+}
+```
+
+For time-dependent forcing, supply the actual interval average in
+`load_average(left, right)`. For example, if the load is
+$F(t)=c+\sin(\omega t)b_\phi$, its average is
+$c+\sin(\omega(t_k+t_{k+1})/2)\operatorname{sinc}(\omega\tau/2)b_\phi$
+with $\operatorname{sinc}(x)=\sin(x)/x$ and $\operatorname{sinc}(0)=1$.
+The time-grid helper adjusts $\tau=T/N$ to land exactly at $T$;
+build the cached operator using this adjusted value.
+The evolution driver stores mass diagnostics and the last vector by
+default; coefficient history is optional and guarded. It advances every
+step, unlike the autonomous spectral shortcut used below.
+
+### 4.1. Detailed mapping of the paper's discrete means to the code {#discrete-means-code-map}
+
+This subsection maps `eq:discrete-means`, `eq:rational-centered-scheme`,
+and `thenumericalscheme` in the paper to the exact statements in the
+functions above. Function names and quoted statements are used instead
+of source line numbers, so the mapping remains valid when this notebook
+is edited. The implementation retains a full coefficient vector $U^k$
+between steps. It forms the centered vector inside the solver and restores
+the mean before returning. In particular, **the forcing mean and centered
+forcing are computed implicitly through a combined right-hand-side
+projection**; there are no separate production variables named `f_bar`
+or `F_Q`.
+
+#### Objects and notation
+
+In this subsection write
+$$
+ \mathbf e=\mathbf1,\qquad c=C\mathbf e,\qquad
+ M_\Gamma=\mathbf e^TC\mathbf e.
+$$
+Here $M_\Gamma$ is the fixed graph length, whereas
+$M_h^k=\mathbf e^TCU^k$ is the solution's time-dependent total mass.
+They must not be confused. The P1 basis is a partition of unity,
+$\sum_i\psi_i=1$, which gives
+$$
+ c_i=\int_\Gamma\psi_i(s)\,ds,\qquad
+ M_\Gamma=\int_\Gamma1\,ds=|\Gamma|.
+$$
+The code uses the following objects.
+
+| Code object | Mathematical object | Interpretation |
+|:--|:--|:--|
+| `obj$one` | $\mathbf e$ | Coefficients of the constant function one |
+| `obj$c_one` | $c=C\mathbf e$ | Integrated load vector for the constant function one |
+| `obj$volume` | $M_\Gamma=\mathbf e^TC\mathbf e$ | Graph length; independent of the solution |
+| `u` in `kappa0_evolution()` | $U^k$ | Full nodal coefficient vector before a step |
+| `F` in `kappa0_evolution()` | $F^{k+1}$ | Time-averaged integrated forcing load for the next step |
+| `rhs`, passed as `v` | $CU^k+\tau F^{k+1}$ | Full right-hand side in load coordinates |
+| `next_mean` | $\bar U^k+\tau\bar f^{k+1}=\bar U^{k+1}$ | Mean after the zero-shift step |
+| `b` | $CV^k+\tau F_Q^{k+1}$ | Centered right-hand side in load coordinates |
+| `centered` before the roundoff correction | Approximation to $V^{k+1}$ | Result of the centered sparse solves |
+| The return value of `my.solver.kappa0()` | $U^{k+1}$ | Centered solution plus the updated constant component |
+
+`U^k` is a vector of FEM coefficients, while `F`, `v`, and `b` are load
+vectors. Multiplication by $C$ converts coefficients to loads; a mass
+solve converts loads to coefficients. The two vector types have the same
+length but require different formulas for their spatial means.
+
+#### A. The shared denominator and the constant load vector
+
+In `my.fractional.operators.kappa0()`:
+
+```r
+one <- rep(1, nrow(C))
+c_one <- as.numeric(C %*% one)
+volume <- sum(c_one)
+```
+
+These statements construct $\mathbf e$, $C\mathbf e$, and
+$\mathbf e^TC\mathbf e$. The operator stores them as `obj$one`,
+`obj$c_one`, and `obj$volume`, respectively. Since the mesh is fixed,
+they are computed once and reused at every time step. `sum(c_one)`
+means $\mathbf e^Tc$, so it is exactly the denominator in all three
+expressions of `eq:discrete-means`.
+
+#### B. The solution mean: the first formula in `eq:discrete-means`
+
+The helper `kappa0_mean(obj, u)` returns
+
+```r
+sum(obj$c_one * u)/obj$volume
+```
+
+The multiplication `obj$c_one * u` is entrywise, and the sum is their
+Euclidean inner product. Since $C$ is symmetric,
+$$
+ \frac{\sum_i c_i u_i}{M_\Gamma}
+ =\frac{(C\mathbf e)^TU}{\mathbf e^TC\mathbf e}
+ =\frac{\mathbf e^TCU}{\mathbf e^TC\mathbf e}
+ =\bar U.
+$$
+This helper implements the paper's coefficient mean. Although it can be
+called directly on $U^k$, the time-step solver obtains the updated mean
+from the full right-hand side, as derived in D below. Its explicit call
+to `kappa0_mean()` is used to remove the residual mean of the centered
+numerical result after the solves.
+
+#### C. The forcing mean and centered load: the second and third formulas
+
+For a load vector $F$, the explicit equivalent statements would be
+
+```r
+f_bar <- sum(F)/obj$volume
+F_Q <- F - f_bar * obj$c_one
+```
+
+These are explanatory statements; the production solver combines their
+effect with the centering of $CU^k$. Indeed, by the partition of unity,
+$$
+ \mathbf e^TF=\sum_i(f,\psi_i)=(f,1)=\int_\Gamma f,
+ \qquad
+ \bar f=\frac{\mathbf e^TF}{M_\Gamma}.
+$$
+Thus `sum(F)` already represents the forcing integral. Multiplying `F`
+by $C$ again would be incorrect: its entries are integrated FEM loads,
+not nodal values of the function $f$.
+
+Subtracting `f_bar * obj$c_one` gives precisely
+$$
+ F_Q=F-\bar f\,C\mathbf e,\qquad
+ \mathbf e^TF_Q=\mathbf e^TF-\bar f M_\Gamma=0.
+$$
+For time-dependent forcing, `F` is the interval average returned by
+`load_average(left, right)`. Therefore its mean is the interval-averaged
+spatial mean, not an endpoint evaluation unless those coincide.
+
+#### D. Why `next_mean` is the exact zero-shift mean update
+
+In `kappa0_evolution()` the driver forms
+
+```r
+rhs <- as.numeric(obj$C %*% u) + obj$time_step * F
+u <- my.solver.kappa0(obj, rhs)
+```
+
+Inside `my.solver.kappa0()`, the argument `v` is this `rhs`. Hence
+
+```r
+next_mean <- sum(v)/obj$volume
+```
+
+computes
+$$
+ \begin{aligned}
+ \texttt{next\_mean}
+ &=\frac{\mathbf e^T(CU^k+\tau F^{k+1})}{M_\Gamma}\\
+ &=\underbrace{\frac{\mathbf e^TCU^k}{M_\Gamma}}_{\bar U^k}
+   +\tau\underbrace{\frac{\mathbf e^TF^{k+1}}{M_\Gamma}}_{\bar f^{k+1}}\\
+ &=\bar U^k+\tau\bar f^{k+1}=\bar U^{k+1}.
+ \end{aligned}
+$$
+It is the **next** mean, not just the current solution mean and not
+just the forcing mean. The recurrence has no denominator involving
+$\nu$, $\gamma_*$, $m$, or $\tau\kappa^\alpha$, because here
+$\kappa=0$ and the diffusion operator annihilates constants. The factor
+$\nu$ multiplies diffusion only; it does not multiply the forcing term.
+
+#### E. Why `b` contains exactly the paper's centered forcing
+
+Immediately after computing `next_mean`, the solver executes
+
+```r
+b <- v - next_mean * obj$c_one
+```
+
+Substituting D and rearranging gives
+$$
+ \begin{aligned}
+ b
+ &=CU^k+\tau F^{k+1}
+    -(\bar U^k+\tau\bar f^{k+1})C\mathbf e\\
+ &=C\underbrace{(U^k-\bar U^k\mathbf e)}_{V^k}
+   +\tau\underbrace{(F^{k+1}-\bar f^{k+1}C\mathbf e)}_{F_Q^{k+1}}\\
+ &=CV^k+\tau F_Q^{k+1}.
+ \end{aligned}
+$$
+This is exactly the load vector in `thenumericalscheme`. Consequently,
+$$
+ \mathbf e^Tb
+ =\mathbf e^Tv-\texttt{next\_mean}\,M_\Gamma=0.
+$$
+The zero-sum condition applies to the load `b`. After a mass solve,
+the coefficient vector $C^{-1}b$ satisfies
+$\mathbf e^TC(C^{-1}b)=0$. It is not necessary that its coefficients
+have zero arithmetic sum.
+
+To make the equivalence explicit, the following expanded calculation
+produces the same right-hand side in exact arithmetic:
+
+```r
+# Explanatory expansion of my.solver.kappa0(); not an additional time step.
+u_bar <- kappa0_mean(obj, u)
+f_bar <- sum(F)/obj$volume
+V_current <- u - u_bar * obj$one
+F_Q <- F - f_bar * obj$c_one
+b_expanded <- as.numeric(obj$C %*% V_current) + obj$time_step * F_Q
+
+v <- as.numeric(obj$C %*% u) + obj$time_step * F
+next_mean <- sum(v)/obj$volume
+b_combined <- v - next_mean * obj$c_one
+# b_expanded and b_combined differ only by floating-point roundoff.
+```
+
+In projector notation, the distinction is
+$$
+ Q_{\mathrm{coeff}}=I-\frac{\mathbf e c^T}{M_\Gamma},\qquad
+ Q_{\mathrm{load}}=I-\frac{c\mathbf e^T}{M_\Gamma}
+                  =Q_{\mathrm{coeff}}^T,
+ \qquad Q_{\mathrm{load}}C=CQ_{\mathrm{coeff}}.
+$$
+The solver's `b` is $Q_{\mathrm{load}}v$. The final identity explains why
+centering the full load combines the two separate projections correctly.
+The implementation never constructs either dense projector matrix.
+
+#### F. Mapping the centered sparse solves to `thenumericalscheme`
+
+The operator constructor stores
+
+```r
+obj$partial_fraction_terms <- lapply(obj$poles,
+                                    function(p) G/scale.factor - p * C)
+obj$factorizations <- lapply(obj$partial_fraction_terms, factorize)
+```
+
+Here `scale.factor` is $\gamma_*$, `obj$poles[i]` is $z_i$,
+`obj$residues[i]` is $a_i$, and `obj$remainder` is $r_\tau$.
+The stored `mass_factor` is the Cholesky factorization of $C$.
+For $0<\beta<1$, the solver executes
+
+```r
+centered <- obj$remainder * as.numeric(
+    Matrix::solve(obj$mass_factor, b, system = "A"))
+for (i in seq_along(obj$residues)) {
+    centered <- centered + obj$residues[i] * as.numeric(
+        Matrix::solve(obj$factorizations[[i]], b, system = "A"))
+}
+```
+
+The initial assignment is $r_\tau C^{-1}b$, and iteration `i` adds
+$a_i(G/\gamma_*-z_iC)^{-1}b$. Together they implement
+$$
+ V^{k+1}=r_\tau C^{-1}b+
+           \sum_{i=1}^m a_i(G/\gamma_*-z_iC)^{-1}b.
+$$
+`system = "A"` requests the solve with the original factored matrix;
+it does not apply just a triangular factor. Neither $C^{-1}$ nor a
+shifted inverse is formed explicitly. The input to these solves is
+already centered, so the rational approximation never needs to represent
+the true zero-eigenvalue response.
+
+For $\beta=1$, the alternative statement
+
+```r
+centered <- as.numeric(Matrix::solve(obj$factorization, b, system = "A"))
+```
+
+uses the previously factorized $C+\tau\nu G$, giving the exact
+integer-power centered backward Euler update. Its mean treatment is
+identical to the fractional branch.
+
+#### G. Mean preservation by each solve and the roundoff correction
+
+For a shifted solve $(G/\gamma_*-z_iC)w_i=b$, multiply by
+$\mathbf e^T$. Symmetry, $G\mathbf e=0$, and $\mathbf e^Tb=0$ give
+$$
+ -z_i\mathbf e^TCw_i=0.
+$$
+Since $z_i<0$, $\mathbf e^TCw_i=0$. Likewise, for the mass solve
+$Cw_0=b$, $\mathbf e^TCw_0=\mathbf e^Tb=0$.
+The integer-power solve satisfies the same property because
+$\mathbf e^T(C+\tau\nu G)w=\mathbf e^TCw$.
+Thus the assembled `centered` vector has zero FEM mean in exact arithmetic.
+
+Finite-precision factorization, solves, and weighted summation can leave
+a small residual mean. The solver removes it explicitly:
+
+```r
+centered <- centered - kappa0_mean(obj, centered)
+```
+
+R subtracts this scalar from every entry, so this is
+$V\leftarrow V-\bar V\mathbf e=Q_{\mathrm{coeff}}V$.
+It removes only a constant residual and leaves nodal differences unchanged.
+The intended physical mean has already been saved as `next_mean`; it is
+not discarded by this correction. This is also why the solver does not
+center the full returned solution to zero.
+
+#### H. Restoring the mean and deriving the discrete mass balance
+
+The final expression of `my.solver.kappa0()` is
+
+```r
+centered + next_mean * obj$one
+```
+
+It reconstructs $U^{k+1}=V^{k+1}+\bar U^{k+1}\mathbf e$.
+Therefore, in exact arithmetic,
+$$
+ \begin{aligned}
+ M_h^{k+1}
+ &=\mathbf e^TCU^{k+1}
+  =M_\Gamma\bar U^{k+1}\\
+ &=M_\Gamma\bar U^k+\tau M_\Gamma\bar f^{k+1}
+  =M_h^k+\tau\mathbf e^TF^{k+1}.
+ \end{aligned}
+$$
+For zero-mean forcing, $\mathbf e^TF^{k+1}=0$, so mass is conserved.
+For nonzero-mean forcing, the mass changes by the supplied forcing integral;
+it is not constrained to stay at its initial value. Floating-point
+arithmetic introduces small discrepancies, which the diagnostics record.
+
+#### I. Projection of the initial condition and mass diagnostics
+
+`kappa0_project(obj, initial_load)` solves
+$CU^0=b_0$, where $(b_0)_i=(u_0,\psi_i)$. Hence
+$$
+ \mathbf e^TCU^0=\mathbf e^Tb_0=\int_\Gamma u_0.
+$$
+This preserves the initial mass to the accuracy of the supplied load
+integration and linear solve. The solver cannot correct an incorrectly
+assembled initial load into the exact continuous projection.
+
+The evolution driver independently accumulates the expected mass using
+
+```r
+expected_mass <- sum(obj$c_one * u)                 # initial mass
+# Within each time step, after obtaining F:
+expected_mass <- expected_mass + obj$time_step * sum(F)
+```
+
+and measures the returned solution's mass using
+
+```r
+mass[k + 1L] <- sum(obj$c_one * u)
+```
+
+The output `max_mass_error` is the maximum absolute difference between
+the measured and accumulated expected masses over all recorded times.
+Index 1 stores $t_0$, so R index `k + 1L` stores the mass after step $k$.
+The expected value uses the actual supplied loads and therefore checks
+discrete mass balance; accurate forcing quadrature must be checked
+separately when comparing with a continuous mass formula.
+
+#### J. The zero-forcing call in `true_frac_diff.R`
+
+The animation has $f=0$, hence $F=F_Q=0$ and $\bar f=0$. Its time loop
+calls the same solver with
+
+```r
+solution[nodes, step + 1L] <- .true_frac_solver$my.solver.kappa0(
+    block$operator, block$operator$C %*% solution[nodes, step])
+```
+
+Here `v` is $CU^k$, so `next_mean` equals $\bar U^k$, and `b` equals
+$C(U^k-\bar U^k\mathbf e)$. The solver diffuses the spatial variations
+and restores the same mean. No forcing load needs to be assembled.
+The installed MetricGraph logo created with `perform_merges = TRUE` is
+connected: its run has one block, one constant mode, and one global mean.
+The animation wrapper's component loop permits other graphs with several
+connected components by applying this connected-graph solver separately
+to each block. It does not disconnect or otherwise change the logo.
+
+
+## 5. Independent tadpole assembly, loads, and quadrature
+
+The tadpole has a stem of length 1 and a loop of length 2. Number the
+free stem endpoint 1 and the junction 2, then the internal stem and loop
+nodes, just as in the fallback tadpole construction in `brasilfunc.Rmd`.
+Both loop endpoints map to node 2. On an interval of length $\ell$,
+$$
+ C_e=\frac\ell6\begin{pmatrix}2&1\\1&2\end{pmatrix},\qquad
+ G_e=\frac1\ell\begin{pmatrix}1&-1\\-1&1\end{pmatrix}.
+$$
+Sparse assembly adds duplicate contributions, including both incidences
+of a loop at its junction. Edge lengths are physical arc lengths;
+there is no approximation of the loop length by polygon chords.
+The supplied tadpole's diameter is exactly 2 and the scale is $1/3$.
+
+Loads and errors use ten-point Gauss--Legendre quadrature on **each FEM
+interval**. For the smooth sine benchmark this is more than sufficient
+at the tested resolutions. Initial values are projected by a mass solve,
+not interpolated at nodes. The quadrature nodes and weights below come
+from the symmetric Jacobi matrix, avoiding an extra package dependency.
+`kappa0_assemble_load()` accepts `function(edge, x)` with local arc
+coordinate $x$, making it usable for other smooth data on this mesh.
+
+```{r kappa0-tadpole-functions}
+kappa0_gauss <- function(order = 10L) {
+    stopifnot(kappa0_positive_scalar(order), order == floor(order), order >= 2)
+    j <- seq_len(order - 1L)
+    J <- matrix(0, order, order)
+    J[cbind(j, j + 1L)] <- J[cbind(j + 1L, j)] <- j/sqrt(4*j^2 - 1)
+    ee <- eigen(J, symmetric = TRUE)
+    ii <- order(ee$values)
+    list(x = ee$values[ii], w = 2 * ee$vectors[1L, ii]^2)
+}
+
+kappa0_tadpole_mesh <- function(h) {
+    stopifnot(kappa0_positive_scalar(h))
+    counts <- pmax(1L, as.integer(ceiling(c(1, 2)/h)))
+    n <- 2L + sum(counts - 1L)
+    inside_stem <- if (counts[1] > 1L) seq.int(3L, counts[1] + 1L) else integer()
+    inside_loop <- if (counts[2] > 1L) seq.int(counts[1] + 2L, n) else integer()
+    paths <- list(c(1L, inside_stem, 2L), c(2L, inside_loop, 2L))
+    elements <- do.call(rbind, lapply(1:2, function(e) {
+        x <- seq(0, c(1, 2)[e], length.out = counts[e] + 1L)
+        data.frame(edge = e, left = head(paths[[e]], -1L),
+                   right = tail(paths[[e]], -1L), a = head(x, -1L), b = tail(x, -1L))
+    }))
+    ell <- elements$b - elements$a
+    i <- c(elements$left, elements$left, elements$right, elements$right)
+    j <- c(elements$left, elements$right, elements$left, elements$right)
+    C <- Matrix::sparseMatrix(i = i, j = j, x = c(ell/3, ell/6, ell/6, ell/3), dims = c(n, n))
+    G <- Matrix::sparseMatrix(i = i, j = j, x = c(1/ell, -1/ell, -1/ell, 1/ell), dims = c(n, n))
+    list(C = C, G = G, elements = elements, paths = paths,
+         h = max(ell), volume = 3, diameter = 2, gamma_star = 1/3)
+}
+
+kappa0_assemble_load <- function(mesh, fun, quadrature = kappa0_gauss()) {
+    out <- numeric(nrow(mesh$C))
+    for (j in seq_len(nrow(mesh$elements))) {
+        e <- mesh$elements[j, ]
+        s <- (quadrature$x + 1)/2
+        x <- e$a + (e$b - e$a) * s
+        values <- rep_len(fun(e$edge, x), length(x))
+        stopifnot(all(is.finite(values)))
+        w <- quadrature$w * (e$b - e$a)/2
+        out[e$left] <- out[e$left] + sum(w * values * (1-s))
+        out[e$right] <- out[e$right] + sum(w * values * s)
+    }
+    out
+}
+
+kappa0_phi <- function(edge, x) if (edge == 2L) sin(2*pi*x) else rep(0, length(x))
+
+kappa0_tadpole_data <- function(h) {
+    mesh <- kappa0_tadpole_mesh(h)
+    c_one <- as.numeric(mesh$C %*% rep(1, nrow(mesh$C)))
+    phi_load <- kappa0_assemble_load(mesh, kappa0_phi)
+    # Enforce the analytically known zero integral at quadrature roundoff.
+    phi_load <- phi_load - sum(phi_load)/mesh$volume * c_one
+    initial_load <- spatial_load <- c_one + phi_load
+    initial <- as.numeric(Matrix::solve(mesh$C, initial_load))
+    list(mesh = mesh, C = mesh$C, G = mesh$G, initial = initial,
+         initial_load = initial_load, spatial_load = spatial_load, phi_load = phi_load)
+}
+
+kappa0_l2_norm <- function(C, u) {
+    sqrt(max(0, sum(u * as.numeric(C %*% u))))
+}
+
+kappa0_final_error <- function(mesh, u, exact, quadrature = kappa0_gauss()) {
+    u <- kappa0_check_vector(u, nrow(mesh$C))
+    squared <- 0
+    for (j in seq_len(nrow(mesh$elements))) {
+        e <- mesh$elements[j, ]
+        s <- (quadrature$x + 1)/2
+        x <- e$a + (e$b - e$a)*s
+        uh <- (1-s)*u[e$left] + s*u[e$right]
+        squared <- squared + sum(quadrature$w * (e$b-e$a)/2 *
+                                 (exact(e$edge, x)-uh)^2)
+    }
+    sqrt(max(0, squared))
+}
+```
+
+## 6. Exact discrete spectrum and autonomous reference
+
+This is a **verification** routine, not the production sparse BRASIL
+method. As in the isolated-$m$ reference in `brasilfunc.Rmd`, solve the
+complete generalized FEM eigenproblem
+$GV=CV\Lambda$, $V^TCV=I$ on a moderate mesh.
+Writing $C=R^TR$, the symmetric matrix is $R^{-T}GR^{-1}$.
+Here we first put the known normalized constant vector in the first
+column of an orthogonal basis in these whitened coordinates, and
+diagonalize its orthogonal complement. We explicitly set
+$\lambda_{1,h}=0$ and $v_1=\mathbf1/\sqrt M$. This avoids raising
+a roundoff perturbation of zero to a fractional power, and avoids
+accidentally centering an arbitrary numerically perturbed eigenvector.
+All remaining eigenvalues must be positive. Residual and mass
+orthogonality checks detect an invalid decomposition. The dimension
+guard runs before dense allocation.
+
+For constant-in-time forcing, modal initial coefficients are
+$a_0=V^TCU^0$ and modal forcing coefficients are $g=V^TF$.
+With $d_j=\nu\lambda_{j,h}^\beta$, the exact semidiscrete and BE
+solutions at $T=N\tau$ are, respectively,
+$$
+ a_j(T)=e^{-Td_j}a_{0,j}+\frac{1-e^{-Td_j}}{d_j}g_j,\qquad
+ a_j^N=(1+\tau d_j)^{-N}a_{0,j}+
+             \frac{1-(1+\tau d_j)^{-N}}{d_j}g_j.
+$$
+Both quotients equal $T$ when $d_j=0$. `log1p()` and `expm1()`
+keep these formulas accurate near zero. The closed recurrence evaluates
+exactly the same BE sequence for autonomous forcing; it permits the
+paper's $\tau=10^{-6}$ check without half a million dense steps.
+It cannot replace the time loop for general time-dependent loads.
+
+```{r kappa0-spectral-functions}
+kappa0_discrete_spectrum <- function(C, G, max_dimension = 1200L) {
+    n <- nrow(C)
+    stopifnot(kappa0_positive_scalar(max_dimension), n >= 2L,
+              n <= max_dimension, n == ncol(C), identical(dim(C), dim(G)))
+    # Twenty dense n-by-n arrays is a conservative peak-storage estimate.
+    estimated_dense_mib <- 20 * 8 * as.double(n)^2/1024^2
+    R <- chol(as.matrix(C))
+    Rinv <- backsolve(R, diag(n))
+    S <- crossprod(Rinv, as.matrix(G) %*% Rinv)
+    c_one <- as.numeric(C %*% rep(1, n))
+    volume <- sum(c_one)
+    z <- as.numeric(R %*% rep(1, n))/sqrt(volume)
+    W <- qr.Q(qr(matrix(z, ncol = 1L)), complete = TRUE)[, -1L, drop = FALSE]
+    reduced <- crossprod(W, S %*% W)
+    ee <- eigen((reduced + t(reduced))/2, symmetric = TRUE)
+    ii <- order(ee$values)
+    stopifnot(all(is.finite(ee$values)), all(ee$values > 0))
+    values <- c(0, ee$values[ii])
+    V <- cbind(rep(1/sqrt(volume), n),
+               backsolve(R, W %*% ee$vectors[, ii, drop = FALSE]))
+    GV <- as.matrix(G %*% V)
+    CV <- as.matrix(C %*% V)
+    residual <- GV - sweep(CV, 2L, values, `*`)
+    denominator <- Matrix::norm(G, "I") * sqrt(colSums(V^2)) +
+                   values * sqrt(colSums(CV^2))
+    relative_residual <- max(sqrt(colSums(residual^2))/pmax(denominator, 1))
+    orthogonality <- max(abs(crossprod(V, CV) - diag(n)))
+    if (relative_residual > 1e-10 || orthogonality > 1e-10)
+        stop("Zero-shift eigensystem failed residual/orthogonality checks.")
+    list(values = values, vectors = V, diagnostics = data.frame(
+        dimension = n, positive_gap = values[2L], relative_residual = relative_residual,
+        C_orthogonality_error = orthogonality, estimated_dense_mib = estimated_dense_mib))
+}
+
+kappa0_autonomous_reference <- function(C, spectrum, initial, spatial_load,
+                                        alpha, T_final, N = NULL, diffusion = 1) {
+    stopifnot(kappa0_positive_scalar(alpha), alpha <= 2,
+              kappa0_positive_scalar(T_final), kappa0_positive_scalar(diffusion))
+    n <- nrow(C)
+    initial <- kappa0_check_vector(initial, n)
+    spatial_load <- kappa0_check_vector(spatial_load, n)
+    V <- spectrum$vectors
+    rates <- diffusion * spectrum$values^(alpha/2)
+    a0 <- as.numeric(Matrix::crossprod(V, C %*% initial))
+    forcing <- as.numeric(crossprod(V, spatial_load))
+    if (is.null(N)) {
+        log_decay <- -T_final * rates
+    } else {
+        stopifnot(kappa0_positive_scalar(N), N == floor(N))
+        log_decay <- -N * log1p(T_final/N * rates)
+    }
+    gain <- rep(T_final, n)
+    positive <- rates > 0
+    gain[positive] <- -expm1(log_decay[positive])/rates[positive]
+    as.numeric(V %*% (exp(log_decay) * a0 + gain * forcing))
+}
+```
+
+## 7. Reproduce the paper's independent zero-shift check
+
+Take $\alpha=1.2$, $T=1/2$, $\nu=1$, $u_0=1+\phi$ and
+$f=1+\phi$, with $\phi=0$ on the stem and
+$\phi(x)=\sin(2\pi x)$ on the loop. It is a normalized mean-zero
+Kirchhoff eigenfunction with eigenvalue $(2\pi)^2$. Thus
+$$
+ u(s,t)=1+t+\left(e^{-at}+\frac{1-e^{-at}}a\right)\phi(s),
+ \qquad a=\nu(2\pi)^\alpha,
+ \qquad \int_\Gamma u(s,t)\,ds=3(1+t).
+$$
+The analytical eigenfunction is used for data and error evaluation only;
+no continuous eigenpair enters either discrete solver.
+The spatial table compares BE with this continuous exact solution at
+$T$, at fixed $\tau=10^{-6}$. The temporal table fixes $h=1/32$
+and compares BE with the **exact semidiscrete** solution, removing spatial
+error. These are final-time $L_2(\Gamma)$ errors, rather than the
+space-time norm used by the other convergence notebooks. They contain
+no rational approximation, matching the paper's validation scope.
+The expected rates are two in space and one in time; final digits and
+roundoff mass differences may vary across numerical libraries.
+
+```{r kappa0-paper-validation}
+kappa0_paper_validation <- function() {
+    alpha <- 1.2
+    T_final <- 0.5
+    rate <- (2*pi)^alpha
+    exact <- function(edge, x)
+        1 + T_final + (exp(-rate*T_final) - expm1(-rate*T_final)/rate) * kappa0_phi(edge, x)
+    hs <- 1/c(8, 16, 32, 64)
+    spatial <- do.call(rbind, lapply(hs, function(h) {
+        data <- kappa0_tadpole_data(h)
+        spectrum <- kappa0_discrete_spectrum(data$C, data$G)
+        final <- kappa0_autonomous_reference(data$C, spectrum, data$initial,
+                    data$spatial_load, alpha, T_final, N = 500000L)
+        data.frame(h = h, error = kappa0_final_error(data$mesh, final, exact),
+                   mass_error = abs(sum(data$C %*% final) - 3*(1+T_final)))
+    }))
+    spatial$rate <- c(NA_real_, log(head(spatial$error, -1)/tail(spatial$error, -1))/log(2))
+    data <- kappa0_tadpole_data(1/32)
+    spectrum <- kappa0_discrete_spectrum(data$C, data$G)
+    semidiscrete <- kappa0_autonomous_reference(data$C, spectrum, data$initial,
+                                               data$spatial_load, alpha, T_final)
+    Ns <- c(5L, 10L, 20L, 40L, 80L, 160L)
+    temporal <- do.call(rbind, lapply(Ns, function(N) {
+        be <- kappa0_autonomous_reference(data$C, spectrum, data$initial,
+                                           data$spatial_load, alpha, T_final, N)
+        data.frame(tau = T_final/N, error = kappa0_l2_norm(data$C, be - semidiscrete))
+    }))
+    temporal$rate <- c(NA_real_, log(head(temporal$error, -1)/tail(temporal$error, -1))/log(2))
+    stopifnot(max(spatial$mass_error) < 1e-10,
+              all(spatial$rate[-1L] > 1.95), all(spatial$rate[-1L] < 2.05),
+              tail(temporal$rate, 1L) > 0.98, tail(temporal$rate, 1L) < 1.05)
+    list(spatial = spatial, temporal = temporal, spectrum = spectrum$diagnostics)
+}
+
+```
+
+```{r kappa0-paper-results, purl=FALSE}
+paper_check <- kappa0_paper_validation()
+knitr::kable(paper_check$spatial, digits = 10,
+             caption = "Spectral FEM: spatial errors and absolute mass differences")
+knitr::kable(paper_check$temporal, digits = 10,
+             caption = "Spectral FEM: isolated backward Euler time errors")
+```
+
+## 8. Sparse BRASIL validation at zero shift
+
+The paper explicitly distinguishes its independent spectral check from
+a dedicated zero-shift BRASIL study. This additional small experiment
+exercises the new sparse implementation on the same nonzero-mean data.
+At fixed $h=1/32$, $\tau=0.01$ and $T=0.5$, compare every rational
+trajectory with exact-discrete BE on the same mesh, time grid, initial
+projection, and load. Compute
+$$
+ E_m^2=\tau\sum_{k=1}^N (U_h^k-U_{h,m}^k)^TC(U_h^k-U_{h,m}^k).
+$$
+This isolates the rational contribution, like `conv_in_m_isolated.Rmd`.
+The table also reports the final-time difference and maximum mass
+balance error. Roundoff can limit improvement at high orders; a finite
+sample is not a proof of the theoretical
+$\exp(-2\pi\sqrt{\beta m})$ bound.
+
+The checks compare a sparse step against the *same rational transfer*
+evaluated on the discrete spectrum (testing scale, residues, and matrix
+ordering), verify pure-constant forcing and zero-mean mass conservation,
+exercise a genuinely time-dependent interval-average callback, and check
+the exact integer-power branch against $(C+\tau\nu G)^{-1}$.
+
+```{r kappa0-rational-validation}
+kappa0_rational_validation <- function(orders = c(2L, 4L, 6L, 8L)) {
+    data <- kappa0_tadpole_data(1/32)
+    C <- data$C
+    G <- data$G
+    alpha <- 1.2
+    tau <- 0.01
+    N <- 50L
+    spectrum <- kappa0_discrete_spectrum(C, G)
+    V <- spectrum$vectors
+    one <- rep(1, nrow(C))
+    c_one <- as.numeric(C %*% one)
+    reference <- vapply(seq_len(N), function(k)
+        kappa0_autonomous_reference(C, spectrum, data$initial,
+            data$spatial_load, alpha, k*tau, N = k), numeric(nrow(C)))
+    table <- do.call(rbind, lapply(orders, function(m) {
+        op <- my.fractional.operators.kappa0(G, alpha/2, C,
+                        data$mesh$gamma_star, m, tau)
+        out <- kappa0_evolution(op, data$initial, N,
+                    function(left, right) data$spatial_load, keep_history = TRUE)
+        difference <- out$history[, -1L, drop = FALSE] - reference
+        error <- sqrt(tau * sum(difference * as.matrix(C %*% difference)))
+        # Exact application of this rational transfer on the full FEM spectrum.
+        transfer <- rep(1, nrow(C))
+        S <- kappa0_brasil_inverse(spectrum$values[-1L]/op$scale.factor, op$coefficients)
+        transfer[-1L] <- S/(S + tau * op$diffusion * op$scale.factor^op$beta)
+        rhs <- as.numeric(C %*% data$initial) + tau * data$spatial_load
+        modal_step <- as.numeric(V %*% (transfer * as.numeric(crossprod(V, rhs))))
+        sparse_step <- my.solver.kappa0(op, rhs)
+        transfer_error <- kappa0_l2_norm(C, modal_step - sparse_step)
+        stopifnot(transfer_error < 1e-10, out$max_mass_error < 1e-10)
+        data.frame(m = m, space_time_error = error,
+                   final_error = kappa0_l2_norm(C, difference[, N]),
+                   max_mass_error = out$max_mass_error,
+                   sparse_vs_modal_error = transfer_error,
+                   partial_fraction_error = op$reconstruction_error)
+    }))
+    op <- my.fractional.operators.kappa0(G, alpha/2, C, data$mesh$gamma_star,
+                                        orders[1L], tau)
+    constant <- kappa0_evolution(op, 2*one, N, function(left, right) c_one)
+    conserved <- kappa0_evolution(op, data$initial, N, function(left, right) data$phi_load)
+    omega <- 3
+    average <- function(left, right) {
+        z <- omega*(right-left)/2
+        sinc <- if (z == 0) 1 else sin(z)/z
+        c_one + sin(omega*(left+right)/2)*sinc*data$phi_load
+    }
+    forced <- kappa0_evolution(op, data$initial, N, average, keep_history = TRUE)
+    # Independent modal time loop with precisely the same averaged forcing.
+    a <- as.numeric(Matrix::crossprod(V, C %*% data$initial))
+    S <- kappa0_brasil_inverse(spectrum$values[-1L]/op$scale.factor, op$coefficients)
+    H <- c(1, S/(S + tau*op$diffusion*op$scale.factor^op$beta))
+    for (k in seq_len(N))
+        a <- H * (a + tau*as.numeric(crossprod(V, average((k-1)*tau, k*tau))))
+    time_dependent_error <- kappa0_l2_norm(C, forced$final - as.numeric(V %*% a))
+    integer_op <- my.fractional.operators.kappa0(G, 1, C, data$mesh$gamma_star,
+                                               time_step = tau, diffusion = 0.7)
+    rhs <- as.numeric(C %*% data$initial) + tau*data$spatial_load
+    integer_error <- kappa0_l2_norm(C, my.solver.kappa0(integer_op, rhs) -
+                      as.numeric(Matrix::solve(C + tau*0.7*G, rhs)))
+    constant_error <- max(abs(constant$final - (2 + N*tau)*one))
+    conservation_error <- max(abs(conserved$mass - conserved$mass[1L]))
+    stopifnot(constant_error < 1e-10, conservation_error < 1e-10,
+              time_dependent_error < 1e-10, forced$max_mass_error < 1e-10,
+              integer_error < 1e-10)
+    list(rational = table, checks = data.frame(constant_error = constant_error,
+         conservation_error = conservation_error, time_dependent_error = time_dependent_error,
+         time_dependent_mass_error = forced$max_mass_error, integer_error = integer_error))
+}
+
+```
+
+```{r kappa0-rational-results, purl=FALSE}
+rational_check <- kappa0_rational_validation()
+knitr::kable(rational_check$rational, digits = 12,
+             caption = "Isolated rational errors: zero shift, nonzero mean")
+knitr::kable(rational_check$checks, digits = 12,
+             caption = "Additional sparse-solver checks")
+```
+
+## 9. Use in parallel experiments
+
+For a fresh session, extract to a separate output and source it. The
+validation chunks are deliberately excluded from `purl()` below, so
+sourcing defines functions only. Knitting still runs both validations.
+Do not write the extracted script to `brasilfunc.R`.
+
+```r
+knitr::purl("kappa0func.Rmd", output = "kappa0func.R", quiet = TRUE)
+source("kappa0func.R")
+
+data <- kappa0_tadpole_data(h = 1/32)
+grid <- kappa0_time_grid(T_final = 0.5, target_step = 0.01)
+op <- my.fractional.operators.kappa0(
+    G = data$G, beta = 1.2/2, C = data$C,
+    scale.factor = data$mesh$gamma_star, m = 8,
+    time_step = grid$time_step, diffusion = 1)
+
+# Same load-vector convention as my.solver.frac():
+rhs <- as.numeric(data$C %*% data$initial) + grid$time_step * data$spatial_load
+U1 <- my.solver.kappa0(op, rhs)
+
+result <- kappa0_evolution(op, data$initial, grid$N,
+                          function(left, right) data$spatial_load)
+result$max_mass_error
+```
+
+For new data, construct `initial_load`, then use
+`kappa0_project(op, initial_load)` to obtain the initial coefficients.
+For a MetricGraph mesh, call `graph$compute_fem()`, use `graph$mesh$C`
+and `graph$mesh$G`, assemble loads in its own node order, and supply a
+certified gap bound based on that graph's length and diameter. The sparse
+solver does not depend on the tadpole assembler or spectral routines.
+Do not pass a positive-shift `L` as `G`, or reuse an operator object after
+changing the step size. Existing positive-shift C++ evolution kernels
+call the original solver and do not automatically acquire the new mean
+splitting; use the driver defined here for zero-shift runs.
+
+The independent spectral reference uses dense storage and is intentionally
+limited to moderate meshes; the sparse rational scheme uses no discrete
+eigendecomposition. The helper callback is responsible for accurate
+space and time integration of other forcing data. In further spatial or
+temporal convergence studies, reduce the rational contribution separately
+and keep the same mean recurrence in all references. The validations
+above create no saved data or figures and change no existing experiment.
+
+## 10. Reusable zero-shift convergence-experiment helpers
+
+The four `true_diff_*.Rmd` notebooks use this section in addition to the
+operator above. They retain the original studies' consistent-mass FEM,
+analytical data loads, interval-averaged sine forcing, right-constant
+reconstruction, and sampled space-time norm. Their filenames and result
+paths are separate from the positive-shift studies. No original notebook
+or extracted `brasilfunc.R` is sourced or regenerated.
+
+The copied reference-norm and forcing-convolution algorithms below come
+from `brasilfunc.Rmd`, with a `kappa0_` prefix. The compiled stepping loop
+adds the same full-load mean split as `my.solver.kappa0()` at every step:
+compute `rhs.sum()/volume`, subtract that mean times `C*one`, perform the
+cached shifted solves, remove their residual coefficient mean, and restore
+the saved next mean. It advances **every** backward Euler step, even when
+the reference grid samples fewer times. It records the maximum mass
+balance discrepancy along the trajectory. The R and compiled paths are
+compared by the validation helper below before convergence results are
+trusted. C++ uses Eigen sparse Cholesky factorizations of the same matrices;
+the R path uses Matrix's factorizations.
+
+The smooth data reproduce the original 16 normalized modes and the
+forced mode 7, with optional constant initial and forcing components.
+The defaults add `initial_mean = forcing_mean = 1`, making the exact mean
+`1 + t`; these constants exercise the null-mode branch and are stated
+explicitly in each notebook. They do not change the positive-mode rates.
+The paper's zero-shift spectral benchmark uses different single-mode data;
+the new BRASIL convergence tables are additional experiments, not the
+paper's published numerical tables.
+
+The rough experiment retains the original quarter-loop symmetry reduction.
+It represents four reflected copies of `[0,1/2]` with homogeneous endpoint
+values, so its matrices and mass norm carry a factor four. Constants are
+absent from this invariant antisymmetric subspace. Consequently its
+restricted zero-shift operator is strictly positive, and `split_mean=FALSE`
+is required: subtracting an arithmetic or FEM mean on the quarter interval
+would destroy the symmetry. The full-graph extension has exactly zero
+mass. `kappa0_rough_operator()` uses the same source coefficients, positive
+gap scale, shifted matrices, and partial-fraction solver, restricted to
+that subspace; it does not call the connected full-space constructor,
+whose check `G %*% one = 0` does not hold after Dirichlet restriction.
+A separate full-tadpole comparison verifies this reduction.
+
+```{r kappa0-experiment-reference-functions}
+kappa0_prepare_reference_error <- function(Psi, reference_C, reference_basis) {
+    E <- as.matrix(reference_basis)
+    stopifnot(nrow(Psi) == nrow(reference_C), nrow(reference_C) == ncol(reference_C), nrow(E) == nrow(Psi), ncol(E) >=
+        1L, all(is.finite(E)))
+    metric <- Matrix::forceSymmetric(as(Matrix::Matrix(Matrix::crossprod(Psi, reference_C %*% Psi), sparse = TRUE),
+        "CsparseMatrix"))
+    cross <- Matrix::crossprod(Psi, reference_C %*% E)
+    factor <- Matrix::Cholesky(metric, LDL = FALSE)
+    projection <- as.matrix(Matrix::solve(factor, cross, system = "A"))
+    residual <- E - as.matrix(Psi %*% projection)
+    list(metric = metric, projection = projection, residual_gram = as.matrix(Matrix::crossprod(residual, reference_C %*%
+        residual)), exact_gram = as.matrix(Matrix::crossprod(E, reference_C %*% E)))
+}
+
+kappa0_reference_coefficient_moments <- function(coefficients, weights) {
+    coefficients <- as.matrix(coefficients)
+    stopifnot(nrow(coefficients) >= 1L, ncol(coefficients) == length(weights), length(weights) >= 1L, all(is.finite(coefficients)),
+        all(is.finite(weights)), all(weights > 0))
+    weight <- sum(weights)
+    centered <- sweep(coefficients, 1L, coefficients[, 1L], `-`)
+    shift <- as.numeric(centered %*% (weights/weight))
+    deviations <- sweep(centered, 1L, shift, `-`)
+    list(weight = weight, mean = coefficients[, 1L] + shift, scatter = tcrossprod(sweep(deviations, 2L, sqrt(weights),
+        `*`)))
+}
+
+kappa0_reference_interval_error <- function(u, moments, projection) {
+    delta <- as.numeric(u - projection$projection %*% moments$mean)
+    metric_product <- as.numeric(projection$metric %*% delta)
+    residual_product <- as.numeric(projection$residual_gram %*% moments$mean)
+    variance_terms <- projection$exact_gram * moments$scatter
+    value <- moments$weight * (sum(delta * metric_product) + sum(moments$mean * residual_product)) + sum(variance_terms)
+    scale <- moments$weight * (sum(abs(delta * metric_product)) + sum(abs(moments$mean * residual_product))) +
+        sum(abs(variance_terms))
+    if (!is.finite(value) || value < -128 * .Machine$double.eps * scale)
+        stop("Invalid reference-grid squared error.")
+    max(0, value)
+}
+
+# R reference retained for numerical regression checks.
+
+kappa0_average_sine_forcing <- function(time_seq, A = 1, omega = pi) {
+    dt <- diff(time_seq)
+    stopifnot(length(time_seq) >= 2L, all(is.finite(time_seq)), all(dt > 0))
+    midpoint <- head(time_seq, -1) + dt/2
+    z <- omega * dt/2
+    sinc_z <- rep(1, length(z))
+    nonzero <- z != 0
+    sinc_z[nonzero] <- sin(z[nonzero])/z[nonzero]
+    averages <- A * sin(omega * midpoint) * sinc_z
+    c(0, averages)
+}
+
+kappa0_decayed_sine_convolution <- function(t, rate, A = 1, omega = pi) {
+    stopifnot(all(is.finite(t)), all(t >= 0), length(rate) == 1L, is.finite(rate), rate >= 0, is.finite(A), is.finite(omega))
+    z <- (rate + (0+1i) * omega) * t
+    small <- Mod(z) < 0.5
+    answer <- numeric(length(t))
+    if (any(small)) {
+        zz <- z[small]
+        term <- rep(1 + (0+0i), length(zz))
+        series <- rep(0 + (0+0i), length(zz))
+        for (k in 1:24) {
+            term <- term * zz/(k + 1)
+            series <- series + term
+        }
+        answer[small] <- A * exp(-rate * t[small]) * t[small] * Im(series)
+    }
+    if (any(!small)) {
+        tt <- t[!small]
+        answer[!small] <- A * Im((exp((0+1i) * omega * tt) - exp(-rate * tt))/(rate + (0+1i) * omega))
+    }
+    answer
+}
+
+kappa0_compile_sampled_solver <- function(cache_dir=tempdir()) {
+    target <- environment(kappa0_compile_sampled_solver)
+    if (!exists("kappa0_sampled_evolve_cpp", envir=target, inherits=FALSE))
+        Rcpp::sourceCpp(code=r"----(
+// [[Rcpp::depends(RcppEigen)]]
+// [[Rcpp::plugins(cpp11)]]
+#include <RcppEigen.h>
+#include <memory>
+#include <vector>
+#include <cmath>
+#include <limits>
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
+using Eigen::SparseMatrix;
+typedef Eigen::SimplicialLLT<SparseMatrix<double> > SmoothFactor;
+
+// Backward Euler/BRASIL updates and the same centered sampled-error identity
+// as the R reference implementation. Every solver step is advanced.
+// [[Rcpp::export]]
+Rcpp::List kappa0_sampled_evolve_cpp(
+    const Eigen::MappedSparseMatrix<double>& C_in,
+    Rcpp::List matrices, VectorXd residues, double remainder,
+    VectorXd initial, VectorXd load, VectorXd forcing,
+    MatrixXd projection,
+    const Eigen::MappedSparseMatrix<double>& metric_in,
+    MatrixXd residual_gram, MatrixXd exact_gram, MatrixXd coefficients,
+    Rcpp::IntegerVector target_steps, VectorXd weights,
+    double tau, int n_steps, double forcing_mean, bool split_mean) {
+    Eigen::setNbThreads(1);
+    SparseMatrix<double> C=C_in, metric=metric_in;
+    const int n=C.rows(), modes=projection.cols();
+    const int samples=target_steps.size(), m=residues.size();
+    if (n_steps<1 || !std::isfinite(tau) || tau<=0 || samples<1 ||
+        C.cols()!=n || matrices.size()!=m || initial.size()!=n || load.size()!=n ||
+        forcing.size()!=n_steps+1 || projection.rows()!=n || modes<1 ||
+        coefficients.rows()!=modes || coefficients.cols()!=samples ||
+        weights.size()!=samples || metric.rows()!=n || metric.cols()!=n ||
+        residual_gram.rows()!=modes || residual_gram.cols()!=modes ||
+        exact_gram.rows()!=modes || exact_gram.cols()!=modes)
+        Rcpp::stop("Invalid smooth-reference dimensions or time grid.");
+    SmoothFactor mass_factor;
+    if (remainder!=0) {
+        mass_factor.compute(C);
+        if (mass_factor.info()!=Eigen::Success)
+            Rcpp::stop("Mass factorization failed.");
+    }
+    std::vector<std::unique_ptr<SmoothFactor> > factors;
+    for (int i=0;i<m;++i) {
+        SparseMatrix<double> A=Rcpp::as<SparseMatrix<double> >(matrices[i]);
+        if (A.rows()!=n || A.cols()!=n)
+            Rcpp::stop("Invalid shifted matrix dimensions.");
+        factors.emplace_back(new SmoothFactor());
+        factors.back()->compute(A);
+        if (factors.back()->info()!=Eigen::Success)
+            Rcpp::stop("Shifted factorization failed.");
+    }
+    VectorXd u=initial, rhs(n), next(n), delta(n), metric_product(n);
+    VectorXd c_one=C*VectorXd::Ones(n);
+    const double volume=c_one.sum();
+    double expected_mass=c_one.dot(initial), max_mass_error=0;
+    VectorXd anchor(modes), shift(modes), mean(modes), centered(modes);
+    VectorXd deviation(modes), residual_product(modes);
+    MatrixXd scatter(modes,modes);
+    int step=0, first=0;
+    double total=0, compensation=0;
+    while (first<samples) {
+        Rcpp::checkUserInterrupt();
+        const int goal=target_steps[first];
+        if (goal<1 || goal<step || goal>n_steps)
+            Rcpp::stop("Invalid reference time-to-step mapping.");
+        while (step<goal) {
+            if ((step & 4095)==0) Rcpp::checkUserInterrupt();
+            ++step;
+            rhs.noalias()=C*u;
+            rhs.noalias()+=tau*load*forcing[step];
+            rhs.noalias()+=tau*forcing_mean*c_one;
+            expected_mass+=tau*(load.sum()*forcing[step]+forcing_mean*volume);
+            double next_mean=0;
+            if (split_mean) {
+                next_mean=rhs.sum()/volume;
+                rhs.noalias()-=next_mean*c_one;
+            }
+            if (remainder!=0) next=remainder*mass_factor.solve(rhs);
+            else next.setZero();
+            for (int i=0;i<m;++i)
+                next.noalias()+=residues[i]*factors[i]->solve(rhs);
+            if (split_mean) {
+                const double residual_mean=c_one.dot(next)/volume;
+                next.array()+=next_mean-residual_mean;
+            }
+            u.swap(next);
+            if (split_mean)
+                max_mass_error=std::max(max_mass_error,std::abs(c_one.dot(u)-expected_mass));
+        }
+        int last=first+1;
+        while (last<samples && target_steps[last]==goal) ++last;
+        long double weight_sum=0;
+        for (int q=first;q<last;++q) {
+            if (!std::isfinite(weights[q]) || weights[q]<=0)
+                Rcpp::stop("Reference weights must be positive and finite.");
+            weight_sum+=weights[q];
+        }
+        const double weight=static_cast<double>(weight_sum);
+        anchor=coefficients.col(first);
+        shift.setZero();
+        for (int q=first;q<last;++q) {
+            if ((q & 4095)==0) Rcpp::checkUserInterrupt();
+            centered=coefficients.col(q)-anchor;
+            shift.noalias()+=(weights[q]/weight)*centered;
+        }
+        mean=anchor+shift;
+        scatter.setZero();
+        for (int q=first;q<last;++q) {
+            centered=coefficients.col(q)-anchor;
+            deviation=std::sqrt(weights[q])*(centered-shift);
+            scatter.noalias()+=deviation*deviation.transpose();
+        }
+        delta.noalias()=u-projection*mean;
+        metric_product.noalias()=metric*delta;
+        residual_product.noalias()=residual_gram*mean;
+        const double variance=exact_gram.cwiseProduct(scatter).sum();
+        double value=weight*(delta.dot(metric_product)+mean.dot(residual_product))+variance;
+        const double scale=weight*(delta.cwiseProduct(metric_product).cwiseAbs().sum()+
+            mean.cwiseProduct(residual_product).cwiseAbs().sum())+
+            exact_gram.cwiseProduct(scatter).cwiseAbs().sum();
+        if (!std::isfinite(value) || value < -128*std::numeric_limits<double>::epsilon()*scale)
+            Rcpp::stop("Invalid reference-grid squared error.");
+        value=std::max(0.0,value);
+        const double adjusted=value-compensation;
+        const double updated=total+adjusted;
+        compensation=(updated-total)-adjusted;
+        total=updated;
+        first=last;
+    }
+    if (step!=n_steps) Rcpp::stop("Reference grid did not reach the final solver step.");
+    return Rcpp::List::create(Rcpp::Named("error")=std::sqrt(total),
+        Rcpp::Named("final_state")=u, Rcpp::Named("solver_steps")=step,
+        Rcpp::Named("max_mass_error")=max_mass_error,
+        Rcpp::Named("final_mass")=c_one.dot(u),
+        Rcpp::Named("mass_checked")=split_mean);
+}
+)----", env=target, cacheDir=cache_dir, showOutput=FALSE, verbose=FALSE)
+    invisible(TRUE)
+}
+```
+
+### Smooth data, interpolation, and exact coefficient evolution
+
+Mode numbering follows `initial_modes_tadpole.R`: mode 1 is the normalized
+constant, each frequency `k*pi/2` contributes `phi`, and positive even
+frequencies also contribute `psi`. Thus modes 5 and 7 are `phi_3` and
+`psi_4`. Element sine/cosine-hat integrals are evaluated analytically with
+small-argument series. Each nonconstant load is centered to its analytically
+known zero integral at roundoff. The added constant load is `mean*C*one`.
+The reference basis uses the function one itself for its last column,
+with coefficient `initial_mean + forcing_mean*t`.
+
+```{r kappa0-experiment-data-functions}
+kappa0_mode_table <- function(max_mode = 21L) {
+    table <- data.frame(k = 0L, kind = "constant")
+    for (k in seq_len(max_mode)) {
+        table <- rbind(table, data.frame(k = k, kind = "phi"))
+        if (k %% 2L == 0L) table <- rbind(table, data.frame(k = k, kind = "psi"))
+    }
+    table[seq_len(max_mode), ]
+}
+
+kappa0_mesh_locations <- function(mesh) {
+    # Same order as the standalone tadpole assembler: endpoints, stem, loop.
+    counts <- lengths(mesh$paths)-1L
+    rbind(c(1,0), c(2,0),
+          if (counts[1L]>1L) cbind(1, seq_len(counts[1L]-1L)/counts[1L]) else NULL,
+          if (counts[2L]>1L) cbind(2, seq_len(counts[2L]-1L)/counts[2L]) else NULL)
+}
+
+kappa0_fem_basis <- function(mesh, locations) {
+    edge <- as.integer(locations[,1L])
+    counts <- lengths(mesh$paths)-1L
+    position <- locations[,2L]*counts[edge]
+    cell <- pmin(floor(position), counts[edge]-1L)
+    fraction <- position-cell
+    left <- right <- integer(nrow(locations))
+    for (e in 1:2) {
+        ids <- which(edge==e)
+        left[ids] <- mesh$paths[[e]][cell[ids]+1L]
+        right[ids] <- mesh$paths[[e]][cell[ids]+2L]
+    }
+    Matrix::drop0(Matrix::sparseMatrix(i=rep(seq_len(nrow(locations)),2L),
+        j=c(left,right), x=c(1-fraction,fraction), dims=c(nrow(locations),nrow(mesh$C))))
+}
+
+kappa0_mode_trig <- function(mode, edge) {
+    k <- mode$k
+    A <- B <- 0
+    if (k==0L) A <- 1/sqrt(3)
+    else if (mode$kind=="psi") A <- (if (edge==1L) (-1)^(k/2) else 1)/sqrt(3/2)
+    else {
+        normalization <- if (k%%2L==1L) sqrt(3) else 1
+        if (edge==1L) A <- -2*sinpi(k/2)/normalization else B <- 1/normalization
+    }
+    c(A=A, B=B)
+}
+
+kappa0_mode_basis <- function(locations, modes) {
+    table <- kappa0_mode_table(max(modes))
+    vapply(modes, function(j) {
+        out <- numeric(nrow(locations))
+        for (edge in 1:2) {
+            ids <- which(locations[,1L]==edge)
+            x <- locations[ids,2L]*c(1,2)[edge]
+            ab <- kappa0_mode_trig(table[j,],edge)
+            out[ids] <- ab[1L]*cos(table$k[j]*pi*x/2) + ab[2L]*sin(table$k[j]*pi*x/2)
+        }
+        out
+    }, numeric(nrow(locations)))
+}
+
+kappa0_trig_hat_pair <- function(a,b,w,A,B) {
+    h <- b-a
+    z <- w*h/2
+    theta <- w*(a+b)/2
+    S <- Q <- numeric(length(z))
+    small <- abs(z)<0.001
+    S[small] <- 1-z[small]^2/6+z[small]^4/120-z[small]^6/5040
+    Q[small] <- z[small]/3-z[small]^3/30+z[small]^5/840-z[small]^7/45360
+    S[!small] <- sin(z[!small])/z[!small]
+    Q[!small] <- (sin(z[!small])-z[!small]*cos(z[!small]))/z[!small]^2
+    v <- A*cos(theta)+B*sin(theta)
+    q <- A*sin(theta)-B*cos(theta)
+    cbind(h/2*(S*v+Q*q), h/2*(S*v-Q*q))
+}
+
+kappa0_mode_load <- function(mesh, j) {
+    mode <- kappa0_mode_table(j)[j,]
+    elements <- mesh$elements
+    pair <- matrix(0,nrow(elements),2L)
+    for (edge in 1:2) {
+        ids <- which(elements$edge==edge)
+        ab <- kappa0_mode_trig(mode,edge)
+        pair[ids,] <- kappa0_trig_hat_pair(elements$a[ids],elements$b[ids],
+                                         mode$k*pi/2,ab[1L],ab[2L])
+    }
+    summed <- rowsum(c(pair[,1L],pair[,2L]), c(elements$left,elements$right), reorder=FALSE)
+    load <- numeric(nrow(mesh$C))
+    load[as.integer(rownames(summed))] <- summed[,1L]
+    if (mode$k>0) {
+        c_one <- as.numeric(mesh$C %*% rep(1,nrow(mesh$C)))
+        load <- load-sum(load)/sum(c_one)*c_one
+    }
+    load
+}
+
+kappa0_smooth_data <- function(h, initial_modes=c(5L,6L,8:21), initial_amplitude=10,
+                               forcing_amplitude=10, initial_mean=1, forcing_mean=1) {
+    stopifnot(length(initial_modes)>=1L, !anyDuplicated(initial_modes),
+              all(initial_modes>=2L), all(initial_modes==as.integer(initial_modes)),
+              !(7L %in% initial_modes), all(is.finite(c(initial_amplitude,forcing_amplitude,
+                                                       initial_mean,forcing_mean))))
+    mesh <- kappa0_tadpole_mesh(h)
+    C <- mesh$C
+    c_one <- as.numeric(C %*% rep(1,nrow(C)))
+    loads <- vapply(initial_modes,function(j) kappa0_mode_load(mesh,j),numeric(nrow(C)))
+    b0 <- initial_mean*c_one+initial_amplitude/sqrt(length(initial_modes))*rowSums(loads)
+    initial <- as.numeric(Matrix::solve(C,b0))
+    list(mesh=mesh, C=C, G=mesh$G, initial=initial,
+         spatial_load=forcing_amplitude*kappa0_mode_load(mesh,7L),
+         initial_modes=initial_modes, initial_amplitude=initial_amplitude,
+         forcing_amplitude=forcing_amplitude, initial_mean=initial_mean, forcing_mean=forcing_mean)
+}
+
+kappa0_smooth_reference <- function(reference_mesh, data, alpha, diffusion, A=1, omega=pi) {
+    modes <- sort(unique(c(data$initial_modes,7L)))
+    E <- kappa0_mode_basis(kappa0_mesh_locations(reference_mesh),modes)
+    table <- kappa0_mode_table(max(modes))
+    rates <- diffusion*(table$k[modes]*pi/2)^alpha
+    initial <- ifelse(modes %in% data$initial_modes,
+                       data$initial_amplitude/sqrt(length(data$initial_modes)),0)
+    forcing <- ifelse(modes==7L,data$forcing_amplitude,0)
+    coefficients <- function(t) {
+        out <- vapply(seq_along(rates),function(j)
+            initial[j]*exp(-rates[j]*t) + forcing[j]*
+                kappa0_decayed_sine_convolution(t,rates[j],A,omega),numeric(length(t)))
+        out <- matrix(out,nrow=length(t),ncol=length(rates))
+        rbind(t(out),data$initial_mean+data$forcing_mean*t)
+    }
+    list(basis=cbind(E,1), coefficients=coefficients, rates=rates)
+}
+
+kappa0_sampled_error <- function(op, grid, initial, load, forcing, reference_grid,
+                                 coefficients, projection, forcing_mean=0,
+                                 split_mean=TRUE, engine=c("cpp","R")) {
+    engine <- match.arg(engine)
+    stopifnot(length(initial)==nrow(op$C), length(load)==length(initial),
+              length(forcing)==length(grid$times),
+              isTRUE(all.equal(grid$time_step,op$time_step)),
+              reference_grid$times[1L]==grid$times[1L],
+              tail(reference_grid$times,1L)==tail(grid$times,1L))
+    times <- reference_grid$times[-1L]
+    weights <- diff(reference_grid$times)
+    coef <- as.matrix(coefficients(times))
+    targets <- as.integer(findInterval(times,grid$times,left.open=TRUE))
+    stopifnot(ncol(coef)==length(times), all(is.finite(coef)),
+              all(targets>=1L), all(targets<=grid$N))
+    if (engine=="R") {
+        u <- initial
+        total <- compensation <- 0
+        step <- 0L
+        one <- rep(1,length(u)); c_one <- as.numeric(op$C %*% one)
+        expected <- sum(c_one*u); mass_error <- 0
+        runs <- rle(targets); first <- 1L
+        for (run in seq_along(runs$values)) {
+            while (step<runs$values[run]) {
+                step <- step+1L
+                F <- load*forcing[step+1L]+forcing_mean*c_one
+                rhs <- as.numeric(op$C %*% u)+grid$time_step*F
+                u <- if (split_mean) my.solver.kappa0(op,rhs) else kappa0_restricted_solve(op,rhs)
+                expected <- expected+grid$time_step*sum(F)
+                if (split_mean) mass_error <- max(mass_error,abs(sum(c_one*u)-expected))
+            }
+            last <- first+runs$lengths[run]-1L
+            columns <- seq.int(first,last)
+            moments <- kappa0_reference_coefficient_moments(coef[,columns,drop=FALSE],weights[columns])
+            value <- kappa0_reference_interval_error(u,moments,projection)
+            adjusted <- value-compensation; updated <- total+adjusted
+            compensation <- (updated-total)-adjusted; total <- updated
+            first <- last+1L
+        }
+        return(list(error=sqrt(total),final_state=u,solver_steps=step,
+                    max_mass_error=mass_error,final_mass=sum(c_one*u),mass_checked=split_mean))
+    }
+    kappa0_compile_sampled_solver()
+    matrices <- if(op$beta==1) list(op$LHS) else op$partial_fraction_terms
+    residues <- if(op$beta==1) 1 else op$residues
+    remainder <- if(op$beta==1) 0 else op$remainder
+    general <- function(x) methods::as(methods::as(x,"generalMatrix"),"CsparseMatrix")
+    kappa0_sampled_evolve_cpp(general(op$C),lapply(matrices,general),residues,remainder,
+        as.numeric(initial),as.numeric(load),as.numeric(forcing),projection$projection,
+        general(projection$metric),projection$residual_gram,projection$exact_gram,coef,
+        targets,weights,grid$time_step,grid$N,forcing_mean,split_mean)
+}
+```
+
+### Rough forcing, restricted operator, and common experiment runners
+
+The rough load keeps exactly the modes `j < J` on a dyadic solver mesh;
+all higher modes of the infinite forcing have zero sine-hat load. The
+finite reference uses a fixed cutoff `K >= max(J)` on every solver mesh
+and a spatial grid `reference_J >= K+2`. The cutoff bound is checked
+against every squared measured error, not just its largest value.
+
+```{r kappa0-experiment-runners}
+kappa0_rough_mesh <- function(J) {
+    stopifnot(J>=3L, J<=20L, J==as.integer(J))
+    h <- 2^-J; n <- 2^(J-1L)-1L
+    C <- Matrix::bandSparse(n,k=c(-1L,0L,1L),diagonals=list(
+        rep(2*h/3,n-1L),rep(8*h/3,n),rep(2*h/3,n-1L)))
+    G <- Matrix::bandSparse(n,k=c(-1L,0L,1L),diagonals=list(
+        rep(-4/h,n-1L),rep(8/h,n),rep(-4/h,n-1L)))
+    j <- seq_len(J-1L); x <- seq_len(n)*h; theta <- pi*2^j*h
+    B <- outer(x,2^j,function(x,k) sinpi(x*k))*
+         rep(4*h*(sin(theta/2)/(theta/2))^2,each=n)
+    list(J=J,h=h,C=C,G=G,x=x,load=as.numeric(B %*% (1/j)))
+}
+
+kappa0_rough_reference <- function(J,cutoff) {
+    stopifnot(cutoff>=1L,cutoff==as.integer(cutoff),J>=cutoff+2L,J<=22L)
+    h <- 2^-J; n <- 2^(J-1L)-1L
+    if (8*n*cutoff/1024^2>1024) stop("Rough reference basis exceeds 1 GiB guard.")
+    C <- Matrix::bandSparse(n,k=c(-1L,0L,1L),diagonals=list(
+        rep(2*h/3,n-1L),rep(8*h/3,n),rep(2*h/3,n-1L)))
+    x <- seq_len(n)*h
+    list(J=J,cutoff=cutoff,C=C,x=x,
+         basis=outer(x,2^seq_len(cutoff),function(x,k) sinpi(x*k)))
+}
+
+kappa0_rough_basis <- function(J,x) {
+    pos <- x*2^J; left <- as.integer(floor(pos)); f <- pos-left
+    n <- 2^(J-1L)-1L; rows <- seq_along(x)
+    kl <- left>=1L & left<=n; kr <- left+1L>=1L & left+1L<=n
+    Matrix::drop0(Matrix::sparseMatrix(i=c(rows[kl],rows[kr]),
+        j=c(left[kl],left[kr]+1L),x=c(1-f[kl],f[kr]),dims=c(length(x),n)))
+}
+
+kappa0_rough_operator <- function(mesh,beta,m,time_step,diffusion=1,gamma_star=1/3) {
+    stopifnot(beta>0,beta<=1,kappa0_positive_scalar(gamma_star),
+              kappa0_positive_scalar(time_step),kappa0_positive_scalar(diffusion))
+    factorize <- function(A) Matrix::Cholesky(Matrix::forceSymmetric(A),LDL=FALSE)
+    op <- list(C=mesh$C,G=mesh$G,beta=beta,time_step=time_step,diffusion=diffusion,
+               scale.factor=gamma_star,m=m,mass_factor=factorize(mesh$C))
+    if (beta==1) {
+        op$LHS <- mesh$C+time_step*diffusion*mesh$G
+        op$factorization <- factorize(op$LHS)
+    } else {
+        op$coefficients <- kappa0_brasil_coefficients(m,beta)
+        transfer <- kappa0_brasil_partial_fractions(op$coefficients,time_step,diffusion*gamma_star^beta)
+        op$poles <- transfer$p; op$residues <- transfer$r; op$remainder <- transfer$k
+        op$partial_fraction_terms <- lapply(op$poles,function(p) mesh$G/gamma_star-p*mesh$C)
+        op$factorizations <- lapply(op$partial_fraction_terms,factorize)
+    }
+    op
+}
+
+kappa0_restricted_solve <- function(op,b) {
+    if (op$beta==1) return(as.numeric(Matrix::solve(op$factorization,b,system="A")))
+    u <- op$remainder*as.numeric(Matrix::solve(op$mass_factor,b,system="A"))
+    for (i in seq_along(op$residues)) u <- u+op$residues[i]*
+        as.numeric(Matrix::solve(op$factorizations[[i]],b,system="A"))
+    u
+}
+
+kappa0_study_settings <- function(study=c("m","tau","h","rough_h"),
+                                   profile=c("validation","paper")) {
+    study <- match.arg(study); profile <- match.arg(profile)
+    cfg <- list(study=study,profile=profile,T_final=1,kappa=0,gamma_star=1/3,
+        alpha=if(profile=="paper") seq(0.9,1.7,0.1) else c(0.9,1.3,1.7),
+        diffusion=if(study %in% c("h","tau")) 1e-3 else 1,
+        initial_modes=c(5L,6L,8:21),initial_amplitude=10,forcing_amplitude=10,
+        initial_mean=1,forcing_mean=1,A=1,omega=pi,workers=1L,
+        refinement_checks=(profile=="validation"))
+    if(study=="m") {
+        cfg$h <- 0.02; cfg$tau <- 0.005
+        cfg$m <- if(profile=="paper") 2:16 else 2:12
+    } else if(study=="tau") {
+        cfg$h <- if(profile=="paper") 1e-3 else 1/512
+        cfg$tau <- 1/c(200L,63L,20L,6L,2L)
+        cfg$m <- 12L
+        cfg$reference_h <- if(profile=="paper") 1e-5 else 1/4096
+        cfg$reference_tau <- if(profile=="paper") 1e-5 else 1e-4
+    } else if(study=="h") {
+        cfg$h <- if(profile=="paper") 2^seq(-9,-5) else 2^seq(-7,-4)
+        cfg$tau <- if(profile=="paper") 2e-5 else 1e-4
+        cfg$m <- 12L
+        cfg$reference_h <- if(profile=="paper") 1e-5 else 1/2048
+        cfg$reference_tau <- if(profile=="paper") 1e-5 else 5e-5
+    } else {
+        cfg$J <- if(profile=="paper") 5:9 else 5:8
+        cfg$tau <- if(profile=="paper") 8e-7 else 2e-6
+        cfg$m <- 14L
+        cfg$cutoff <- if(profile=="paper") 16L else 12L
+        cfg$reference_J <- cfg$cutoff+2L
+        cfg$reference_tau <- if(profile=="paper") 1e-5 else 2e-4
+        cfg$max_tail_squared_fraction <- 0.002
+        cfg$initial_mean <- cfg$forcing_mean <- 0
+    }
+    cfg
+}
+
+kappa0_map_cases <- function(cases,FUN,workers=1L) {
+    safe <- function(i) tryCatch(FUN(i),error=function(e) list(failed=conditionMessage(e)))
+    values <- if(workers>1L && .Platform$OS.type=="unix")
+        parallel::mclapply(cases,safe,mc.cores=min(workers,length(cases)),mc.preschedule=FALSE)
+        else lapply(cases,safe)
+    failed <- vapply(values,function(x) !is.list(x) || !is.null(x$failed),logical(1))
+    if(any(failed)) stop("Experiment failed: ",paste(vapply(values[failed],function(x)
+        if(is.list(x)) x$failed else as.character(x),character(1)),collapse="; "))
+    values
+}
+
+kappa0_run_smooth_study <- function(cfg) {
+    stopifnot(cfg$study %in% c("h","tau"),cfg$kappa==0,cfg$gamma_star>0)
+    kappa0_compile_sampled_solver()
+    ref_mesh <- kappa0_tadpole_mesh(cfg$reference_h)
+    ref_grid <- kappa0_time_grid(cfg$T_final,cfg$reference_tau)
+    axis <- if(cfg$study=="h") cfg$h else cfg$tau
+    rows <- vector("list",length(axis))
+    for(i in seq_along(axis)) {
+        data <- kappa0_smooth_data(if(cfg$study=="h") axis[i] else cfg$h,
+            cfg$initial_modes,cfg$initial_amplitude,cfg$forcing_amplitude,
+            cfg$initial_mean,cfg$forcing_mean)
+        grid <- kappa0_time_grid(cfg$T_final,if(cfg$study=="tau") axis[i] else cfg$tau)
+        forcing <- kappa0_average_sine_forcing(grid$times,cfg$A,cfg$omega)
+        ref <- kappa0_smooth_reference(ref_mesh,data,cfg$alpha[1],cfg$diffusion,cfg$A,cfg$omega)
+        Psi <- kappa0_fem_basis(data$mesh,kappa0_mesh_locations(ref_mesh))
+        projection <- kappa0_prepare_reference_error(Psi,ref_mesh$C,ref$basis)
+        values <- kappa0_map_cases(seq_along(cfg$alpha),function(j) {
+            alpha <- cfg$alpha[j]
+            ref <- kappa0_smooth_reference(ref_mesh,data,
+                       alpha,cfg$diffusion,cfg$A,cfg$omega)
+            op <- my.fractional.operators.kappa0(data$G,alpha/2,data$C,
+                      cfg$gamma_star,cfg$m,grid$time_step,cfg$diffusion)
+            value <- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,forcing,
+                       ref_grid,ref$coefficients,projection,forcing_mean=cfg$forcing_mean)
+            data.frame(alpha=alpha,axis=if(cfg$study=="h") data$mesh$h else grid$time_step,
+                error=value$error,max_mass_error=value$max_mass_error,
+                steps=grid$N,unknowns=nrow(data$C))
+        },cfg$workers)
+        rows[[i]] <- do.call(rbind,values)
+    }
+    results <- do.call(rbind,rows)
+    rates <- do.call(rbind,lapply(cfg$alpha,function(a) {
+        d <- results[results$alpha==a,]
+        data.frame(alpha=a,reference=if(cfg$study=="h") 2 else 1,
+                   observed=unname(coef(lm(log(error)~log(axis),data=d))[2L]))
+    }))
+    if(any(results$max_mass_error>1e-8)) stop("Smooth-study mass balance check failed.")
+    list(results=results,rates=rates)
+}
+
+kappa0_run_rough_study <- function(cfg) {
+    stopifnot(cfg$kappa==0,cfg$cutoff>=max(cfg$J))
+    kappa0_compile_sampled_solver()
+    reference <- kappa0_rough_reference(cfg$reference_J,cfg$cutoff)
+    ref_grid <- kappa0_time_grid(cfg$T_final,cfg$reference_tau)
+    grid <- kappa0_time_grid(cfg$T_final,cfg$tau)
+    meshes <- lapply(cfg$J,kappa0_rough_mesh)
+    projections <- lapply(meshes,function(mesh) kappa0_prepare_reference_error(
+        kappa0_rough_basis(mesh$J,reference$x),reference$C,reference$basis))
+    cases <- expand.grid(mesh=seq_along(cfg$J),alpha=seq_along(cfg$alpha))
+    values <- kappa0_map_cases(seq_len(nrow(cases)),function(i) {
+        mesh <- meshes[[cases$mesh[i]]]; alpha <- cfg$alpha[cases$alpha[i]]
+        j <- seq_len(cfg$cutoff); rates <- cfg$diffusion*(pi*2^j)^alpha
+        coefficients <- function(t) -expm1(-outer(rates,t))/(j*rates)
+        op <- kappa0_rough_operator(mesh,alpha/2,cfg$m,grid$time_step,cfg$diffusion,cfg$gamma_star)
+        value <- kappa0_sampled_error(op,grid,rep(0,nrow(mesh$C)),mesh$load,
+            rep(1,length(grid$times)),ref_grid,coefficients,projections[[cases$mesh[i]]],split_mean=FALSE)
+        bound <- cfg$T_final/(cfg$diffusion^2*pi^(2*alpha)) *
+                 2^(-2*alpha*(cfg$cutoff+1))/((cfg$cutoff+1)^2*(1-2^(-2*alpha)))
+        data.frame(alpha=alpha,axis=mesh$h,J=mesh$J,error=value$error,
+            corrected_error=mesh$J*value$error,cutoff_squared_bound=bound,
+            tail_squared_fraction=bound/value$error^2,steps=grid$N,
+            unknowns=nrow(mesh$C),mass_by_antisymmetry=0)
+    },cfg$workers)
+    results <- do.call(rbind,values)
+    if(any(results$tail_squared_fraction>cfg$max_tail_squared_fraction))
+        stop("Reference cutoff budget failed; increase cutoff and reference_J together.")
+    rates <- do.call(rbind,lapply(cfg$alpha,function(a) {
+        d <- results[results$alpha==a,]
+        data.frame(alpha=a,reference=a,
+            raw=unname(coef(lm(log(error)~log(axis),data=d))[2L]),
+            observed=unname(coef(lm(log(corrected_error)~log(axis),data=d))[2L]))
+    }))
+    list(results=results,rates=rates)
+}
+
+kappa0_discrete_be_coefficients <- function(data,spectrum,grid,alpha,diffusion,A=1,omega=pi) {
+    V <- spectrum$vectors
+    y <- as.numeric(Matrix::crossprod(V,data$C %*% data$initial))
+    f <- as.numeric(Matrix::crossprod(V,data$spatial_load))
+    c_one <- as.numeric(data$C %*% rep(1,nrow(data$C)))
+    fc <- as.numeric(Matrix::crossprod(V,data$forcing_mean*c_one))
+    rates <- diffusion*spectrum$values^(alpha/2)
+    H <- 1/(1+grid$time_step*rates)
+    forcing <- kappa0_average_sine_forcing(grid$times,A,omega)
+    coefficients <- matrix(0,length(y),grid$N+1L); coefficients[,1L] <- y
+    for(k in seq_len(grid$N)) {
+        y <- H*(y+grid$time_step*(f*forcing[k+1L]+fc))
+        coefficients[,k+1L] <- y
+    }
+    list(coefficients=coefficients,forcing=forcing,modal_load=f,modal_constant_load=fc,rates=rates)
+}
+
+kappa0_isolated_m_case <- function(data,spectrum,grid,reference,alpha,m,diffusion,gamma_star) {
+    op <- my.fractional.operators.kappa0(data$G,alpha/2,data$C,gamma_star,m,grid$time_step,diffusion)
+    n <- nrow(data$C)
+    projection <- list(projection=spectrum$vectors,metric=data$C,
+                       residual_gram=matrix(0,n,n),exact_gram=diag(n))
+    # The reference samples are the BE vectors at these very same time nodes.
+    lookup <- function(t) reference$coefficients[,pmin(grid$N,as.integer(round(t/grid$time_step)))+1L,drop=FALSE]
+    value <- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,reference$forcing,
+               grid,lookup,projection,forcing_mean=data$forcing_mean)
+    H <- rep(1,n)
+    if(alpha==2) H <- 1/(1+grid$time_step*diffusion*spectrum$values)
+    else {
+        S <- kappa0_brasil_inverse(spectrum$values[-1L]/gamma_star,op$coefficients)
+        H[-1L] <- S/(S+grid$time_step*diffusion*gamma_star^(alpha/2))
+    }
+    y <- reference$coefficients[,1L]; total <- 0
+    for(k in seq_len(grid$N)) {
+        y <- H*(y+grid$time_step*(reference$modal_load*reference$forcing[k+1L]+reference$modal_constant_load))
+        dy <- y-reference$coefficients[,k+1L]
+        total <- total+grid$time_step*sum(dy^2)
+    }
+    modal_error <- sqrt(total)
+    gap <- kappa0_l2_norm(data$C,value$final_state-as.numeric(spectrum$vectors %*% y))
+    data.frame(alpha=alpha,m=m,axis=m,error=value$error,product_error=modal_error,
+        absolute_error_disagreement=abs(value$error-modal_error),final_state_gap_C=gap,
+        max_mass_error=value$max_mass_error)
+}
+
+kappa0_run_m_study <- function(cfg) {
+    kappa0_compile_sampled_solver()
+    data <- kappa0_smooth_data(cfg$h,cfg$initial_modes,cfg$initial_amplitude,
+                cfg$forcing_amplitude,cfg$initial_mean,cfg$forcing_mean)
+    grid <- kappa0_time_grid(cfg$T_final,cfg$tau)
+    spectrum <- kappa0_discrete_spectrum(data$C,data$G)
+    stopifnot(cfg$gamma_star<=spectrum$values[2L])
+    values <- kappa0_map_cases(seq_along(cfg$alpha),function(i) {
+        alpha <- cfg$alpha[i]
+        reference <- kappa0_discrete_be_coefficients(data,spectrum,grid,alpha,cfg$diffusion,cfg$A,cfg$omega)
+        rows <- lapply(cfg$m,function(m) kappa0_isolated_m_case(data,spectrum,grid,reference,
+                  alpha,m,cfg$diffusion,cfg$gamma_star))
+        list(rows=do.call(rbind,rows))
+    },cfg$workers)
+    results <- do.call(rbind,lapply(values,`[[`,"rows"))
+    reference <- kappa0_discrete_be_coefficients(data,spectrum,grid,2,cfg$diffusion,cfg$A,cfg$omega)
+    control <- kappa0_isolated_m_case(data,spectrum,grid,reference,2,min(cfg$m),cfg$diffusion,cfg$gamma_star)
+    results$noise_indicator <- pmax(results$absolute_error_disagreement,control$error,.Machine$double.xmin)
+    results$resolved <- results$product_error>100*results$noise_indicator
+    slopes <- function(d) if(nrow(d)<2L) NA_real_ else unname(coef(lm(log(error)~sqrt(m),data=d))[2L])
+    rates <- do.call(rbind,lapply(cfg$alpha,function(a) {
+        d <- results[results$alpha==a,]
+        data.frame(alpha=a,reference=-2*pi*sqrt(a/2),observed=slopes(d),
+                   resolved_only=slopes(d[d$resolved,]),resolved_orders=sum(d$resolved))
+    }))
+    unit <- do.call(rbind,lapply(cfg$alpha,function(a) do.call(rbind,lapply(cfg$m,function(m) {
+        x <- c(0,sort(exp(seq(log(0.001),0,length.out=10001L))))
+        c <- kappa0_brasil_coefficients(m,a/2)
+        data.frame(alpha=a,m=m,error=max(abs(kappa0_brasil_power(x,c)-x^(a/2))))
+    }))))
+    if(any(results$max_mass_error>1e-8)) stop("Isolated-m mass balance check failed.")
+    list(results=results,rates=rates,control=control,spectrum=spectrum$diagnostics,unit_errors=unit)
+}
+```
+
+### Validation, result provenance, and stale-cache protection
+
+These checks compare the compiled implementation with the readable R
+solver on nonzero-mean data, including integer diffusion; compare the
+rough restricted solution with the full connected tadpole; and verify
+the compressed sampled norm against its direct reference-grid quadratic
+form. Each result file records its settings, these checks, package
+versions, source hashes, and generation time. Loading a result with
+mismatched settings or source hashes triggers recomputation, rather than
+silently relabeling an older positive-shift result.
+
+```{r kappa0-experiment-validation-functions}
+kappa0_validate_experiment_helpers <- function() {
+    data <- kappa0_smooth_data(1/16)
+    ref_mesh <- kappa0_tadpole_mesh(1/128)
+    grid <- kappa0_time_grid(0.1,0.01)
+    ref_grid <- kappa0_time_grid(0.1,0.003)
+    forcing <- kappa0_average_sine_forcing(grid$times)
+    checks <- list()
+    for(alpha in c(1.2,2)) {
+        ref <- kappa0_smooth_reference(ref_mesh,data,alpha,0.7)
+        Psi <- kappa0_fem_basis(data$mesh,kappa0_mesh_locations(ref_mesh))
+        projection <- kappa0_prepare_reference_error(Psi,ref_mesh$C,ref$basis)
+        op <- my.fractional.operators.kappa0(data$G,alpha/2,data$C,1/3,8,grid$time_step,0.7)
+        cpp <- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,forcing,
+                    ref_grid,ref$coefficients,projection,forcing_mean=1)
+        r <- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,forcing,
+                    ref_grid,ref$coefficients,projection,forcing_mean=1,engine="R")
+        final_gap <- kappa0_l2_norm(data$C,cpp$final_state-r$final_state)
+        error_gap <- abs(cpp$error-r$error)
+        u <- data$initial; history <- matrix(0,length(u),grid$N)
+        c_one <- as.numeric(data$C %*% rep(1,length(u)))
+        for(k in seq_len(grid$N)) {
+            u <- my.solver.kappa0(op,as.numeric(data$C %*% u)+
+                        grid$time_step*(data$spatial_load*forcing[k+1L]+c_one))
+            history[,k] <- u
+        }
+        targets <- findInterval(ref_grid$times[-1L],grid$times,left.open=TRUE)
+        direct <- 0
+        for(q in seq_along(targets)) {
+            d <- as.numeric(ref$basis %*% ref$coefficients(ref_grid$times[q+1L]))-
+                 as.numeric(Psi %*% history[,targets[q]])
+            direct <- direct+diff(ref_grid$times)[q]*sum(d*as.numeric(ref_mesh$C %*% d))
+        }
+        direct_gap <- abs(sqrt(direct)-r$error)
+        stopifnot(final_gap<1e-10,error_gap<1e-10,direct_gap<1e-10,cpp$max_mass_error<1e-10)
+        checks[[length(checks)+1L]] <- data.frame(check=paste0("smooth_alpha_",alpha),
+            final_C_gap=final_gap,error_gap=error_gap,direct_norm_gap=direct_gap,
+            max_mass_error=cpp$max_mass_error)
+    }
+    # The reduction is tested on the same data and step size on the full graph.
+    J <- 4L
+    mesh <- kappa0_rough_mesh(J)
+    op <- kappa0_rough_operator(mesh,0.6,8,grid$time_step)
+    full <- kappa0_tadpole_mesh(2^-J)
+    elements <- full$elements; ids <- which(elements$edge==2L)
+    load <- numeric(nrow(full$C))
+    for(j in seq_len(J-1L)) {
+        pair <- kappa0_trig_hat_pair(elements$a[ids],elements$b[ids],pi*2^j,0,1/j)
+        summed <- rowsum(c(pair[,1L],pair[,2L]),c(elements$left[ids],elements$right[ids]),reorder=FALSE)
+        load[as.integer(rownames(summed))] <- load[as.integer(rownames(summed))]+summed[,1L]
+    }
+    full_op <- my.fractional.operators.kappa0(full$G,0.6,full$C,1/3,8,grid$time_step)
+    reduced <- rep(0,nrow(mesh$C)); u <- rep(0,nrow(full$C))
+    for(k in seq_len(grid$N)) {
+        reduced <- kappa0_restricted_solve(op,as.numeric(mesh$C %*% reduced)+grid$time_step*mesh$load)
+        u <- my.solver.kappa0(full_op,as.numeric(full$C %*% u)+grid$time_step*load)
+    }
+    loc <- kappa0_mesh_locations(full); loop <- which(loc[,1L]==2L)
+    x <- loc[loop,2L]*2; r <- x%%1; q <- pmin(r,1-r)
+    extension <- rep(0,nrow(full$C))
+    extension[loop] <- as.numeric(kappa0_rough_basis(J,q) %*% reduced)*ifelse(r<=0.5,1,-1)
+    reduction_gap <- kappa0_l2_norm(full$C,u-extension)
+    norm_gap <- abs(kappa0_l2_norm(full$C,extension)-kappa0_l2_norm(mesh$C,reduced))
+    mass <- abs(sum(full$C %*% u))
+    stopifnot(reduction_gap<1e-10,norm_gap<1e-10,mass<1e-10)
+    checks[[length(checks)+1L]] <- data.frame(check="rough_full_graph_reduction",
+        final_C_gap=reduction_gap,error_gap=norm_gap,direct_norm_gap=NA_real_,max_mass_error=mass)
+    do.call(rbind,checks)
+}
+
+kappa0_execute_study <- function(cfg,notebook_file,recompute=FALSE,
+                                 output_dir="data_files") {
+    paths <- c("kappa0func.Rmd",notebook_file)
+    hashes <- tools::md5sum(paths)
+    versions <- vapply(c("Matrix","rSPDE","Rcpp","RcppEigen"),function(p)
+                       as.character(utils::packageVersion(p)),character(1))
+    file <- file.path(output_dir,paste0(tools::file_path_sans_ext(basename(notebook_file)),
+                                       "_",cfg$profile,".rds"))
+    if(file.exists(file) && !recompute) {
+        saved <- readRDS(file)
+        if(identical(saved$parameters,cfg) && identical(saved$source_hashes,hashes) &&
+           identical(saved$package_versions,versions)) return(saved)
+        message("Settings, source, or package versions changed; recomputing ",file)
+    }
+    stopifnot(all(is.finite(cfg$alpha)),all(cfg$alpha>0),all(cfg$alpha<2),
+              !anyDuplicated(cfg$alpha),cfg$kappa==0,cfg$gamma_star>0)
+    kappa0_compile_sampled_solver()
+    validation <- kappa0_validate_experiment_helpers()
+    started <- proc.time()[["elapsed"]]
+    result <- switch(cfg$study,m=kappa0_run_m_study(cfg),h=kappa0_run_smooth_study(cfg),
+                     tau=kappa0_run_smooth_study(cfg),rough_h=kappa0_run_rough_study(cfg))
+    result$refinement_checks <- if(isTRUE(cfg$refinement_checks))
+        kappa0_refinement_checks(cfg,result) else NULL
+    result$parameters <- cfg
+    result$validation <- validation
+    result$source_hashes <- hashes
+    result$package_versions <- versions
+    result$elapsed_seconds <- proc.time()[["elapsed"]]-started
+    result$generated_at <- format(Sys.time(),"%Y-%m-%d %H:%M:%S %Z",tz="Asia/Riyadh")
+    result$error_definition <- if(cfg$study=="m") "isolated discrete BE space-time error"
+        else "sampled continuum-reference space-time error, consistent reference mass"
+    dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
+    saveRDS(result,file)
+    result
+}
+```
+
+### Discretization and reference sensitivity checks
+
+The validation profile additionally repeats each exponent's finest tested
+case with one fixed setting refined at a time. These checks report the
+relative change in the measured error, which is evidence about sensitivity
+rather than a rigorous upper bound on that error component. Smooth h runs
+halve the solver time step, increase m by two, halve reference h, and halve
+reference tau. Smooth tau runs halve solver h instead of halving the
+varied time step. Rough runs halve solver tau, increase m by two, refine
+the reference spatial grid, halve its time step, and increase the series
+cutoff by two while resolving the increased cutoff. All comparisons keep
+the primary study axis fixed. These checks are on by default for the
+validation profile; the expensive paper profile can enable them explicitly
+with `settings$refinement_checks <- TRUE`.
+
+```{r kappa0-experiment-refinement-functions}
+kappa0_refinement_checks <- function(cfg,baseline) {
+    if(cfg$study=="m") return(NULL)
+    runner <- if(cfg$study=="rough_h") kappa0_run_rough_study else kappa0_run_smooth_study
+    rows <- list()
+    for(a in cfg$alpha) {
+        small <- cfg; small$alpha <- a; small$workers <- 1L
+        if(cfg$study=="h") small$h <- min(cfg$h)
+        else if(cfg$study=="tau") small$tau <- min(cfg$tau)
+        else small$J <- max(cfg$J)
+        d <- baseline$results[baseline$results$alpha==a,]
+        base_error <- d$error[which.min(d$axis)]
+        changes <- list()
+        if(cfg$study=="tau") {v<-small;v$h<-v$h/2;changes$solver_h_halved<-v}
+        else {v<-small;v$tau<-v$tau/2;changes$solver_tau_halved<-v}
+        v<-small;v$m<-v$m+2L;changes$rational_order_plus_two<-v
+        if(cfg$study=="rough_h") {
+            v<-small;v$reference_J<-v$reference_J+1L;changes$reference_h_halved<-v
+            v<-small;v$cutoff<-v$cutoff+2L;v$reference_J<-max(v$reference_J,v$cutoff+2L)
+            changes$cutoff_plus_two_resolved<-v
+        } else {
+            v<-small;v$reference_h<-v$reference_h/2;changes$reference_h_halved<-v
+        }
+        v<-small;v$reference_tau<-v$reference_tau/2;changes$reference_tau_halved<-v
+        for(name in names(changes)) {
+            refined <- runner(changes[[name]])$results$error[1L]
+            rows[[length(rows)+1L]] <- data.frame(alpha=a,check=name,
+                baseline_error=base_error,refined_error=refined,
+                relative_error_change=abs(refined-base_error)/base_error)
+        }
+    }
+    do.call(rbind,rows)
+}
+```
