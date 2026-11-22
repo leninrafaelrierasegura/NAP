@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+
+
+
+<title>Zero-shift benchmark: spectral convergence, BRASIL mass balance, and small shifts</title>
+
+<script src="site_libs/header-attrs-2.30/header-attrs.js"></script>
+<script src="site_libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="site_libs/bootstrap-3.3.5/css/flatly.min.css" rel="stylesheet" />
+<script src="site_libs/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="site_libs/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="site_libs/jqueryui-1.13.2/jquery-ui.min.js"></script>
+<link href="site_libs/tocify-1.9.1/jquery.tocify.css" rel="stylesheet" />
+<script src="site_libs/tocify-1.9.1/jquery.tocify.js"></script>
+<script src="site_libs/navigation-1.1/tabsets.js"></script>
+<script src="site_libs/navigation-1.1/codefolding.js"></script>
+<link href="site_libs/highlightjs-9.12.0/default.css" rel="stylesheet" />
+<script src="site_libs/highlightjs-9.12.0/highlight.js"></script>
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+<style type="text/css">code{white-space: pre;}</style>
+<script type="text/javascript">
+if (window.hljs) {
+  hljs.configure({languages: []});
+  hljs.initHighlightingOnLoad();
+  if (document.readyState && document.readyState === "complete") {
+    window.setTimeout(function() { hljs.initHighlighting(); }, 0);
+  }
+}
+</script>
+
+
+
+
+
+
+<link rel="stylesheet" href="visual.css" type="text/css" />
+
+
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+img {
+  max-width:100%;
+}
+.tabbed-pane {
+  padding-top: 12px;
+}
+.html-widget {
+  margin-bottom: 20px;
+}
+button.code-folding-btn:focus {
+  outline: none;
+}
+summary {
+  display: list-item;
+}
+details > summary > p:only-child {
+  display: inline;
+}
+pre code {
+  padding: 0;
+}
+</style>
+
+
+<style type="text/css">
+.dropdown-submenu {
+  position: relative;
+}
+.dropdown-submenu>.dropdown-menu {
+  top: 0;
+  left: 100%;
+  margin-top: -6px;
+  margin-left: -1px;
+  border-radius: 0 6px 6px 6px;
+}
+.dropdown-submenu:hover>.dropdown-menu {
+  display: block;
+}
+.dropdown-submenu>a:after {
+  display: block;
+  content: " ";
+  float: right;
+  width: 0;
+  height: 0;
+  border-color: transparent;
+  border-style: solid;
+  border-width: 5px 0 5px 5px;
+  border-left-color: #cccccc;
+  margin-top: 5px;
+  margin-right: -10px;
+}
+.dropdown-submenu:hover>a:after {
+  border-left-color: #adb5bd;
+}
+.dropdown-submenu.pull-left {
+  float: none;
+}
+.dropdown-submenu.pull-left>.dropdown-menu {
+  left: -100%;
+  margin-left: 10px;
+  border-radius: 6px 0 6px 6px;
+}
+</style>
+
+<script type="text/javascript">
+// manage active state of menu based on current page
+$(document).ready(function () {
+  // active menu anchor
+  href = window.location.pathname
+  href = href.substr(href.lastIndexOf('/') + 1)
+  if (href === "")
+    href = "index.html";
+  var menuAnchor = $('a[href="' + href + '"]');
+
+  // mark the anchor link active (and if it's in a dropdown, also mark that active)
+  var dropdown = menuAnchor.closest('li.dropdown');
+  if (window.bootstrap) { // Bootstrap 4+
+    menuAnchor.addClass('active');
+    dropdown.find('> .dropdown-toggle').addClass('active');
+  } else { // Bootstrap 3
+    menuAnchor.parent().addClass('active');
+    dropdown.addClass('active');
+  }
+
+  // Navbar adjustments
+  var navHeight = $(".navbar").first().height() + 15;
+  var style = document.createElement('style');
+  var pt = "padding-top: " + navHeight + "px; ";
+  var mt = "margin-top: -" + navHeight + "px; ";
+  var css = "";
+  // offset scroll position for anchor links (for fixed navbar)
+  for (var i = 1; i <= 6; i++) {
+    css += ".section h" + i + "{ " + pt + mt + "}\n";
+  }
+  style.innerHTML = "body {" + pt + "padding-bottom: 40px; }\n" + css;
+  document.head.appendChild(style);
+});
+</script>
+
+<!-- tabsets -->
+
+<style type="text/css">
+.tabset-dropdown > .nav-tabs {
+  display: inline-table;
+  max-height: 500px;
+  min-height: 44px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.tabset-dropdown > .nav-tabs > li.active:before, .tabset-dropdown > .nav-tabs.nav-tabs-open:before {
+  content: "\e259";
+  font-family: 'Glyphicons Halflings';
+  display: inline-block;
+  padding: 10px;
+  border-right: 1px solid #ddd;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li.active:before {
+  content: "\e258";
+  font-family: 'Glyphicons Halflings';
+  border: none;
+}
+
+.tabset-dropdown > .nav-tabs > li.active {
+  display: block;
+}
+
+.tabset-dropdown > .nav-tabs > li > a,
+.tabset-dropdown > .nav-tabs > li > a:focus,
+.tabset-dropdown > .nav-tabs > li > a:hover {
+  border: none;
+  display: inline-block;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.tabset-dropdown > .nav-tabs.nav-tabs-open > li {
+  display: block;
+  float: none;
+}
+
+.tabset-dropdown > .nav-tabs > li {
+  display: none;
+}
+</style>
+
+<!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
+
+
+
+<style type="text/css">
+
+#TOC {
+  margin: 25px 0px 20px 0px;
+}
+@media (max-width: 768px) {
+#TOC {
+  position: relative;
+  width: 100%;
+}
+}
+
+@media print {
+.toc-content {
+  /* see https://github.com/w3c/csswg-drafts/issues/4434 */
+  float: right;
+}
+}
+
+.toc-content {
+  padding-left: 30px;
+  padding-right: 40px;
+}
+
+div.main-container {
+  max-width: 1200px;
+}
+
+div.tocify {
+  width: 20%;
+  max-width: 260px;
+  max-height: 85%;
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  div.tocify {
+    width: 25%;
+  }
+}
+
+@media (max-width: 767px) {
+  div.tocify {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+.tocify ul, .tocify li {
+  line-height: 20px;
+}
+
+.tocify-subheader .tocify-item {
+  font-size: 0.90em;
+}
+
+.tocify .list-group-item {
+  border-radius: 0px;
+}
+
+
+</style>
+
+
+
+</head>
+
+<body>
+
+
+<div class="container-fluid main-container">
+
+
+<!-- setup 3col/9col grid for toc_float and main content  -->
+<div class="row">
+<div class="col-xs-12 col-sm-4 col-md-3">
+<div id="TOC" class="tocify">
+</div>
+</div>
+
+<div class="toc-content col-xs-12 col-sm-8 col-md-9">
+
+
+
+
+<div class="navbar navbar-default  navbar-fixed-top" role="navigation">
+  <div class="container">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-bs-toggle="collapse" data-target="#navbar" data-bs-target="#navbar">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <a class="navbar-brand" href="index.html">BRASIL</a>
+    </div>
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li>
+  <a href="index.html">Experiments</a>
+</li>
+<li>
+  <a href="about.html">Contents</a>
+</li>
+<li>
+  <a href="brasilfunc.html">Theory and functions</a>
+</li>
+<li>
+  <a href="cov_in_h_mat.html">Convergence in 𝘩</a>
+</li>
+<li>
+  <a href="conv_in_tau_mat.html">Convergence in τ</a>
+</li>
+<li>
+  <a href="conv_in_m_isolated.html">Convergence in 𝑚</a>
+</li>
+<li>
+  <a href="cov_in_h_rough_as_in_mat.html">Convergence in 𝘩, rough</a>
+</li>
+      </ul>
+      <ul class="nav navbar-nav navbar-right">
+        
+      </ul>
+    </div><!--/.nav-collapse -->
+  </div><!--/.container -->
+</div><!--/.navbar -->
+
+<div id="header">
+
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
+
+
+<h1 class="title toc-ignore">Zero-shift benchmark: spectral convergence,
+BRASIL mass balance, and small shifts</h1>
+
+</div>
+
+
+<p><a href="kappa0func.html">Zero-shift theory</a> · <a
+href="true_diff_conv_in_m_isolated.html">m</a> · <a
+href="true_diff_cov_in_h_mat.html">h</a> · <a
+href="true_diff_conv_in_tau_mat.html">tau</a> · <a
+href="true_diff_cov_in_h_rough_as_in_mat.html">rough h</a></p>
+<p>This is the ninth experiment notebook. It keeps the nonzero-mean data
+separate from the four mean-zero <code>true_diff_*</code> convergence
+studies. The spatial table, original temporal table, and experiment C
+reproduce Section <code>sec:zero-shift-test</code> of
+<code>Numerical_fractional_diffusion_IMAJNA_kappa0.tex</code>. The
+refined temporal sequence and experiment B provide additional numerical
+evidence. The original four positive-shift notebooks remain
+unchanged.</p>
+<div id="running-and-knitting" class="section level2">
+<h2>Running and knitting</h2>
+<p>Run setup, parameters, and the computation chunk manually. Knit
+afterward to read the saved result and draw tables and figures. The
+computation chunk has <code>eval=FALSE</code>; missing or incompatible
+results stop knitting instead of launching an experiment. No global
+profile or recompute option changes this behavior. Internal
+implementation tests and refinement audits are stored in
+<code>/home/rierasl/Desktop/DOCS/NAP/true_diff_internal</code> and are
+not executed by this notebook.</p>
+<pre class="r"><code>knitr::opts_chunk$set(message=FALSE,warning=TRUE,error=FALSE,cache=FALSE,
+                      dev=&quot;png&quot;,fig.width=8,fig.height=5)
+if(!requireNamespace(&quot;ggplot2&quot;,quietly=TRUE)) stop(&quot;Install ggplot2 for the figures.&quot;)</code></pre>
+</div>
+<div id="parameters" class="section level2">
+<h2>Parameters</h2>
+<p>All physical and numerical settings are explicit. Unlike the four
+mean-zero convergence studies, this benchmark intentionally uses
+<code>u0 = f = 1 + phi</code>. The forcing is constant in time and has
+spatial mean 1.</p>
+<pre class="r"><code>alpha &lt;- 1.2
+T_final &lt;- 0.5
+diffusion &lt;- 1
+kappa &lt;- 0
+gamma_star &lt;- 1/3
+spatial_h &lt;- 1/c(8,16,32,64)
+spatial_tau &lt;- 1e-6
+temporal_h &lt;- 1/32
+temporal_paper_N &lt;- c(5L,10L,20L,40L,80L,160L)
+# Refined sequence for the first-order asymptotic regime (same PDE and h).
+temporal_N &lt;- as.integer(80L*2^(0:7))
+rational_h &lt;- 1/32
+rational_tau &lt;- 0.01
+m_vector &lt;- 2:16
+continuity_h &lt;- 1/32
+continuity_tau &lt;- 1e-6
+kappa_vector &lt;- c(0,1e-4,1e-2)
+output_file &lt;- &quot;data_files/true_diff_zero_shift_benchmark.rds&quot;
+figure_dir &lt;- &quot;data_files/true_diff_zero_shift_benchmark&quot;
+settings &lt;- list(alpha=alpha,T_final=T_final,diffusion=diffusion,kappa=kappa,
+    gamma_star=gamma_star,spatial_h=spatial_h,spatial_tau=spatial_tau,
+    temporal_h=temporal_h,temporal_N=temporal_N,temporal_paper_N=temporal_paper_N,
+    rational_h=rational_h,
+    rational_tau=rational_tau,m_vector=m_vector,continuity_h=continuity_h,
+    continuity_tau=continuity_tau,kappa_vector=kappa_vector)
+knitr::kable(data.frame(parameter=names(settings),
+    value=vapply(settings,function(x) paste(x,collapse=&quot;, &quot;),character(1))))</code></pre>
+<table>
+<colgroup>
+<col width="20%" />
+<col width="20%" />
+<col width="60%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left"></th>
+<th align="left">parameter</th>
+<th align="left">value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">alpha</td>
+<td align="left">alpha</td>
+<td align="left">1.2</td>
+</tr>
+<tr class="even">
+<td align="left">T_final</td>
+<td align="left">T_final</td>
+<td align="left">0.5</td>
+</tr>
+<tr class="odd">
+<td align="left">diffusion</td>
+<td align="left">diffusion</td>
+<td align="left">1</td>
+</tr>
+<tr class="even">
+<td align="left">kappa</td>
+<td align="left">kappa</td>
+<td align="left">0</td>
+</tr>
+<tr class="odd">
+<td align="left">gamma_star</td>
+<td align="left">gamma_star</td>
+<td align="left">0.333333333333333</td>
+</tr>
+<tr class="even">
+<td align="left">spatial_h</td>
+<td align="left">spatial_h</td>
+<td align="left">0.125, 0.0625, 0.03125, 0.015625</td>
+</tr>
+<tr class="odd">
+<td align="left">spatial_tau</td>
+<td align="left">spatial_tau</td>
+<td align="left">1e-06</td>
+</tr>
+<tr class="even">
+<td align="left">temporal_h</td>
+<td align="left">temporal_h</td>
+<td align="left">0.03125</td>
+</tr>
+<tr class="odd">
+<td align="left">temporal_N</td>
+<td align="left">temporal_N</td>
+<td align="left">80, 160, 320, 640, 1280, 2560, 5120, 10240</td>
+</tr>
+<tr class="even">
+<td align="left">temporal_paper_N</td>
+<td align="left">temporal_paper_N</td>
+<td align="left">5, 10, 20, 40, 80, 160</td>
+</tr>
+<tr class="odd">
+<td align="left">rational_h</td>
+<td align="left">rational_h</td>
+<td align="left">0.03125</td>
+</tr>
+<tr class="even">
+<td align="left">rational_tau</td>
+<td align="left">rational_tau</td>
+<td align="left">0.01</td>
+</tr>
+<tr class="odd">
+<td align="left">m_vector</td>
+<td align="left">m_vector</td>
+<td align="left">2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16</td>
+</tr>
+<tr class="even">
+<td align="left">continuity_h</td>
+<td align="left">continuity_h</td>
+<td align="left">0.03125</td>
+</tr>
+<tr class="odd">
+<td align="left">continuity_tau</td>
+<td align="left">continuity_tau</td>
+<td align="left">1e-06</td>
+</tr>
+<tr class="even">
+<td align="left">kappa_vector</td>
+<td align="left">kappa_vector</td>
+<td align="left">0, 1e-04, 0.01</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="data-projections-and-exact-solution" class="section level2">
+<h2>Data, projections, and exact solution</h2>
+<p>The connected tadpole has a stem of length 1 and a loop parameterized
+by <span class="math inline">\(x\in[0,2]\)</span>. Let <span
+class="math inline">\(\phi=0\)</span> on the stem and <span
+class="math inline">\(\phi(x)=\sin(2\pi x)\)</span> on the loop. Then
+<span class="math inline">\(\int_\Gamma\phi=0\)</span>, <span
+class="math inline">\(\|\phi\|_{L_2}=1\)</span>, and <span
+class="math inline">\(-\Delta_\Gamma\phi=(2\pi)^2\phi\)</span>. With
+<span class="math inline">\(u_0=f=1+\phi\)</span> and zero shift, <span
+class="math display">\[
+u(s,t)=1+t+\left(e^{-at}+\frac{1-e^{-at}}a\right)\phi(s),
+\qquad a=\nu(2\pi)^\alpha,\qquad M(t)=3(1+t).
+\]</span> Consistent P1 mass and stiffness matrices are assembled with
+both loop endpoints identified at the junction. Initial and forcing data
+use <span class="math inline">\(L_2\)</span> projection; ten-point
+Gauss–Legendre quadrature on every interval assembles the smooth loads
+and evaluates the continuous final-time error. The known zero integral
+of the phi load is enforced only at quadrature roundoff. No continuous
+eigenpair is used to advance the numerical solution.</p>
+</div>
+<div id="computation" class="section level2">
+<h2>Computation</h2>
+<p>This manual chunk is the only action that computes or overwrites the
+benchmark result. It does not run the separate internal test suite.</p>
+<pre class="r"><code>for(package in c(&quot;Matrix&quot;,&quot;rSPDE&quot;))
+    if(!requireNamespace(package,quietly=TRUE)) stop(&quot;Missing package: &quot;,package)
+true_diff &lt;- local({
+    extracted &lt;- tempfile(&quot;true_diff_benchmark_&quot;,fileext=&quot;.R&quot;)
+    on.exit(unlink(extracted),add=TRUE)
+    knitr::purl(&quot;kappa0func.Rmd&quot;,output=extracted,quiet=TRUE,documentation=0L)
+    functions &lt;- new.env(parent=globalenv())
+    sys.source(extracted,envir=functions)
+    functions
+})
+result &lt;- true_diff$kappa0_compute_benchmark(settings,
+    &quot;true_diff_zero_shift_benchmark.Rmd&quot;,output_file)</code></pre>
+</div>
+<div id="load-saved-results" class="section level2">
+<h2>Load saved results</h2>
+<pre class="r"><code>if(!file.exists(output_file)) stop(&quot;Saved benchmark results are missing. Run setup, parameters, and recompute manually, then knit.&quot;)
+result &lt;- readRDS(output_file)
+mismatch &lt;- names(settings)[!vapply(names(settings),function(name)
+    isTRUE(all.equal(settings[[name]],result$parameters[[name]],tolerance=1e-12)),logical(1))]
+if(length(mismatch)) stop(&quot;Saved benchmark settings differ for: &quot;,paste(mismatch,collapse=&quot;, &quot;),
+                         &quot;. Run the recompute chunk manually, then knit.&quot;)
+cat(&quot;Generated:&quot;,result$generated_at,&quot;\nComputation seconds:&quot;,result$elapsed_seconds,&quot;\n&quot;)</code></pre>
+<pre><code>## Generated: 2026-11-22 12:57:58 +03 
+## Computation seconds: 0.652</code></pre>
+<pre class="r"><code>dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)</code></pre>
+</div>
+<div id="a.-reproduce-the-manuscripts-spectral-fem-benchmark"
+class="section level2">
+<h2>A. Reproduce the manuscript’s spectral FEM benchmark</h2>
+<p>Use the complete generalized eigensystem <span
+class="math inline">\(GV=CV\Lambda\)</span>, <span
+class="math inline">\(V^TCV=I\)</span>, with the known constant vector
+and exactly zero constant eigenvalue. All positive discrete eigenpairs
+are retained. The fractional power is <strong>exact in this discrete
+spectrum</strong>, with no rational approximation.</p>
+<p>For autonomous forcing, the mode with decay rate <span
+class="math inline">\(d\)</span> has the BE value <span
+class="math display">\[
+y^N=(1+\tau d)^{-N}y^0+
+       \frac{1-(1+\tau d)^{-N}}d\,g.
+\]</span> At <span class="math inline">\(d=0\)</span>, the forcing
+multiplier is <span class="math inline">\(T=N\tau\)</span>. Evaluating
+this closed recurrence gives the same BE solution as repeating every
+step, and makes the manuscript’s <span
+class="math inline">\(\tau=10^{-6}\)</span> affordable without dense
+time marching. <code>log1p</code> and <code>expm1</code> avoid
+cancellation near zero.</p>
+<p>Spatial errors below compare with the continuous exact solution at
+<span class="math inline">\(T\)</span>. Temporal errors compare with
+exact <strong>semidiscrete</strong> evolution at the same <span
+class="math inline">\(h\)</span>, separating time error from spatial
+error. The manuscript’s six time steps are retained in a separate table.
+The temporal plot separates the original and refined ranges. The fitted
+slope uses the explicit refined sequence N=80,…,10240: the coarse
+original sequence started at tau=0.1, where the excited mode’s decay
+rate times tau is about 0.91, outside the small-step asymptotic regime.
+The local rates approach one under refinement, and
+<code>error_per_tau</code> approaches a constant. No points are deleted
+from the original reproduction table. Refining time against a continuous
+reference instead would eventually reveal spatial error; that is
+deliberately excluded from this isolated temporal comparison. The
+expected limiting rates are two and one, respectively. The absolute mass
+error at zero shift is measured against <span
+class="math inline">\(3(1+T)\)</span>.</p>
+<p>For an autonomous positive mode with rate a_j, initial coefficient
+c_j and forcing coefficient g_j, the final-time temporal difference is
+<span class="math display">\[
+(c_j-g_j/a_j)\left[(1+\tau a_j)^{-T/\tau}-e^{-Ta_j}\right].
+\]</span> Its leading term is proportional to tau. Mass-orthonormality
+therefore predicts the constant in E_tau ~ C_time*tau: <span
+class="math display">\[
+C_{\rm time}=\frac T2\left(\sum_{j\ge2}
+|(c_j-g_j/a_j)a_j^2e^{-Ta_j}|^2\right)^{1/2}.
+\]</span> The dashed temporal guide uses this computed analytical
+constant, not a fit to the error values. The table also compares
+E_tau/tau with C_time. The zero mode is exact and has no contribution to
+this temporal difference.</p>
+<pre class="r"><code>knitr::kable(result$spatial,digits=12,caption=&quot;Spectral FEM spatial convergence; no rational error&quot;)</code></pre>
+<table>
+<caption>Spectral FEM spatial convergence; no rational error</caption>
+<thead>
+<tr class="header">
+<th align="right">h</th>
+<th align="right">error</th>
+<th align="right">mass_error</th>
+<th align="right">tau</th>
+<th align="right">rate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.125000</td>
+<td align="right">5.423418e-03</td>
+<td align="right">0</td>
+<td align="right">1e-06</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">0.062500</td>
+<td align="right">1.359144e-03</td>
+<td align="right">0</td>
+<td align="right">1e-06</td>
+<td align="right">1.996504</td>
+</tr>
+<tr class="odd">
+<td align="right">0.031250</td>
+<td align="right">3.399033e-04</td>
+<td align="right">0</td>
+<td align="right">1e-06</td>
+<td align="right">1.999502</td>
+</tr>
+<tr class="even">
+<td align="right">0.015625</td>
+<td align="right">8.486474e-05</td>
+<td align="right">0</td>
+<td align="right">1e-06</td>
+<td align="right">2.001887</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(result$temporal_paper[,c(&quot;tau&quot;,&quot;N&quot;,&quot;error&quot;,&quot;mass_error&quot;,&quot;rate&quot;)],digits=12,
+             caption=&quot;Original manuscript time sequence, retained for comparison&quot;)</code></pre>
+<table>
+<caption>Original manuscript time sequence, retained for
+comparison</caption>
+<thead>
+<tr class="header">
+<th align="right">tau</th>
+<th align="right">N</th>
+<th align="right">error</th>
+<th align="right">mass_error</th>
+<th align="right">rate</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0.100000</td>
+<td align="right">5</td>
+<td align="right">0.0256443445</td>
+<td align="right">0</td>
+<td align="right">NA</td>
+</tr>
+<tr class="even">
+<td align="right">0.050000</td>
+<td align="right">10</td>
+<td align="right">0.0115451640</td>
+<td align="right">0</td>
+<td align="right">1.151352</td>
+</tr>
+<tr class="odd">
+<td align="right">0.025000</td>
+<td align="right">20</td>
+<td align="right">0.0053616127</td>
+<td align="right">0</td>
+<td align="right">1.106550</td>
+</tr>
+<tr class="even">
+<td align="right">0.012500</td>
+<td align="right">40</td>
+<td align="right">0.0025648013</td>
+<td align="right">0</td>
+<td align="right">1.063820</td>
+</tr>
+<tr class="odd">
+<td align="right">0.006250</td>
+<td align="right">80</td>
+<td align="right">0.0012516435</td>
+<td align="right">0</td>
+<td align="right">1.035023</td>
+</tr>
+<tr class="even">
+<td align="right">0.003125</td>
+<td align="right">160</td>
+<td align="right">0.0006179081</td>
+<td align="right">0</td>
+<td align="right">1.018359</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(result$temporal,digits=12,
+             caption=&quot;Refined isolated temporal convergence: asymptotic first-order regime&quot;)</code></pre>
+<table>
+<caption>Refined isolated temporal convergence: asymptotic first-order
+regime</caption>
+<colgroup>
+<col width="19%" />
+<col width="9%" />
+<col width="19%" />
+<col width="16%" />
+<col width="13%" />
+<col width="21%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">tau</th>
+<th align="right">N</th>
+<th align="right">error</th>
+<th align="right">mass_error</th>
+<th align="right">rate</th>
+<th align="right">error_per_tau</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">6.250000e-03</td>
+<td align="right">80</td>
+<td align="right">1.251643e-03</td>
+<td align="right">0</td>
+<td align="right">NA</td>
+<td align="right">0.2002630</td>
+</tr>
+<tr class="even">
+<td align="right">3.125000e-03</td>
+<td align="right">160</td>
+<td align="right">6.179081e-04</td>
+<td align="right">0</td>
+<td align="right">1.018359</td>
+<td align="right">0.1977306</td>
+</tr>
+<tr class="odd">
+<td align="right">1.562500e-03</td>
+<td align="right">320</td>
+<td align="right">3.069474e-04</td>
+<td align="right">0</td>
+<td align="right">1.009401</td>
+<td align="right">0.1964463</td>
+</tr>
+<tr class="even">
+<td align="right">7.812500e-04</td>
+<td align="right">640</td>
+<td align="right">1.529685e-04</td>
+<td align="right">0</td>
+<td align="right">1.004757</td>
+<td align="right">0.1957996</td>
+</tr>
+<tr class="odd">
+<td align="right">3.906250e-04</td>
+<td align="right">1280</td>
+<td align="right">7.635748e-05</td>
+<td align="right">0</td>
+<td align="right">1.002393</td>
+<td align="right">0.1954751</td>
+</tr>
+<tr class="even">
+<td align="right">1.953125e-04</td>
+<td align="right">2560</td>
+<td align="right">3.814700e-05</td>
+<td align="right">0</td>
+<td align="right">1.001200</td>
+<td align="right">0.1953126</td>
+</tr>
+<tr class="odd">
+<td align="right">9.765625e-05</td>
+<td align="right">5120</td>
+<td align="right">1.906555e-05</td>
+<td align="right">0</td>
+<td align="right">1.000601</td>
+<td align="right">0.1952313</td>
+</tr>
+<tr class="even">
+<td align="right">4.882813e-05</td>
+<td align="right">10240</td>
+<td align="right">9.530791e-06</td>
+<td align="right">0</td>
+<td align="right">1.000301</td>
+<td align="right">0.1951906</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(result$temporal_fit,digits=8,caption=&quot;Fit over all refined temporal points&quot;)</code></pre>
+<table>
+<caption>Fit over all refined temporal points</caption>
+<colgroup>
+<col width="9%" />
+<col width="8%" />
+<col width="5%" />
+<col width="5%" />
+<col width="25%" />
+<col width="20%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">reference</th>
+<th align="right">observed</th>
+<th align="right">N_min</th>
+<th align="right">N_max</th>
+<th align="right">asymptotic_error_constant</th>
+<th align="right">finest_error_per_tau</th>
+<th align="right">finest_ratio_relative_gap</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1.004503</td>
+<td align="right">80</td>
+<td align="right">10240</td>
+<td align="right">0.1951499</td>
+<td align="right">0.1951906</td>
+<td align="right">0.00020854</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>space &lt;- result$spatial
+space$guide &lt;- exp(mean(log(space$error)-2*log(space$h)))*space$h^2
+p_space &lt;- ggplot2::ggplot(space,ggplot2::aes(h,error))+
+    ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::geom_line(ggplot2::aes(y=guide),linetype=&quot;dashed&quot;)+
+    ggplot2::scale_x_log10()+ggplot2::scale_y_log10()+
+    ggplot2::labs(x=&quot;h&quot;,y=&quot;Final-time L2 error&quot;,title=&quot;Spectral FEM: spatial convergence&quot;)+
+    ggplot2::theme_minimal()
+time &lt;- result$temporal
+time$guide &lt;- result$temporal_fit$asymptotic_error_constant*time$tau
+paper_time &lt;- result$temporal_paper
+paper_time$guide &lt;- result$temporal_fit$asymptotic_error_constant*paper_time$tau
+paper_time$sequence &lt;- &quot;Original manuscript sequence&quot;
+time$sequence &lt;- &quot;Refined asymptotic sequence&quot;
+plot_time &lt;- rbind(paper_time,time)
+plot_time$sequence &lt;- factor(plot_time$sequence,
+    levels=c(&quot;Original manuscript sequence&quot;,&quot;Refined asymptotic sequence&quot;))
+p_time &lt;- ggplot2::ggplot(plot_time,ggplot2::aes(tau,error))+
+    ggplot2::geom_line()+ggplot2::geom_point()+
+    ggplot2::geom_line(ggplot2::aes(y=guide),linetype=&quot;dashed&quot;,colour=&quot;#2166ac&quot;)+
+    ggplot2::facet_wrap(~sequence,scales=&quot;free&quot;,nrow=1)+
+    ggplot2::scale_x_log10()+ggplot2::scale_y_log10()+
+    ggplot2::labs(x=&quot;tau&quot;,y=&quot;Final-time semidiscrete L2 difference&quot;,
+        title=&quot;Spectral FEM: temporal convergence&quot;,
+        subtitle=sprintf(&quot;Refined-grid fitted slope %.5f; dashed guides have slope 1&quot;,result$temporal_fit$observed),
+        caption=&quot;Both time sequences are shown in full. Dashed guides use the predicted leading term C_time * tau.&quot;)+
+    ggplot2::theme_minimal()+ggplot2::theme(plot.caption=ggplot2::element_text(hjust=0))
+print(p_space);print(p_time)</code></pre>
+<p><img src="true_diff_zero_shift_benchmark_files/figure-html/true-diff-benchmark-spectral-plots-1.png" width="768" /><img src="true_diff_zero_shift_benchmark_files/figure-html/true-diff-benchmark-spectral-plots-2.png" width="768" /></p>
+<pre class="r"><code>ggplot2::ggsave(file.path(figure_dir,&quot;spectral_spatial.pdf&quot;),p_space,width=8,height=5)
+ggplot2::ggsave(file.path(figure_dir,&quot;spectral_temporal.pdf&quot;),p_time,width=8,height=5)</code></pre>
+</div>
+<div id="b.-brasil-with-the-same-nonzero-mean-data"
+class="section level2">
+<h2>B. BRASIL with the same nonzero-mean data</h2>
+<p>This is an additional experiment beyond the manuscript’s spectral
+table. At fixed h and tau, advance each BRASIL trajectory through every
+backward Euler step and compare it with exact-discrete BE using the
+<strong>same</strong> initial projection, load, mesh, and time grid. The
+reported rational error is <span class="math display">\[
+E_m^2=\tau\sum_{k=1}^N
+(U_h^k-U_{h,m}^k)^TC(U_h^k-U_{h,m}^k).
+\]</span> It includes neither continuous spatial nor temporal
+discretization error. The final-time discrete difference is reported
+separately. The constant mode is restored using its exact discrete mean
+recurrence, so at every node the mass should be <span
+class="math inline">\(3(1+t_k)\)</span>, independently of m. Here mass
+grows because of the forcing; the quantity being verified is
+<strong>mass balance</strong>.</p>
+<p>The dedicated <a href="true_diff_conv_in_m_isolated.html">isolated-m
+convergence study</a> uses the richer 16-mode initial data and remains
+the main solution-level rational convergence experiment. This
+single-mode benchmark verifies its particular evolution and mass
+balance; the additional spectral bound below measures approximation
+quality over the wider discrete spectrum.</p>
+<div id="diagnosis-of-the-single-mode-rational-curve"
+class="section level3">
+<h3>Diagnosis of the single-mode rational curve</h3>
+<p>On this aligned uniform mesh, the projected sine excites one positive
+<strong>eigenvalue</strong>, possibly represented by two rotated
+eigenvectors in its repeated eigenspace. Thus the rational solution
+error probes the BRASIL approximation at essentially one argument <span
+class="math inline">\(x_\phi=\gamma_*/\lambda_{\phi,h}\approx0.008416\)</span>.
+As m changes, the approximant’s error extrema and zeros change around
+this fixed spectral sampling point. Its pointwise error can increase at
+an individual order even though the overall approximation improves. The
+original sparse trajectory and the independent full-modal calculation
+agree at about <span class="math inline">\(3\times10^{-14}\)</span> in
+the diagnosed run: the wiggles are not a failure of the sparse stepping
+or mass split.</p>
+<p>We retain all solution-error points and gamma*=1/3. An internal sweep
+of admissible scales 1/3, 1, and pi^2/4 confirmed that a tighter scale
+does not remove single-point oscillations or improve every individual
+order. The physical benchmark data are unchanged. The following spectral
+diagnostic makes the broader rational convergence visible without
+changing the data or filtering orders.</p>
+<p>For each positive FEM eigenvalue, write <span class="math display">\[
+a_j=\nu\lambda_{j,h}^{\alpha/2},\quad
+\widehat a_{j,m}=\frac{\nu\gamma_*^{\alpha/2}}
+                         {S_m(\lambda_{j,h}/\gamma_*)},\quad
+q_j=(1+\tau a_j)^{-1},\quad H_{j,m}=(1+\tau\widehat a_{j,m})^{-1}.
+\]</span> For the fixed-mesh family with initial coefficients g and
+autonomous forcing coefficients g, define the unit modal responses <span
+class="math display">\[
+z_j^k=q_j^k+\frac{1-q_j^k}{a_j},\qquad
+\widehat z_{j,m}^k=H_{j,m}^k+
+                         \frac{1-H_{j,m}^k}{\widehat a_{j,m}}.
+\]</span> Mass-orthonormality gives the exact finite-dimensional induced
+norm <span class="math display">\[
+B_m=\max_{j\ge2}\left(\tau\sum_{k=1}^N
+                |z_j^k-\widehat z_{j,m}^k|^2\right)^{1/2}.
+\]</span> It examines <strong>all</strong> positive discrete modes
+instead of the single excited eigenvalue. In exact arithmetic the
+physical benchmark satisfies <span
+class="math inline">\(E_m\le\|P_h\phi\|_C B_m\)</span>. This is a bound
+for this discrete initial/forcing family, not for arbitrary
+time-dependent forcing or the continuum error. The constant component is
+exact and contributes zero to both differences.</p>
+<p><code>modal_error</code> uses the actual projected initial and
+forcing coefficients; it is an independent evaluation of the same E_m as
+the sparse trajectory. <code>sampled_source_uniform_error</code> is a
+sampled maximum of <span
+class="math inline">\(|r_m(x)-x^{\alpha/2}|\)</span> on [0,1], including
+zero. It is an approximation diagnostic, not a certified continuous
+supremum. Monotonicity of B_m is an observation for these parameters,
+not an imposed constraint or theorem.</p>
+<pre class="r"><code>knitr::kable(result$rational[,c(&quot;m&quot;,&quot;error&quot;,&quot;modal_error&quot;,&quot;sparse_modal_disagreement&quot;,
+    &quot;final_error&quot;,&quot;max_mass_error&quot;,&quot;resolved&quot;)],digits=14,
+    caption=&quot;All single-mode solution errors and their independent modal verification&quot;)</code></pre>
+<table>
+<caption>All single-mode solution errors and their independent modal
+verification</caption>
+<colgroup>
+<col width="3%" />
+<col width="14%" />
+<col width="14%" />
+<col width="28%" />
+<col width="14%" />
+<col width="16%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">m</th>
+<th align="right">error</th>
+<th align="right">modal_error</th>
+<th align="right">sparse_modal_disagreement</th>
+<th align="right">final_error</th>
+<th align="right">max_mass_error</th>
+<th align="left">resolved</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">2</td>
+<td align="right">1.079675e-02</td>
+<td align="right">1.079675e-02</td>
+<td align="right">1e-14</td>
+<td align="right">8.254827e-03</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">3</td>
+<td align="right">2.073225e-03</td>
+<td align="right">2.073225e-03</td>
+<td align="right">1e-14</td>
+<td align="right">1.640099e-03</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">4</td>
+<td align="right">2.562169e-04</td>
+<td align="right">2.562169e-04</td>
+<td align="right">1e-14</td>
+<td align="right">2.014475e-04</td>
+<td align="right">2e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="right">9.346546e-05</td>
+<td align="right">9.346546e-05</td>
+<td align="right">1e-14</td>
+<td align="right">7.351771e-05</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">6</td>
+<td align="right">7.449943e-05</td>
+<td align="right">7.449943e-05</td>
+<td align="right">1e-14</td>
+<td align="right">5.862548e-05</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">7</td>
+<td align="right">1.033636e-05</td>
+<td align="right">1.033636e-05</td>
+<td align="right">1e-14</td>
+<td align="right">8.132117e-06</td>
+<td align="right">2e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">8</td>
+<td align="right">1.023493e-05</td>
+<td align="right">1.023493e-05</td>
+<td align="right">1e-14</td>
+<td align="right">8.052322e-06</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">9</td>
+<td align="right">2.742322e-06</td>
+<td align="right">2.742322e-06</td>
+<td align="right">1e-14</td>
+<td align="right">2.157593e-06</td>
+<td align="right">2e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">10</td>
+<td align="right">2.177432e-06</td>
+<td align="right">2.177432e-06</td>
+<td align="right">1e-14</td>
+<td align="right">1.713149e-06</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">11</td>
+<td align="right">3.574048e-07</td>
+<td align="right">3.574048e-07</td>
+<td align="right">0e+00</td>
+<td align="right">2.811953e-07</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">12</td>
+<td align="right">6.056139e-07</td>
+<td align="right">6.056139e-07</td>
+<td align="right">2e-14</td>
+<td align="right">4.764783e-07</td>
+<td align="right">2e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">13</td>
+<td align="right">7.753968e-08</td>
+<td align="right">7.753968e-08</td>
+<td align="right">1e-14</td>
+<td align="right">6.100591e-08</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">14</td>
+<td align="right">1.409871e-07</td>
+<td align="right">1.409871e-07</td>
+<td align="right">1e-14</td>
+<td align="right">1.109245e-07</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="right">15</td>
+<td align="right">8.076374e-08</td>
+<td align="right">8.076377e-08</td>
+<td align="right">2e-14</td>
+<td align="right">6.354253e-08</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="odd">
+<td align="right">16</td>
+<td align="right">5.498170e-09</td>
+<td align="right">5.498170e-09</td>
+<td align="right">1e-14</td>
+<td align="right">4.325800e-09</td>
+<td align="right">3e-14</td>
+<td align="left">TRUE</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(result$rational[,c(&quot;m&quot;,&quot;operator_error&quot;,&quot;resolvent_error&quot;,
+    &quot;source_point_error&quot;,&quot;sampled_source_uniform_error&quot;)],digits=14,
+    caption=&quot;All-positive-mode and source-approximation diagnostics&quot;)</code></pre>
+<table>
+<caption>All-positive-mode and source-approximation
+diagnostics</caption>
+<colgroup>
+<col width="3%" />
+<col width="18%" />
+<col width="19%" />
+<col width="23%" />
+<col width="35%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">m</th>
+<th align="right">operator_error</th>
+<th align="right">resolvent_error</th>
+<th align="right">source_point_error</th>
+<th align="right">sampled_source_uniform_error</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">2</td>
+<td align="right">6.819506e-02</td>
+<td align="right">3.981922e-01</td>
+<td align="right">3.054131e-03</td>
+<td align="right">9.801928e-03</td>
+</tr>
+<tr class="even">
+<td align="right">3</td>
+<td align="right">2.121007e-02</td>
+<td align="right">1.615431e-01</td>
+<td align="right">5.947739e-04</td>
+<td align="right">3.396664e-03</td>
+</tr>
+<tr class="odd">
+<td align="right">4</td>
+<td align="right">3.208953e-03</td>
+<td align="right">2.688228e-02</td>
+<td align="right">7.331598e-05</td>
+<td align="right">1.370201e-03</td>
+</tr>
+<tr class="even">
+<td align="right">5</td>
+<td align="right">7.325633e-04</td>
+<td align="right">6.065812e-03</td>
+<td align="right">2.674976e-05</td>
+<td align="right">5.970973e-04</td>
+</tr>
+<tr class="odd">
+<td align="right">6</td>
+<td align="right">2.349057e-04</td>
+<td align="right">1.816261e-03</td>
+<td align="right">2.132563e-05</td>
+<td align="right">2.723385e-04</td>
+</tr>
+<tr class="even">
+<td align="right">7</td>
+<td align="right">8.777184e-05</td>
+<td align="right">6.601874e-04</td>
+<td align="right">2.958530e-06</td>
+<td align="right">1.279908e-04</td>
+</tr>
+<tr class="odd">
+<td align="right">8</td>
+<td align="right">3.640601e-05</td>
+<td align="right">2.732913e-04</td>
+<td align="right">2.929499e-06</td>
+<td align="right">6.143459e-05</td>
+</tr>
+<tr class="even">
+<td align="right">9</td>
+<td align="right">1.635461e-05</td>
+<td align="right">1.255917e-04</td>
+<td align="right">7.849339e-07</td>
+<td align="right">2.995531e-05</td>
+</tr>
+<tr class="odd">
+<td align="right">10</td>
+<td align="right">7.874186e-06</td>
+<td align="right">6.173884e-05</td>
+<td align="right">6.232454e-07</td>
+<td align="right">1.478560e-05</td>
+</tr>
+<tr class="even">
+<td align="right">11</td>
+<td align="right">3.970155e-06</td>
+<td align="right">3.219423e-05</td>
+<td align="right">1.022995e-07</td>
+<td align="right">7.370488e-06</td>
+</tr>
+<tr class="odd">
+<td align="right">12</td>
+<td align="right">2.091513e-06</td>
+<td align="right">1.745518e-05</td>
+<td align="right">1.733440e-07</td>
+<td align="right">3.704044e-06</td>
+</tr>
+<tr class="even">
+<td align="right">13</td>
+<td align="right">1.125220e-06</td>
+<td align="right">9.576322e-06</td>
+<td align="right">2.219409e-08</td>
+<td align="right">1.874368e-06</td>
+</tr>
+<tr class="odd">
+<td align="right">14</td>
+<td align="right">5.477122e-07</td>
+<td align="right">4.251767e-06</td>
+<td align="right">4.035459e-08</td>
+<td align="right">9.543671e-07</td>
+</tr>
+<tr class="even">
+<td align="right">15</td>
+<td align="right">3.178560e-07</td>
+<td align="right">2.577454e-06</td>
+<td align="right">2.311692e-08</td>
+<td align="right">4.895825e-07</td>
+</tr>
+<tr class="odd">
+<td align="right">16</td>
+<td align="right">1.879062e-07</td>
+<td align="right">1.585472e-06</td>
+<td align="right">1.573740e-09</td>
+<td align="right">2.520489e-07</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>knitr::kable(subset(result$rational_spectrum,excited),digits=12,
+    caption=&quot;Excited positive modes; a repeated eigenvalue is one spectral sampling point&quot;)</code></pre>
+<table>
+<caption>Excited positive modes; a repeated eigenvalue is one spectral
+sampling point</caption>
+<colgroup>
+<col width="3%" />
+<col width="5%" />
+<col width="13%" />
+<col width="20%" />
+<col width="23%" />
+<col width="23%" />
+<col width="9%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left"></th>
+<th align="right">mode</th>
+<th align="right">eigenvalue</th>
+<th align="right">inverse_argument</th>
+<th align="right">initial_coefficient</th>
+<th align="right">forcing_coefficient</th>
+<th align="left">excited</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">5</td>
+<td align="right">6</td>
+<td align="right">39.60541</td>
+<td align="right">0.008416358</td>
+<td align="right">0.9775207</td>
+<td align="right">0.9775207</td>
+<td align="left">TRUE</td>
+</tr>
+<tr class="even">
+<td align="left">6</td>
+<td align="right">7</td>
+<td align="right">39.60541</td>
+<td align="right">0.008416358</td>
+<td align="right">-0.2108344</td>
+<td align="right">-0.2108344</td>
+<td align="left">TRUE</td>
+</tr>
+</tbody>
+</table>
+<pre class="r"><code>physical &lt;- data.frame(m=result$rational$m,error=result$rational$error,
+                       quantity=&quot;Single-mode solution error&quot;)
+bound &lt;- data.frame(m=result$rational$m,error=result$rational$operator_bound_for_phi,
+                    quantity=&quot;All-positive-mode spectral bound&quot;)
+curves &lt;- rbind(physical,bound)
+p_rational &lt;- ggplot2::ggplot(curves,ggplot2::aes(sqrt(m),error,colour=quantity,shape=quantity))+
+    ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::scale_y_log10()+
+    ggplot2::labs(x=&quot;sqrt(m)&quot;,y=&quot;Space-time L2 difference / spectral bound&quot;,colour=NULL,shape=NULL,
+        title=&quot;BRASIL: single-mode error and full-spectrum convergence&quot;,
+        caption=&quot;All orders are retained. The bound applies to the fixed-mesh family u0=g, f=g.&quot;)+
+    ggplot2::theme_minimal()+ggplot2::theme(legend.position=&quot;bottom&quot;)
+selected &lt;- unique(c(min(m_vector),m_vector[ceiling(length(m_vector)/2)],max(m_vector)))
+mass &lt;- result$rational_mass[result$rational_mass$m %in% selected,]
+mass$order &lt;- factor(mass$m)
+p_mass &lt;- ggplot2::ggplot(mass,ggplot2::aes(time,mass,colour=order,group=order))+
+    ggplot2::geom_line()+
+    ggplot2::geom_line(data=mass[mass$m==selected[1],],ggplot2::aes(y=expected_mass),colour=&quot;black&quot;,linetype=&quot;dashed&quot;)+
+    ggplot2::labs(x=&quot;Time&quot;,y=&quot;Total mass&quot;,colour=&quot;m&quot;,title=&quot;Mass balance: M(t) = 3(1+t)&quot;)+
+    ggplot2::theme_minimal()
+print(p_rational);print(p_mass)</code></pre>
+<p><img src="true_diff_zero_shift_benchmark_files/figure-html/true-diff-benchmark-rational-plots-1.png" width="768" /><img src="true_diff_zero_shift_benchmark_files/figure-html/true-diff-benchmark-rational-plots-2.png" width="768" /></p>
+<pre class="r"><code>ggplot2::ggsave(file.path(figure_dir,&quot;brasil_rational.pdf&quot;),p_rational,width=8,height=5)
+ggplot2::ggsave(file.path(figure_dir,&quot;brasil_mass_balance.pdf&quot;),p_mass,width=8,height=5)</code></pre>
+</div>
+</div>
+<div id="c.-small-shift-spectral-comparison" class="section level2">
+<h2>C. Small-shift spectral comparison</h2>
+<p>Repeat the manuscript’s final-time comparison at <span
+class="math inline">\(\kappa=0,10^{-4},10^{-2}\)</span>. For positive
+shifts, the exact mean solves <span class="math inline">\(\bar
+u&#39;+\nu\kappa^\alpha\bar u=1\)</span>, <span
+class="math inline">\(\bar u(0)=1\)</span>; it is not <span
+class="math inline">\(1+t\)</span>. The phi mode has rate <span
+class="math inline">\(\nu((2\pi)^2+\kappa^2)^{\alpha/2}\)</span>. The
+numerical eigenvalues are <span
+class="math inline">\(\lambda_{j,h}=\mu_{j,h}+\kappa^2\)</span>,
+including the analytically specified constant eigenvalue <span
+class="math inline">\(\kappa^2\)</span>.</p>
+<p>This comparison uses exact discrete spectral powers. It is not a
+BRASIL study at positive near-zero shifts.
+<code>discrete_mass_error</code> compares with the scalar BE mass
+recurrence. <code>continuous_mass_difference</code> additionally
+contains temporal discretization error for positive shifts. Both reduce
+to the zero-shift mass-balance check when kappa is zero.</p>
+<pre class="r"><code>knitr::kable(result$continuity,digits=14)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">kappa</th>
+<th align="right">error</th>
+<th align="right">discrete_mass_error</th>
+<th align="right">continuous_mass_difference</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">0e+00</td>
+<td align="right">0.0003399033</td>
+<td align="right">0</td>
+<td align="right">0.000e+00</td>
+</tr>
+<tr class="even">
+<td align="right">1e-04</td>
+<td align="right">0.0003399033</td>
+<td align="right">0</td>
+<td align="right">1.189e-11</td>
+</tr>
+<tr class="odd">
+<td align="right">1e-02</td>
+<td align="right">0.0003399019</td>
+<td align="right">0</td>
+<td align="right">2.968e-09</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="reproducibility" class="section level2">
+<h2>Reproducibility</h2>
+<p>All settings, numerical tables, mass trajectories, source hashes,
+package versions, and generation time are stored in the benchmark’s own
+RDS file. PDF figures have a separate benchmark directory. The original
+manuscript time sequence remains available alongside the refined
+sequence. The modal and spectral comparisons above are explicit
+experiment measurements. The standalone internal test suite and
+parameter sweeps are stored in
+<code>DOCS/NAP/true_diff_internal/benchmark_diagnosis_2026-11-22</code>
+and are not executed when knitting this report.</p>
+</div>
+
+
+
+</div>
+</div>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.odd').parent('tbody').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+</script>
+
+<!-- tabsets -->
+
+<script>
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown > .nav-tabs > li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open');
+  });
+});
+</script>
+
+<!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
+
+<script>
+$(document).ready(function ()  {
+
+    // temporarily add toc-ignore selector to headers for the consistency with Pandoc
+    $('.unlisted.unnumbered').addClass('toc-ignore')
+
+    // move toc-ignore selectors from section div to header
+    $('div.section.toc-ignore')
+        .removeClass('toc-ignore')
+        .children('h1,h2,h3,h4,h5').addClass('toc-ignore');
+
+    // establish options
+    var options = {
+      selectors: "h1,h2,h3",
+      theme: "bootstrap3",
+      context: '.toc-content',
+      hashGenerator: function (text) {
+        return text.replace(/[.\\/?&!#<>]/g, '').replace(/\s/g, '_');
+      },
+      ignoreSelector: ".toc-ignore",
+      scrollTo: 0
+    };
+    options.showAndHide = true;
+    options.smoothScroll = true;
+
+    // tocify
+    var toc = $("#TOC").tocify(options).data("toc-tocify");
+});
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

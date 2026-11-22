@@ -5,12 +5,12 @@ output:
     toc: true
     toc_float: true
     theme: flatly
-    code_folding: show
+    code_folding: hide
     self_contained: true
     css: visual.css
 ---
 
-[Zero-shift theory](kappa0func.html) · [m](true_diff_conv_in_m_isolated.html) · [h](true_diff_cov_in_h_mat.html) · [tau](true_diff_conv_in_tau_mat.html) · [rough_h](true_diff_cov_in_h_rough_as_in_mat.html)
+[Zero-shift theory](kappa0func.html) · [m](true_diff_conv_in_m_isolated.html) · [h](true_diff_cov_in_h_mat.html) · [tau](true_diff_conv_in_tau_mat.html) · [rough_h](true_diff_cov_in_h_rough_as_in_mat.html) · [Benchmark](true_diff_zero_shift_benchmark.html)
 
 ## Scope and relation to the paper
 
@@ -25,71 +25,89 @@ continuity and Kirchhoff conditions. The fixed geometric gap scale is
 $\gamma_*=2/(3\cdot2)=1/3$. It is independent of $h$ and $\tau$ and
 introduces no reaction or decay of the constant mode.
 
-The paper's rational construction applies at zero shift. Its reported
-zero-shift numerical table, however, uses the **exact discrete spectral
-power**, not BRASIL, and different single-mode data. The earlier agreement
-with that table and the one-step sparse/modal check validate components
-of this implementation; they are not convergence results for these new
-studies. The tables generated here are additional zero-shift BRASIL
-experiments. They must not be quoted as the paper's published slopes.
+The aim is to carry out the smooth and rough convergence studies in
+`main.tex`, Section "Numerical experiments", for the unshifted operator.
+The zero-shift treatment follows `eq:gamma-scale`, `eq:discrete-means`,
+`eq:rational-centered-scheme`, and `thenumericalscheme` in
+`Numerical_fractional_diffusion_IMAJNA_kappa0.tex`. Both manuscripts are in
+`/home/rierasl/Desktop/6ac76d140751a76e98ae4d0b`.
 
-## Loading and running independently
+The necessary operator changes are $L=G$, an exact zero constant eigenvalue,
+a positive normalization scale $\gamma_*=1/3$ in place of $\kappa^2$,
+and the separate mean update. The convergence data retain their zero mean;
+no constants are added to the initial condition or forcing. The separate
+nonzero-mean benchmark in the revised paper is a different experiment and
+is not substituted for these convergence studies. Meshes, time grids,
+error norms, and approximation orders are explicit below; numerical
+parameter adjustments must be justified by zero-shift error-budget checks.
+Internal diagnostics belong to `DOCS/NAP`, outside this report.
 
-Use `/usr/bin/Rscript` or the RStudio session containing `rSPDE`, `Matrix`,
-`Rcpp`, `RcppEigen`, `knitr`, `rmarkdown`, and `ggplot2`. The system R used
-for verification is distinct from the older `/usr/local/bin/Rscript`.
-The setup extracts definitions from `kappa0func.Rmd` to a temporary file
-and loads a private environment. It does not source `brasilfunc.R`, create
-a persistent generated R library, or execute the helper notebook's demos.
+The computed zero-shift errors and slopes are new results for the
+unshifted equation. They are not expected to equal the positive-shift
+numbers in `main.tex`, because the modal rates change from
+$\nu(\mu_j+16)^{\alpha/2}$ to $\nu\mu_j^{\alpha/2}$.
+
+## Running and knitting
+
+This notebook follows the original experiment workflow. All full-run
+parameters are explicit in the parameter chunk below. There are no
+validation profiles or global options that select a different experiment.
+
+1. Run the setup and parameter chunks in RStudio.
+2. Run the computation chunk manually to generate `true_diff_cov_in_h_mat_paper.rds`.
+3. Knit the notebook to load that saved result, print its tables, and draw
+   its plots. Knitting never advances a PDE solution, compiles a solver,
+   or runs internal tests. Missing or incompatible results stop with an
+   instruction to run the computation chunk.
+
+Use the R installation containing `rSPDE`, `Matrix`, `Rcpp`, and
+`RcppEigen` for computation (for example `/usr/bin/Rscript`). Knitting
+needs the reporting packages only. Internal implementation tests and
+refinement studies are kept separately in
+`/home/rierasl/Desktop/DOCS/NAP/true_diff_internal`.
 
 ```{r true-diff-cov-in-h-mat-setup}
-knitr::opts_chunk$set(message=FALSE, warning=TRUE, error=FALSE, cache=FALSE,
-                      dev="png", fig.width=8, fig.height=5)
-for (package in c("Matrix","rSPDE","Rcpp","RcppEigen","ggplot2"))
-    if (!requireNamespace(package,quietly=TRUE)) stop("Missing package: ",package)
-true_diff <- local({
-    extracted <- tempfile("true_diff_functions_",fileext=".R")
-    on.exit(unlink(extracted),add=TRUE)
-    knitr::purl("kappa0func.Rmd",output=extracted,quiet=TRUE,documentation=0L)
-    functions <- new.env(parent=globalenv())
-    sys.source(extracted,envir=functions)
-    functions
-})
+knitr::opts_chunk$set(message=FALSE,warning=TRUE,error=FALSE,cache=FALSE,
+                      dev="png",fig.width=8,fig.height=5)
+if (!requireNamespace("ggplot2",quietly=TRUE)) stop("Install ggplot2 to render the plots.")
 ```
-
-Two explicitly labeled profiles are available. **Validation** is the
-runnable default: it uses three exponents, smaller grids, and independent
-implementation checks. **Paper** uses all nine exponents and the original
-study's main mesh/time targets. Both use the same equations, solver, and
-error definition. For smooth h/tau studies, the fixed rational order is
-12 instead of the original positive-shift order 8, to reduce contamination
-under the smaller gap scale. The full settings are printed below and
-stored with results. A fitted slope alone does not certify that every
-other error contribution is negligible.
-
-To run this notebook at paper resolution, set the options before rendering:
-
-```r
-options(NAP.true_diff.profile="paper", NAP.true_diff.recompute=TRUE)
-# rmarkdown::render("true_diff_cov_in_h_mat.Rmd")
-```
-
-The paper-resolution rough study takes 1,250,000 solver steps **per case**.
-Use the validation profile first. `workers` defaults to 1; edit the
-parameter chunk or supply an explicit override to use independent forked
-cases on Unix. Neither profile silently substitutes a closed modal
-recurrence for the sparse rational evolution.
 
 ## Parameters
 
+These are the full experiment settings. Edit them here before running
+the computation. `workers` controls execution only; it does not change
+the mathematical problem. The `_paper` filename suffix is retained for
+compatibility with previously generated full-run results.
+
 ```{r true-diff-cov-in-h-mat-parameters}
-profile <- getOption("NAP.true_diff.profile","validation")
-settings <- true_diff$kappa0_study_settings("h",profile)
-# Optional named overrides; the saved settings and cache identity include them.
-overrides <- getOption("NAP.true_diff.overrides",list())
-if (length(setdiff(names(overrides),names(settings)))) stop("Unknown setting override.")
-for (name in names(overrides)) settings[[name]] <- overrides[[name]]
-# For example: settings$workers <- 3L
+T_final <- 1
+kappa <- 0
+gamma_star <- 1/3
+alpha_vector <- seq(0.9,1.7,0.1)
+diffusion <- 1e-3
+h_vector <- 2^seq(-9,-5)
+time_step <- 2e-5
+m_fixed <- 12L
+overkill_h <- 1e-5
+overkill_time_step <- 1e-5
+workers <- 9L
+K <- 16L
+initial_modes <- c(5L,6L,8:21)
+initial_amplitude <- 10
+forcing_amplitude <- 10
+initial_mean <- 0
+forcing_mean <- 0
+AAA <- 1
+OMEGA <- pi
+stopifnot(length(initial_modes)==K,!(7L %in% initial_modes))
+output_file <- "data_files/true_diff_cov_in_h_mat_paper.rds"
+
+# Bundle only the visible parameters above for the shared runner.
+settings <- list(study="h",T_final=T_final,kappa=kappa,gamma_star=gamma_star,
+    alpha=alpha_vector,diffusion=diffusion,workers=workers,initial_modes=initial_modes,
+    initial_amplitude=initial_amplitude,forcing_amplitude=forcing_amplitude,
+    initial_mean=initial_mean,forcing_mean=forcing_mean,A=AAA,omega=OMEGA,h=h_vector,tau=time_step,m=m_fixed,
+    reference_h=overkill_h,reference_tau=overkill_time_step)
 settings_table <- data.frame(parameter=names(settings),
     value=vapply(settings,function(x) paste(x,collapse=", "),character(1)))
 knitr::kable(settings_table)
@@ -100,14 +118,15 @@ knitr::kable(settings_table)
 Keep the original smooth experiment's normalized eigenfunctions, with
 $\mathcal J=\{5,6,8,\ldots,21\}$, $K=16$, and use
 $$
- u_0=\bar u_0+\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J}e_j,
- \qquad f(s,t)=\bar f+a_f A\sin(\omega t)e_7(s).
+ u_0=\frac{a_0}{\sqrt K}\sum_{j\in\mathcal J}e_j,
+ \qquad f(s,t)=a_f A\sin(\omega t)e_7(s).
 $$
-The defaults are $a_0=a_f=10$, $A=1$, $\omega=\pi$, and
-$\bar u_0=\bar f=1$. The added constants deliberately test nonzero mass:
-$M(t)=3(1+t)$. Set both means to zero to reproduce the original studies'
-mean-zero data at zero shift. The positive-mode initial norm remains 10;
-the full initial norm is $\sqrt{10^2+3\bar u_0^2}$.
+As in `main.tex`, $a_0=a_f=10$, $A=1$, $\omega=\pi$, and
+both spatial means are zero. Thus $\|u_0\|_{L_2}=10$ and $M(t)=0$.
+The visible `initial_mean` and `forcing_mean` parameters are both zero;
+they must remain zero for this mean-zero convergence experiment. The
+general solver still handles its constant mode exactly, including any
+roundoff residual. Nonzero-mean tests are kept separately in `DOCS/NAP`.
 
 The mode table is defined in `kappa0_mode_table()`: $e_1=1/\sqrt3$,
 $e_5=\phi_3$, $e_7=\psi_4$, with unshifted eigenvalues
@@ -118,8 +137,8 @@ $$
        \int_0^t e^{-d_j(t-s)}\sin(\omega s)\,ds.
 $$
 `kappa0_decayed_sine_convolution()` evaluates the convolution stably near
-$t=0$. The constant coefficient, in the basis function one, is exactly
-$\bar u_0+t\bar f$. Continuous eigenfunctions are used to specify data
+$t=0$. The reference retains exactly the 17 active positive modes and has no
+constant component. Continuous eigenfunctions are used to specify data
 and evaluate the reference, not as a truncation of the numerical solver.
 
 `kappa0_smooth_data()` assembles sine/cosine-hat loads analytically and
@@ -127,7 +146,7 @@ solves the consistent mass system for $P_hu_0$. The time forcing uses
 its exact interval average, evaluated with a midpoint-sinc formula.
 At each step the solver forms
 $$
- v=CU^k+\tau(F_{\rm sine}\overline g_{k+1}+\bar f C\mathbf1),
+ v=CU^k+\tau F_{\rm sine}\overline g_{k+1},
  \quad q=\mathbf1^Tv/3,\quad b=v-qC\mathbf1.
 $$
 It applies the cached sparse rational update to $b$ and returns the
@@ -157,10 +176,9 @@ vectors or subtracting nearly equal norm squares. It is not exact
 continuum integration in space or time.
 
 Every solver step is advanced. Mass is checked at every step, not only
-at reference samples. The constant mode is exact at solver time nodes;
-its right-constant reconstruction can still differ from $1+t$ inside an
-interval. That temporal reconstruction error belongs in this space-time
-norm. Spatial and temporal reference refinement, rational-order
+at reference samples. The exact constant component is zero, so there is no added uniform
+forcing or constant-mode reconstruction error. The positive-mode temporal
+reconstruction error remains part of this space-time norm. Spatial and temporal reference refinement, rational-order
 refinement, and solver-time refinement should be used when errors
 approach a floor; implementation agreement alone does not certify these
 separate discretization budgets.
@@ -170,39 +188,67 @@ separate discretization budgets.
 Vary $h$ while fixing $\tau$, $m$, the forcing, and the reference grids.
 Smooth finite-mode data are in every graph spectral Sobolev space, so
 the spatial reference slope is 2. Fit $\log E=s_h\log h+b$.
-The paper profile retains $h=2^{-9},\ldots,2^{-5}$,
+The full experiment retains $h=2^{-9},\ldots,2^{-5}$,
 $\tau=2\cdot10^{-5}$, $\nu=10^{-3}$ and reference resolutions
-$h_\star=\tau_\star=10^{-5}$, with rational order increased to 12.
-The smaller validation settings are printed above and saved separately.
+$h_\star=\tau_\star=10^{-5}$, with rational order 12. This is a numerical error-budget adjustment from
+the manuscript's order 8 for the smaller zero-shift normalization scale.
+At the finest h and the tested endpoint exponents 0.9 and 1.7, comparison
+with order 14 changed the measured error by at most 0.984% for order 8
+and 0.032% for order 12. The internal comparison is recorded in
+`DOCS/NAP/true_diff_internal/mean_zero_order_audit.csv`; it is a sensitivity
+check at those cases, not a certified bound for every parameter.
+All numerical settings are printed above and stored with the result.
 
 At each mesh the hat loads, initial projection, interpolation matrix,
 error metric, and shifted factorizations are rebuilt. The exact reference
-uses unshifted continuum rates, and its positive modes are unchanged
-when constant data are added. A mesh-independent $\gamma_*$ is reused
+uses unshifted continuum rates for exactly the original 17 active modes. A mesh-independent $\gamma_*$ is reused
 throughout. Temporal, rational, and reference errors can create a floor;
 the reported regression is an observation for the displayed settings,
 not a guarantee that every point lies in the asymptotic spatial regime.
 
-## Compute or load matching results
+## Computation
 
-This chunk runs when knitting. Existing matching results are reused;
-missing or stale results are recomputed. Filenames include the notebook
-name and profile. The result identity includes the full settings, source
-hashes, and numerical package versions, so other profiles and the
-positive-shift studies cannot be loaded accidentally.
+Run this chunk manually after the setup and parameters. `eval=FALSE`
+prevents it from running when knitting. This explicit action computes
+the experiment and overwrites only the named full-run result file.
+It does not run internal implementation tests or refinement studies.
 
-Before computation the checks compare compiled and R solutions for
-fractional and integer powers, compare compressed and direct reference
-quadratic forms, and compare the rough reduction with full-graph FEM.
-Those are implementation checks; the displayed convergence results and
-mass diagnostics provide separate evidence about the actual experiment.
+```{r true-diff-cov-in-h-mat-recompute, eval=FALSE}
+for (package in c("Matrix","rSPDE","Rcpp","RcppEigen"))
+    if (!requireNamespace(package,quietly=TRUE)) stop("Missing package: ",package)
+true_diff <- local({
+    extracted <- tempfile("true_diff_functions_",fileext=".R")
+    on.exit(unlink(extracted),add=TRUE)
+    knitr::purl("kappa0func.Rmd",output=extracted,quiet=TRUE,documentation=0L)
+    functions <- new.env(parent=globalenv())
+    sys.source(extracted,envir=functions)
+    functions
+})
+result <- true_diff$kappa0_compute_study(settings,"true_diff_cov_in_h_mat.Rmd",output_file)
+```
 
-```{r true-diff-cov-in-h-mat-recompute-or-load}
-result <- true_diff$kappa0_execute_study(settings,"true_diff_cov_in_h_mat.Rmd",
-    recompute=isTRUE(getOption("NAP.true_diff.recompute",FALSE)))
-knitr::kable(result$validation,digits=12,caption="Independent implementation checks")
-cat("Profile:",settings$profile,"\nGenerated:",result$generated_at,
-    "\nComputation seconds:",round(result$elapsed_seconds,2),"\n")
+## Load saved results
+
+This is the only experiment-data action taken while knitting. Check the
+saved scientific parameters against the visible settings. A worker-count
+change does not invalidate numerical results. Historical internal-check
+fields, if present in an older result, are not executed or displayed.
+Source hashes and package versions are retained as provenance; source
+changes do not silently launch another computation.
+
+```{r true-diff-cov-in-h-mat-load-results}
+if (!file.exists(output_file))
+    stop("Saved results are missing: ",output_file,
+         ". Run the setup, parameters, and recompute chunks manually, then knit.")
+result <- readRDS(output_file)
+scientific_parameters <- setdiff(names(settings),"workers")
+mismatch <- scientific_parameters[!vapply(scientific_parameters,function(name)
+    isTRUE(all.equal(result$parameters[[name]],settings[[name]],tolerance=1e-12)),logical(1))]
+if (length(mismatch))
+    stop("Saved settings differ for: ",paste(mismatch,collapse=", "),
+         ". Run the recompute chunk manually for these parameters, then knit.")
+cat("Generated:",result$generated_at,"\nSaved computation seconds:",
+    round(result$elapsed_seconds,2),"\nSaved worker count:",result$parameters$workers,"\n")
 ```
 
 ## Results and fitted rates
@@ -243,29 +289,11 @@ guides <- do.call(rbind,lapply(settings$alpha,function(a) {
 }))
 guides$alpha_label <- factor(guides$alpha,levels=settings$alpha)
 p <- p+ggplot2::geom_line(data=guides,ggplot2::aes(y=guide),linetype="dashed",alpha=0.6)+
-    ggplot2::theme_minimal(base_size=12)+ggplot2::labs(subtitle=paste("kappa=0; gamma*=1/3;",settings$profile,"profile"))
+    ggplot2::theme_minimal(base_size=12)+ggplot2::labs(subtitle=sprintf("kappa=0; gamma*=%g",settings$gamma_star))
 print(p)
-figure_dir <- file.path("data_files",paste0("true_diff_cov_in_h_mat_",settings$profile))
+figure_dir <- "data_files/true_diff_cov_in_h_mat_paper"
 dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
 ggplot2::ggsave(file.path(figure_dir,"convergence.pdf"),p,width=8,height=5)
-```
-
-## Sensitivity of the finest tested case
-
-The validation profile refines the fixed solver and reference settings
-one at a time at the finest tested primary axis value, for every exponent.
-The table measures the change in the sampled error. It is a sensitivity
-check, not a certified bound on an individual error contribution. The
-isolated-m study instead has the independent modal and integer-power
-controls above. Paper-resolution sensitivity runs are opt-in through
-`settings$refinement_checks <- TRUE` because they can be expensive.
-
-```{r true-diff-cov-in-h-mat-sensitivity}
-if (!is.null(result$refinement_checks)) {
-    knitr::kable(result$refinement_checks,digits=9)
-} else {
-    cat("No additional discretization sensitivity run for these settings.\n")
-}
 ```
 
 ## Numerical values and reproducibility
@@ -276,10 +304,11 @@ knitr::kable(data.frame(package=names(result$package_versions),
                         version=unname(result$package_versions)))
 ```
 
-The `.rds` file contains settings, errors, rates, validation values,
-source hashes, versions, and the generation timestamp. PDF figures are
-written to a matching profile-specific directory. To force a fresh run,
-set `options(NAP.true_diff.recompute=TRUE)` before rendering. To check
-other error budgets, override only the corresponding settings and save
-that run under a separate output identity or copy its result before
-changing parameters; never compare relabeled caches from different runs.
+The `.rds` file contains the saved settings, errors, rates, source hashes,
+package versions, and generation timestamp. Figures are redrawn from the
+saved values when knitting and written to the full-run figure directory.
+To change the experiment, edit its parameter chunk and run the computation
+chunk manually before knitting again. Setting `NAP.true_diff.recompute`
+or any previous profile option has no effect on knitting these notebooks.
+Internal tests and smaller exploratory runs belong in `DOCS/NAP`, not in
+these report notebooks.

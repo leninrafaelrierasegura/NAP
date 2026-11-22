@@ -1,4 +1,6 @@
 ## ----brasil-functions-0, eval=TRUE--------------------------------------------
+# remotes::install_github("davidbolin/rspde", ref = "devel")
+# remotes::install_github("davidbolin/metricgraph", ref = "devel")
 brasil_supported_orders <- function() {
     tables <- grep("^m_brasil[0-9]+t$", ls(asNamespace("rSPDE")), value = TRUE)
     sort(as.integer(sub("^m_brasil([0-9]+)t$", "\\1", tables)))

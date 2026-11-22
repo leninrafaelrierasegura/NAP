@@ -2678,89 +2678,9 @@ libraries.</p>
 }</code></pre>
 <pre class="r"><code>paper_check &lt;- kappa0_paper_validation()
 knitr::kable(paper_check$spatial, digits = 10,
-             caption = &quot;Spectral FEM: spatial errors and absolute mass differences&quot;)</code></pre>
-<table>
-<caption>Spectral FEM: spatial errors and absolute mass
-differences</caption>
-<thead>
-<tr class="header">
-<th align="right">h</th>
-<th align="right">error</th>
-<th align="right">mass_error</th>
-<th align="right">rate</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">0.125000</td>
-<td align="right">0.0054234185</td>
-<td align="right">0</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="right">0.062500</td>
-<td align="right">0.0013591444</td>
-<td align="right">0</td>
-<td align="right">1.996504</td>
-</tr>
-<tr class="odd">
-<td align="right">0.031250</td>
-<td align="right">0.0003399033</td>
-<td align="right">0</td>
-<td align="right">1.999502</td>
-</tr>
-<tr class="even">
-<td align="right">0.015625</td>
-<td align="right">0.0000848647</td>
-<td align="right">0</td>
-<td align="right">2.001887</td>
-</tr>
-</tbody>
-</table>
-<pre class="r"><code>knitr::kable(paper_check$temporal, digits = 10,
+             caption = &quot;Spectral FEM: spatial errors and absolute mass differences&quot;)
+knitr::kable(paper_check$temporal, digits = 10,
              caption = &quot;Spectral FEM: isolated backward Euler time errors&quot;)</code></pre>
-<table>
-<caption>Spectral FEM: isolated backward Euler time errors</caption>
-<thead>
-<tr class="header">
-<th align="right">tau</th>
-<th align="right">error</th>
-<th align="right">rate</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">0.100000</td>
-<td align="right">0.0256443445</td>
-<td align="right">NA</td>
-</tr>
-<tr class="even">
-<td align="right">0.050000</td>
-<td align="right">0.0115451640</td>
-<td align="right">1.151352</td>
-</tr>
-<tr class="odd">
-<td align="right">0.025000</td>
-<td align="right">0.0053616127</td>
-<td align="right">1.106550</td>
-</tr>
-<tr class="even">
-<td align="right">0.012500</td>
-<td align="right">0.0025648013</td>
-<td align="right">1.063820</td>
-</tr>
-<tr class="odd">
-<td align="right">0.006250</td>
-<td align="right">0.0012516435</td>
-<td align="right">1.035023</td>
-</tr>
-<tr class="even">
-<td align="right">0.003125</td>
-<td align="right">0.0006179081</td>
-<td align="right">1.018359</td>
-</tr>
-</tbody>
-</table>
 </div>
 <div id="sparse-brasil-validation-at-zero-shift" class="section level2">
 <h2>8. Sparse BRASIL validation at zero shift</h2>
@@ -2854,92 +2774,9 @@ against <span class="math inline">\((C+\tau\nu G)^{-1}\)</span>.</p>
 }</code></pre>
 <pre class="r"><code>rational_check &lt;- kappa0_rational_validation()
 knitr::kable(rational_check$rational, digits = 12,
-             caption = &quot;Isolated rational errors: zero shift, nonzero mean&quot;)</code></pre>
-<table>
-<caption>Isolated rational errors: zero shift, nonzero mean</caption>
-<colgroup>
-<col width="3%" />
-<col width="18%" />
-<col width="13%" />
-<col width="16%" />
-<col width="23%" />
-<col width="24%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="right">m</th>
-<th align="right">space_time_error</th>
-<th align="right">final_error</th>
-<th align="right">max_mass_error</th>
-<th align="right">sparse_vs_modal_error</th>
-<th align="right">partial_fraction_error</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">2</td>
-<td align="right">1.079675e-02</td>
-<td align="right">8.254827e-03</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-</tr>
-<tr class="even">
-<td align="right">4</td>
-<td align="right">2.562169e-04</td>
-<td align="right">2.014475e-04</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-</tr>
-<tr class="odd">
-<td align="right">6</td>
-<td align="right">7.449943e-05</td>
-<td align="right">5.862548e-05</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-</tr>
-<tr class="even">
-<td align="right">8</td>
-<td align="right">1.023493e-05</td>
-<td align="right">8.052322e-06</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-</tr>
-</tbody>
-</table>
-<pre class="r"><code>knitr::kable(rational_check$checks, digits = 12,
+             caption = &quot;Isolated rational errors: zero shift, nonzero mean&quot;)
+knitr::kable(rational_check$checks, digits = 12,
              caption = &quot;Additional sparse-solver checks&quot;)</code></pre>
-<table>
-<caption>Additional sparse-solver checks</caption>
-<colgroup>
-<col width="15%" />
-<col width="20%" />
-<col width="22%" />
-<col width="27%" />
-<col width="14%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th align="right">constant_error</th>
-<th align="right">conservation_error</th>
-<th align="right">time_dependent_error</th>
-<th align="right">time_dependent_mass_error</th>
-<th align="right">integer_error</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-<td align="right">0</td>
-</tr>
-</tbody>
-</table>
 </div>
 <div id="use-in-parallel-experiments" class="section level2">
 <h2>9. Use in parallel experiments</h2>
@@ -3004,19 +2841,20 @@ prefix. The compiled stepping loop adds the same full-load mean split as
 residual coefficient mean, and restore the saved next mean. It advances
 <strong>every</strong> backward Euler step, even when the reference grid
 samples fewer times. It records the maximum mass balance discrepancy
-along the trajectory. The R and compiled paths are compared by the
-validation helper below before convergence results are trusted. C++ uses
-Eigen sparse Cholesky factorizations of the same matrices; the R path
-uses Matrix’s factorizations.</p>
-<p>The smooth data reproduce the original 16 normalized modes and the
-forced mode 7, with optional constant initial and forcing components.
-The defaults add <code>initial_mean = forcing_mean = 1</code>, making
-the exact mean <code>1 + t</code>; these constants exercise the
-null-mode branch and are stated explicitly in each notebook. They do not
-change the positive-mode rates. The paper’s zero-shift spectral
-benchmark uses different single-mode data; the new BRASIL convergence
-tables are additional experiments, not the paper’s published numerical
-tables.</p>
+along the trajectory. The R and compiled paths are compared by a
+separate internal script in
+<code>/home/rierasl/Desktop/DOCS/NAP/true_diff_internal</code>; the
+convergence notebooks do not run those tests. C++ uses Eigen sparse
+Cholesky factorizations of the same matrices; the R path uses Matrix’s
+factorizations.</p>
+<p>The smooth convergence data retain the original 16 normalized initial
+modes and the forced mode 7 from <code>main.tex</code>. The default
+initial and forcing means are both zero; no constant components are
+added. The same 17 active modes define the analytical reference, with
+unshifted rates. The optional nonzero-mean arguments support separate
+internal tests, not a different default convergence problem. The revised
+paper’s nonzero-mean single-mode benchmark is kept distinct from these
+convergence studies.</p>
 <p>The rough experiment retains the original quarter-loop symmetry
 reduction. It represents four reflected copies of <code>[0,1/2]</code>
 with homogeneous endpoint values, so its matrices and mass norm carry a
@@ -3029,8 +2867,8 @@ symmetry. The full-graph extension has exactly zero mass.
 positive gap scale, shifted matrices, and partial-fraction solver,
 restricted to that subspace; it does not call the connected full-space
 constructor, whose check <code>G %*% one = 0</code> does not hold after
-Dirichlet restriction. A separate full-tadpole comparison verifies this
-reduction.</p>
+Dirichlet restriction. A separate full-tadpole comparison in the
+internal test directory verifies this reduction.</p>
 <pre class="r"><code>kappa0_prepare_reference_error &lt;- function(Psi, reference_C, reference_basis) {
     E &lt;- as.matrix(reference_basis)
     stopifnot(nrow(Psi) == nrow(reference_C), nrow(reference_C) == ncol(reference_C), nrow(E) == nrow(Psi), ncol(E) &gt;=
@@ -3259,8 +3097,9 @@ contribute <code>psi</code>. Thus modes 5 and 7 are <code>phi_3</code>
 and <code>psi_4</code>. Element sine/cosine-hat integrals are evaluated
 analytically with small-argument series. Each nonconstant load is
 centered to its analytically known zero integral at roundoff. The added
-constant load is <code>mean*C*one</code>. The reference basis uses the
-function one itself for its last column, with coefficient
+constant load is <code>mean*C*one</code>. For the mean-zero experiment
+the reference has exactly 17 active columns. Only an explicitly
+requested nonzero-mean test appends the function one with coefficient
 <code>initial_mean + forcing_mean*t</code>.</p>
 <pre class="r"><code>kappa0_mode_table &lt;- function(max_mode = 21L) {
     table &lt;- data.frame(k = 0L, kind = &quot;constant&quot;)
@@ -3357,7 +3196,7 @@ kappa0_mode_load &lt;- function(mesh, j) {
 }
 
 kappa0_smooth_data &lt;- function(h, initial_modes=c(5L,6L,8:21), initial_amplitude=10,
-                               forcing_amplitude=10, initial_mean=1, forcing_mean=1) {
+                               forcing_amplitude=10, initial_mean=0, forcing_mean=0) {
     stopifnot(length(initial_modes)&gt;=1L, !anyDuplicated(initial_modes),
               all(initial_modes&gt;=2L), all(initial_modes==as.integer(initial_modes)),
               !(7L %in% initial_modes), all(is.finite(c(initial_amplitude,forcing_amplitude,
@@ -3382,14 +3221,16 @@ kappa0_smooth_reference &lt;- function(reference_mesh, data, alpha, diffusion, A
     initial &lt;- ifelse(modes %in% data$initial_modes,
                        data$initial_amplitude/sqrt(length(data$initial_modes)),0)
     forcing &lt;- ifelse(modes==7L,data$forcing_amplitude,0)
+    include_mean &lt;- data$initial_mean!=0 || data$forcing_mean!=0
     coefficients &lt;- function(t) {
         out &lt;- vapply(seq_along(rates),function(j)
             initial[j]*exp(-rates[j]*t) + forcing[j]*
                 kappa0_decayed_sine_convolution(t,rates[j],A,omega),numeric(length(t)))
         out &lt;- matrix(out,nrow=length(t),ncol=length(rates))
-        rbind(t(out),data$initial_mean+data$forcing_mean*t)
+        out &lt;- t(out)
+        if(include_mean) rbind(out,data$initial_mean+data$forcing_mean*t) else out
     }
-    list(basis=cbind(E,1), coefficients=coefficients, rates=rates)
+    list(basis=if(include_mean) cbind(E,1) else E, coefficients=coefficients, rates=rates)
 }
 
 kappa0_sampled_error &lt;- function(op, grid, initial, load, forcing, reference_grid,
@@ -3511,43 +3352,6 @@ kappa0_restricted_solve &lt;- function(op,b) {
     for (i in seq_along(op$residues)) u &lt;- u+op$residues[i]*
         as.numeric(Matrix::solve(op$factorizations[[i]],b,system=&quot;A&quot;))
     u
-}
-
-kappa0_study_settings &lt;- function(study=c(&quot;m&quot;,&quot;tau&quot;,&quot;h&quot;,&quot;rough_h&quot;),
-                                   profile=c(&quot;validation&quot;,&quot;paper&quot;)) {
-    study &lt;- match.arg(study); profile &lt;- match.arg(profile)
-    cfg &lt;- list(study=study,profile=profile,T_final=1,kappa=0,gamma_star=1/3,
-        alpha=if(profile==&quot;paper&quot;) seq(0.9,1.7,0.1) else c(0.9,1.3,1.7),
-        diffusion=if(study %in% c(&quot;h&quot;,&quot;tau&quot;)) 1e-3 else 1,
-        initial_modes=c(5L,6L,8:21),initial_amplitude=10,forcing_amplitude=10,
-        initial_mean=1,forcing_mean=1,A=1,omega=pi,workers=1L,
-        refinement_checks=(profile==&quot;validation&quot;))
-    if(study==&quot;m&quot;) {
-        cfg$h &lt;- 0.02; cfg$tau &lt;- 0.005
-        cfg$m &lt;- if(profile==&quot;paper&quot;) 2:16 else 2:12
-    } else if(study==&quot;tau&quot;) {
-        cfg$h &lt;- if(profile==&quot;paper&quot;) 1e-3 else 1/512
-        cfg$tau &lt;- 1/c(200L,63L,20L,6L,2L)
-        cfg$m &lt;- 12L
-        cfg$reference_h &lt;- if(profile==&quot;paper&quot;) 1e-5 else 1/4096
-        cfg$reference_tau &lt;- if(profile==&quot;paper&quot;) 1e-5 else 1e-4
-    } else if(study==&quot;h&quot;) {
-        cfg$h &lt;- if(profile==&quot;paper&quot;) 2^seq(-9,-5) else 2^seq(-7,-4)
-        cfg$tau &lt;- if(profile==&quot;paper&quot;) 2e-5 else 1e-4
-        cfg$m &lt;- 12L
-        cfg$reference_h &lt;- if(profile==&quot;paper&quot;) 1e-5 else 1/2048
-        cfg$reference_tau &lt;- if(profile==&quot;paper&quot;) 1e-5 else 5e-5
-    } else {
-        cfg$J &lt;- if(profile==&quot;paper&quot;) 5:9 else 5:8
-        cfg$tau &lt;- if(profile==&quot;paper&quot;) 8e-7 else 2e-6
-        cfg$m &lt;- 14L
-        cfg$cutoff &lt;- if(profile==&quot;paper&quot;) 16L else 12L
-        cfg$reference_J &lt;- cfg$cutoff+2L
-        cfg$reference_tau &lt;- if(profile==&quot;paper&quot;) 1e-5 else 2e-4
-        cfg$max_tail_squared_fraction &lt;- 0.002
-        cfg$initial_mean &lt;- cfg$forcing_mean &lt;- 0
-    }
-    cfg
 }
 
 kappa0_map_cases &lt;- function(cases,FUN,workers=1L) {
@@ -3716,169 +3520,224 @@ kappa0_run_m_study &lt;- function(cfg) {
     list(results=results,rates=rates,control=control,spectrum=spectrum$diagnostics,unit_errors=unit)
 }</code></pre>
 </div>
-<div id="validation-result-provenance-and-stale-cache-protection" class="section level3">
-<h3>Validation, result provenance, and stale-cache protection</h3>
-<p>These checks compare the compiled implementation with the readable R
-solver on nonzero-mean data, including integer diffusion; compare the
-rough restricted solution with the full connected tadpole; and verify
-the compressed sampled norm against its direct reference-grid quadratic
-form. Each result file records its settings, these checks, package
-versions, source hashes, and generation time. Loading a result with
-mismatched settings or source hashes triggers recomputation, rather than
-silently relabeling an older positive-shift result.</p>
-<pre class="r"><code>kappa0_validate_experiment_helpers &lt;- function() {
-    data &lt;- kappa0_smooth_data(1/16)
-    ref_mesh &lt;- kappa0_tadpole_mesh(1/128)
-    grid &lt;- kappa0_time_grid(0.1,0.01)
-    ref_grid &lt;- kappa0_time_grid(0.1,0.003)
-    forcing &lt;- kappa0_average_sine_forcing(grid$times)
-    checks &lt;- list()
-    for(alpha in c(1.2,2)) {
-        ref &lt;- kappa0_smooth_reference(ref_mesh,data,alpha,0.7)
-        Psi &lt;- kappa0_fem_basis(data$mesh,kappa0_mesh_locations(ref_mesh))
-        projection &lt;- kappa0_prepare_reference_error(Psi,ref_mesh$C,ref$basis)
-        op &lt;- my.fractional.operators.kappa0(data$G,alpha/2,data$C,1/3,8,grid$time_step,0.7)
-        cpp &lt;- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,forcing,
-                    ref_grid,ref$coefficients,projection,forcing_mean=1)
-        r &lt;- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,forcing,
-                    ref_grid,ref$coefficients,projection,forcing_mean=1,engine=&quot;R&quot;)
-        final_gap &lt;- kappa0_l2_norm(data$C,cpp$final_state-r$final_state)
-        error_gap &lt;- abs(cpp$error-r$error)
-        u &lt;- data$initial; history &lt;- matrix(0,length(u),grid$N)
-        c_one &lt;- as.numeric(data$C %*% rep(1,length(u)))
-        for(k in seq_len(grid$N)) {
-            u &lt;- my.solver.kappa0(op,as.numeric(data$C %*% u)+
-                        grid$time_step*(data$spatial_load*forcing[k+1L]+c_one))
-            history[,k] &lt;- u
-        }
-        targets &lt;- findInterval(ref_grid$times[-1L],grid$times,left.open=TRUE)
-        direct &lt;- 0
-        for(q in seq_along(targets)) {
-            d &lt;- as.numeric(ref$basis %*% ref$coefficients(ref_grid$times[q+1L]))-
-                 as.numeric(Psi %*% history[,targets[q]])
-            direct &lt;- direct+diff(ref_grid$times)[q]*sum(d*as.numeric(ref_mesh$C %*% d))
-        }
-        direct_gap &lt;- abs(sqrt(direct)-r$error)
-        stopifnot(final_gap&lt;1e-10,error_gap&lt;1e-10,direct_gap&lt;1e-10,cpp$max_mass_error&lt;1e-10)
-        checks[[length(checks)+1L]] &lt;- data.frame(check=paste0(&quot;smooth_alpha_&quot;,alpha),
-            final_C_gap=final_gap,error_gap=error_gap,direct_norm_gap=direct_gap,
-            max_mass_error=cpp$max_mass_error)
-    }
-    # The reduction is tested on the same data and step size on the full graph.
-    J &lt;- 4L
-    mesh &lt;- kappa0_rough_mesh(J)
-    op &lt;- kappa0_rough_operator(mesh,0.6,8,grid$time_step)
-    full &lt;- kappa0_tadpole_mesh(2^-J)
-    elements &lt;- full$elements; ids &lt;- which(elements$edge==2L)
-    load &lt;- numeric(nrow(full$C))
-    for(j in seq_len(J-1L)) {
-        pair &lt;- kappa0_trig_hat_pair(elements$a[ids],elements$b[ids],pi*2^j,0,1/j)
-        summed &lt;- rowsum(c(pair[,1L],pair[,2L]),c(elements$left[ids],elements$right[ids]),reorder=FALSE)
-        load[as.integer(rownames(summed))] &lt;- load[as.integer(rownames(summed))]+summed[,1L]
-    }
-    full_op &lt;- my.fractional.operators.kappa0(full$G,0.6,full$C,1/3,8,grid$time_step)
-    reduced &lt;- rep(0,nrow(mesh$C)); u &lt;- rep(0,nrow(full$C))
-    for(k in seq_len(grid$N)) {
-        reduced &lt;- kappa0_restricted_solve(op,as.numeric(mesh$C %*% reduced)+grid$time_step*mesh$load)
-        u &lt;- my.solver.kappa0(full_op,as.numeric(full$C %*% u)+grid$time_step*load)
-    }
-    loc &lt;- kappa0_mesh_locations(full); loop &lt;- which(loc[,1L]==2L)
-    x &lt;- loc[loop,2L]*2; r &lt;- x%%1; q &lt;- pmin(r,1-r)
-    extension &lt;- rep(0,nrow(full$C))
-    extension[loop] &lt;- as.numeric(kappa0_rough_basis(J,q) %*% reduced)*ifelse(r&lt;=0.5,1,-1)
-    reduction_gap &lt;- kappa0_l2_norm(full$C,u-extension)
-    norm_gap &lt;- abs(kappa0_l2_norm(full$C,extension)-kappa0_l2_norm(mesh$C,reduced))
-    mass &lt;- abs(sum(full$C %*% u))
-    stopifnot(reduction_gap&lt;1e-10,norm_gap&lt;1e-10,mass&lt;1e-10)
-    checks[[length(checks)+1L]] &lt;- data.frame(check=&quot;rough_full_graph_reduction&quot;,
-        final_C_gap=reduction_gap,error_gap=norm_gap,direct_norm_gap=NA_real_,max_mass_error=mass)
-    do.call(rbind,checks)
-}
-
-kappa0_execute_study &lt;- function(cfg,notebook_file,recompute=FALSE,
-                                 output_dir=&quot;data_files&quot;) {
-    paths &lt;- c(&quot;kappa0func.Rmd&quot;,notebook_file)
-    hashes &lt;- tools::md5sum(paths)
-    versions &lt;- vapply(c(&quot;Matrix&quot;,&quot;rSPDE&quot;,&quot;Rcpp&quot;,&quot;RcppEigen&quot;),function(p)
-                       as.character(utils::packageVersion(p)),character(1))
-    file &lt;- file.path(output_dir,paste0(tools::file_path_sans_ext(basename(notebook_file)),
-                                       &quot;_&quot;,cfg$profile,&quot;.rds&quot;))
-    if(file.exists(file) &amp;&amp; !recompute) {
-        saved &lt;- readRDS(file)
-        if(identical(saved$parameters,cfg) &amp;&amp; identical(saved$source_hashes,hashes) &amp;&amp;
-           identical(saved$package_versions,versions)) return(saved)
-        message(&quot;Settings, source, or package versions changed; recomputing &quot;,file)
-    }
+<div id="manual-computation-and-saved-result-provenance" class="section level3">
+<h3>Manual computation and saved-result provenance</h3>
+<p>The convergence notebooks declare all experiment parameters
+explicitly. Their computation chunks have <code>eval=FALSE</code>; only
+running those chunks manually invokes the experiment runners. Knitting
+reads the named saved result, checks its scientific settings, and
+redraws plots. Missing or incompatible results produce an error and
+never start a simulation. No global option can enable computation while
+knitting.</p>
+<p><code>kappa0_compute_study()</code> always performs the requested
+experiment when called explicitly and writes its settings, source
+hashes, package versions, and timestamp. It does not run implementation
+comparisons or refinement tests. Those scripts and their outputs are
+kept separately in
+<code>/home/rierasl/Desktop/DOCS/NAP/true_diff_internal</code>, outside
+the reports. The numerical mass-balance diagnostics and isolated-m
+integer-power control remain part of the scientific experiment, as in
+the original notebooks.</p>
+<pre class="r"><code>kappa0_compute_study &lt;- function(cfg,notebook_file,output_file) {
     stopifnot(all(is.finite(cfg$alpha)),all(cfg$alpha&gt;0),all(cfg$alpha&lt;2),
               !anyDuplicated(cfg$alpha),cfg$kappa==0,cfg$gamma_star&gt;0)
+    versions &lt;- vapply(c(&quot;Matrix&quot;,&quot;rSPDE&quot;,&quot;Rcpp&quot;,&quot;RcppEigen&quot;),function(p)
+                       as.character(utils::packageVersion(p)),character(1))
     kappa0_compile_sampled_solver()
-    validation &lt;- kappa0_validate_experiment_helpers()
     started &lt;- proc.time()[[&quot;elapsed&quot;]]
     result &lt;- switch(cfg$study,m=kappa0_run_m_study(cfg),h=kappa0_run_smooth_study(cfg),
                      tau=kappa0_run_smooth_study(cfg),rough_h=kappa0_run_rough_study(cfg))
-    result$refinement_checks &lt;- if(isTRUE(cfg$refinement_checks))
-        kappa0_refinement_checks(cfg,result) else NULL
     result$parameters &lt;- cfg
-    result$validation &lt;- validation
-    result$source_hashes &lt;- hashes
+    result$source_hashes &lt;- tools::md5sum(c(&quot;kappa0func.Rmd&quot;,notebook_file))
     result$package_versions &lt;- versions
     result$elapsed_seconds &lt;- proc.time()[[&quot;elapsed&quot;]]-started
     result$generated_at &lt;- format(Sys.time(),&quot;%Y-%m-%d %H:%M:%S %Z&quot;,tz=&quot;Asia/Riyadh&quot;)
     result$error_definition &lt;- if(cfg$study==&quot;m&quot;) &quot;isolated discrete BE space-time error&quot;
         else &quot;sampled continuum-reference space-time error, consistent reference mass&quot;
-    dir.create(output_dir,recursive=TRUE,showWarnings=FALSE)
-    saveRDS(result,file)
+    dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
+    saveRDS(result,output_file)
     result
 }</code></pre>
 </div>
-<div id="discretization-and-reference-sensitivity-checks" class="section level3">
-<h3>Discretization and reference sensitivity checks</h3>
-<p>The validation profile additionally repeats each exponent’s finest
-tested case with one fixed setting refined at a time. These checks
-report the relative change in the measured error, which is evidence
-about sensitivity rather than a rigorous upper bound on that error
-component. Smooth h runs halve the solver time step, increase m by two,
-halve reference h, and halve reference tau. Smooth tau runs halve solver
-h instead of halving the varied time step. Rough runs halve solver tau,
-increase m by two, refine the reference spatial grid, halve its time
-step, and increase the series cutoff by two while resolving the
-increased cutoff. All comparisons keep the primary study axis fixed.
-These checks are on by default for the validation profile; the expensive
-paper profile can enable them explicitly with
-<code>settings$refinement_checks &lt;- TRUE</code>.</p>
-<pre class="r"><code>kappa0_refinement_checks &lt;- function(cfg,baseline) {
-    if(cfg$study==&quot;m&quot;) return(NULL)
-    runner &lt;- if(cfg$study==&quot;rough_h&quot;) kappa0_run_rough_study else kappa0_run_smooth_study
-    rows &lt;- list()
-    for(a in cfg$alpha) {
-        small &lt;- cfg; small$alpha &lt;- a; small$workers &lt;- 1L
-        if(cfg$study==&quot;h&quot;) small$h &lt;- min(cfg$h)
-        else if(cfg$study==&quot;tau&quot;) small$tau &lt;- min(cfg$tau)
-        else small$J &lt;- max(cfg$J)
-        d &lt;- baseline$results[baseline$results$alpha==a,]
-        base_error &lt;- d$error[which.min(d$axis)]
-        changes &lt;- list()
-        if(cfg$study==&quot;tau&quot;) {v&lt;-small;v$h&lt;-v$h/2;changes$solver_h_halved&lt;-v}
-        else {v&lt;-small;v$tau&lt;-v$tau/2;changes$solver_tau_halved&lt;-v}
-        v&lt;-small;v$m&lt;-v$m+2L;changes$rational_order_plus_two&lt;-v
-        if(cfg$study==&quot;rough_h&quot;) {
-            v&lt;-small;v$reference_J&lt;-v$reference_J+1L;changes$reference_h_halved&lt;-v
-            v&lt;-small;v$cutoff&lt;-v$cutoff+2L;v$reference_J&lt;-max(v$reference_J,v$cutoff+2L)
-            changes$cutoff_plus_two_resolved&lt;-v
-        } else {
-            v&lt;-small;v$reference_h&lt;-v$reference_h/2;changes$reference_h_halved&lt;-v
-        }
-        v&lt;-small;v$reference_tau&lt;-v$reference_tau/2;changes$reference_tau_halved&lt;-v
-        for(name in names(changes)) {
-            refined &lt;- runner(changes[[name]])$results$error[1L]
-            rows[[length(rows)+1L]] &lt;- data.frame(alpha=a,check=name,
-                baseline_error=base_error,refined_error=refined,
-                relative_error_change=abs(refined-base_error)/base_error)
-        }
-    }
-    do.call(rbind,rows)
-}</code></pre>
 </div>
+<div id="separate-nonzero-mean-zero-shift-benchmark" class="section level2">
+<h2>11. Separate nonzero-mean zero-shift benchmark</h2>
+<p><code>true_diff_zero_shift_benchmark.Rmd</code> uses the following
+parameterized functions for its three experiments. They are separate
+from the mean-zero convergence studies. The data are the manuscript’s
+<code>u0=f=1+phi</code>, with <code>phi=sin(2*pi*x)</code> on the loop
+and zero on the stem. For a shift kappa, the continuum constant and phi
+coefficients both solve <code>a&#39; + rate*a = 1</code>, with initial value
+1 and rates <code>nu*kappa^alpha</code> and
+<code>nu*((2*pi)^2+kappa^2)^(alpha/2)</code>, respectively.</p>
+<p>The generalized eigenvectors of <code>(G+kappa^2*C,C)</code> are
+those of <code>(G,C)</code>; only their eigenvalues change, by adding
+<code>kappa^2</code>. Thus the small-shift spectral comparison uses the
+same mass-orthonormal numerical eigenbasis, with the constant eigenvalue
+set analytically before taking its power. For autonomous forcing the
+closed scalar BE recurrence is exactly the same discrete method as
+repeated BE steps. It avoids 500,000 dense matrix-vector updates in the
+spectral benchmark. The BRASIL benchmark instead advances every step
+through the cached shifted sparse solves. No internal implementation
+tests are run by these functions.</p>
+<pre class="r"><code>kappa0_benchmark_scalar &lt;- function(rate,t,N=NULL) {
+    if(rate==0) return(1+t)
+    log_decay &lt;- if(is.null(N)) -rate*t else -N*log1p(rate*t/N)
+    exp(log_decay)-expm1(log_decay)/rate
+}
+
+kappa0_benchmark_exact &lt;- function(edge,x,t,alpha=1.2,diffusion=1,kappa=0) {
+    mean &lt;- kappa0_benchmark_scalar(diffusion*kappa^alpha,t)
+    phi &lt;- kappa0_benchmark_scalar(diffusion*((2*pi)^2+kappa^2)^(alpha/2),t)
+    mean+phi*kappa0_phi(edge,x)
+}
+
+kappa0_benchmark_spectral &lt;- function(data,spectrum,alpha,T_final,diffusion=1,
+                                      kappa=0,N=NULL) {
+    stopifnot(length(kappa)==1L,is.finite(kappa),kappa&gt;=0)
+    shifted &lt;- spectrum
+    shifted$values &lt;- spectrum$values+kappa^2
+    kappa0_autonomous_reference(data$C,shifted,data$initial,data$spatial_load,
+                                alpha,T_final,N=N,diffusion=diffusion)
+}
+
+kappa0_compute_benchmark &lt;- function(cfg,notebook_file,output_file) {
+    stopifnot(cfg$kappa==0,cfg$alpha&gt;0,cfg$alpha&lt;2,cfg$T_final&gt;0,cfg$diffusion&gt;0,
+              cfg$gamma_star&gt;0,all(cfg$kappa_vector&gt;=0),
+              all(cfg$temporal_N&gt;=1L),all(cfg$temporal_N==as.integer(cfg$temporal_N)))
+    started &lt;- proc.time()[[&quot;elapsed&quot;]]
+    cache &lt;- new.env(parent=emptyenv())
+    get_data &lt;- function(h) {
+        key &lt;- sprintf(&quot;%.16g&quot;,h)
+        if(!exists(key,cache,inherits=FALSE)) {
+            data &lt;- kappa0_tadpole_data(h)
+            assign(key,list(data=data,spectrum=kappa0_discrete_spectrum(data$C,data$G)),cache)
+        }
+        get(key,cache,inherits=FALSE)
+    }
+    space_grid &lt;- kappa0_time_grid(cfg$T_final,cfg$spatial_tau)
+    spatial &lt;- do.call(rbind,lapply(cfg$spatial_h,function(h) {
+        item &lt;- get_data(h); data &lt;- item$data
+        be &lt;- kappa0_benchmark_spectral(data,item$spectrum,cfg$alpha,cfg$T_final,
+                                         cfg$diffusion,N=space_grid$N)
+        exact &lt;- function(edge,x) kappa0_benchmark_exact(edge,x,cfg$T_final,cfg$alpha,cfg$diffusion)
+        data.frame(h=data$mesh$h,error=kappa0_final_error(data$mesh,be,exact),
+            mass_error=abs(sum(data$C %*% be)-3*(1+cfg$T_final)),tau=space_grid$time_step)
+    }))
+    spatial$rate &lt;- c(NA_real_,log(head(spatial$error,-1)/tail(spatial$error,-1))/
+                                   log(head(spatial$h,-1)/tail(spatial$h,-1)))
+    item &lt;- get_data(cfg$temporal_h); data &lt;- item$data
+    semidiscrete &lt;- kappa0_benchmark_spectral(data,item$spectrum,cfg$alpha,cfg$T_final,cfg$diffusion)
+    temporal_table &lt;- function(Ns) {
+        table &lt;- do.call(rbind,lapply(Ns,function(N) {
+            be &lt;- kappa0_benchmark_spectral(data,item$spectrum,cfg$alpha,cfg$T_final,cfg$diffusion,N=N)
+            data.frame(tau=cfg$T_final/N,N=N,error=kappa0_l2_norm(data$C,be-semidiscrete),
+                       mass_error=abs(sum(data$C %*% be)-3*(1+cfg$T_final)))
+        }))
+        table$rate &lt;- c(NA_real_,log(head(table$error,-1)/tail(table$error,-1))/
+                                         log(head(table$tau,-1)/tail(table$tau,-1)))
+        table$error_per_tau &lt;- table$error/table$tau
+        table
+    }
+    temporal &lt;- temporal_table(cfg$temporal_N)
+    temporal_paper &lt;- temporal_table(if(is.null(cfg$temporal_paper_N)) cfg$temporal_N else cfg$temporal_paper_N)
+    temporal_fit &lt;- data.frame(reference=1,observed=unname(coef(lm(log(error)~log(tau),data=temporal))[2L]),
+                               N_min=min(temporal$N),N_max=max(temporal$N))
+    positive_time &lt;- seq.int(2L,nrow(data$C))
+    time_rates &lt;- cfg$diffusion*item$spectrum$values[positive_time]^(cfg$alpha/2)
+    time_initial &lt;- as.numeric(Matrix::crossprod(item$spectrum$vectors,data$C %*% data$initial))[positive_time]
+    time_forcing &lt;- as.numeric(Matrix::crossprod(item$spectrum$vectors,data$spatial_load))[positive_time]
+    temporal_fit$asymptotic_error_constant &lt;- cfg$T_final/2*sqrt(sum(
+        ((time_initial-time_forcing/time_rates)*time_rates^2*exp(-time_rates*cfg$T_final))^2))
+    temporal_fit$finest_error_per_tau &lt;- tail(temporal$error_per_tau,1L)
+    temporal_fit$finest_ratio_relative_gap &lt;- abs(temporal_fit$finest_error_per_tau/
+                                                temporal_fit$asymptotic_error_constant-1)
+    item &lt;- get_data(cfg$rational_h);data &lt;- item$data;spectrum &lt;- item$spectrum
+    stopifnot(cfg$gamma_star&lt;=spectrum$values[2L])
+    grid &lt;- kappa0_time_grid(cfg$T_final,cfg$rational_tau)
+    reference &lt;- vapply(seq_len(grid$N),function(k)
+        kappa0_benchmark_spectral(data,spectrum,cfg$alpha,grid$times[k+1L],cfg$diffusion,N=k),
+        numeric(nrow(data$C)))
+    # Modal diagnostics use all positive FEM eigenvalues. For the given
+    # aligned sine data, only one positive eigenvalue (a repeated pair) is excited.
+    V &lt;- spectrum$vectors
+    positive &lt;- seq.int(2L,nrow(data$C))
+    lambda &lt;- spectrum$values[positive]
+    initial_coef &lt;- as.numeric(Matrix::crossprod(V,data$C %*% data$initial))[positive]
+    forcing_coef &lt;- as.numeric(Matrix::crossprod(V,data$spatial_load))[positive]
+    rates &lt;- cfg$diffusion*lambda^(cfg$alpha/2)
+    k &lt;- seq_len(grid$N)
+    log_q &lt;- -log1p(grid$time_step*rates)
+    decay &lt;- exp(outer(log_q,k));gain &lt;- -expm1(outer(log_q,k))/rates
+    reference_modal &lt;- decay*initial_coef+gain*forcing_coef
+    reference_unit &lt;- decay+gain
+    tolerance &lt;- 1e-9*max(1,sqrt(sum(initial_coef^2)),sqrt(sum(forcing_coef^2)))
+    excited &lt;- abs(initial_coef)&gt;tolerance | abs(forcing_coef)&gt;tolerance
+    spectrum_diagnostics &lt;- data.frame(mode=positive,eigenvalue=lambda,
+        inverse_argument=cfg$gamma_star/lambda,initial_coefficient=initial_coef,
+        forcing_coefficient=forcing_coef,excited=excited)
+    projected_phi_norm &lt;- sqrt(sum(initial_coef^2))
+    mass_rows &lt;- list()
+    rational &lt;- do.call(rbind,lapply(cfg$m_vector,function(m) {
+        op &lt;- my.fractional.operators.kappa0(data$G,cfg$alpha/2,data$C,cfg$gamma_star,
+                                            m,grid$time_step,cfg$diffusion)
+        evolved &lt;- kappa0_evolution(op,data$initial,grid$N,
+                       function(left,right) data$spatial_load,keep_history=TRUE)
+        delta &lt;- evolved$history[,-1L,drop=FALSE]-reference
+        error &lt;- sqrt(grid$time_step*sum(delta*as.matrix(data$C %*% delta)))
+        S &lt;- kappa0_brasil_inverse(lambda/cfg$gamma_star,op$coefficients)
+        rational_rates &lt;- cfg$diffusion*cfg$gamma_star^(cfg$alpha/2)/S
+        log_H &lt;- -log1p(grid$time_step*rational_rates)
+        decay_m &lt;- exp(outer(log_H,k));gain_m &lt;- -expm1(outer(log_H,k))/rational_rates
+        modal &lt;- decay_m*initial_coef+gain_m*forcing_coef
+        modal_error &lt;- sqrt(grid$time_step*sum((modal-reference_modal)^2))
+        # Exact induced norm for the fixed-mesh family u0=g, f(t)=g:
+        # diagonalization makes its squared space-time norm a diagonal form.
+        operator_error &lt;- max(sqrt(grid$time_step*rowSums((decay_m+gain_m-reference_unit)^2)))
+        source_x &lt;- c(0,exp(seq(log(1e-14),0,length.out=20001L)))
+        source_uniform &lt;- max(abs(kappa0_brasil_power(source_x,op$coefficients)-source_x^(cfg$alpha/2)))
+        point_error &lt;- if(any(excited)) max(abs(S[excited]-(cfg$gamma_star/lambda[excited])^(cfg$alpha/2))) else 0
+        expected &lt;- 3*(1+grid$times)
+        mass_rows[[length(mass_rows)+1L]] &lt;&lt;- data.frame(m=m,time=grid$times,
+            mass=evolved$mass,expected_mass=expected,mass_difference=evolved$mass-expected)
+        disagreement &lt;- abs(error-modal_error)
+        data.frame(m=m,error=error,modal_error=modal_error,
+            sparse_modal_disagreement=disagreement,
+            operator_error=operator_error,operator_bound_for_phi=projected_phi_norm*operator_error,
+            resolvent_error=max(abs(exp(log_H)-exp(log_q))),
+            source_point_error=point_error,sampled_source_uniform_error=source_uniform,
+            final_error=kappa0_l2_norm(data$C,delta[,grid$N]),
+            max_mass_error=max(abs(evolved$mass-expected)),
+            recurrence_mass_error=evolved$max_mass_error,
+            partial_fraction_error=op$reconstruction_error,
+            resolved=modal_error&gt;100*max(disagreement,.Machine$double.eps))
+    }))
+    item &lt;- get_data(cfg$continuity_h);data &lt;- item$data
+    shift_grid &lt;- kappa0_time_grid(cfg$T_final,cfg$continuity_tau)
+    continuity &lt;- do.call(rbind,lapply(cfg$kappa_vector,function(kappa) {
+        be &lt;- kappa0_benchmark_spectral(data,item$spectrum,cfg$alpha,cfg$T_final,
+                                         cfg$diffusion,kappa=kappa,N=shift_grid$N)
+        exact &lt;- function(edge,x) kappa0_benchmark_exact(edge,x,cfg$T_final,
+                                                        cfg$alpha,cfg$diffusion,kappa)
+        mean_be &lt;- kappa0_benchmark_scalar(cfg$diffusion*kappa^cfg$alpha,cfg$T_final,shift_grid$N)
+        mean_exact &lt;- kappa0_benchmark_scalar(cfg$diffusion*kappa^cfg$alpha,cfg$T_final)
+        data.frame(kappa=kappa,error=kappa0_final_error(data$mesh,be,exact),
+            discrete_mass_error=abs(sum(data$C %*% be)-3*mean_be),
+            continuous_mass_difference=abs(sum(data$C %*% be)-3*mean_exact))
+    }))
+    result &lt;- list(parameters=cfg,spatial=spatial,temporal=temporal,temporal_paper=temporal_paper,
+        temporal_fit=temporal_fit,rational=rational,rational_spectrum=spectrum_diagnostics,
+        projected_phi_norm=projected_phi_norm,
+        rational_mass=do.call(rbind,mass_rows),continuity=continuity,
+        source_hashes=tools::md5sum(c(&quot;kappa0func.Rmd&quot;,notebook_file)),
+        package_versions=vapply(c(&quot;Matrix&quot;,&quot;rSPDE&quot;),function(p)
+            as.character(utils::packageVersion(p)),character(1)),
+        elapsed_seconds=proc.time()[[&quot;elapsed&quot;]]-started,
+        generated_at=format(Sys.time(),&quot;%Y-%m-%d %H:%M:%S %Z&quot;,tz=&quot;Asia/Riyadh&quot;))
+    dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
+    saveRDS(result,output_file)
+    result
+}</code></pre>
 </div>
 
 

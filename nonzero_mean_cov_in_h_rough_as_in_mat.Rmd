@@ -1,0 +1,359 @@
+---
+title: "Nonzero-mean zero-shift spatial convergence: rough forcing"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+    self_contained: true
+    css: visual.css
+---
+
+[Experiment index](index.html) · [Zero-shift functions](kappa0func.html) · [m](nonzero_mean_conv_in_m_isolated.html) · [tau](nonzero_mean_conv_in_tau_mat.html) · [smooth h](nonzero_mean_cov_in_h_mat.html) · [Mean-zero rough study](true_diff_cov_in_h_rough_as_in_mat.html)
+
+## Problem and relation to the other three notebooks
+
+This fourth added-mean convergence study complements the three restored
+smooth experiments. It combines a dedicated centered rough
+run with its exact constant mode, rather than restoring an archived
+nonzero-mean rough run. All nine exponents
+$\alpha=0.9,\ldots,1.7$ and all meshes of the mean-zero rough study are retained.
+The connected tadpole has stem length 1, loop length 2, and total length 3.
+We solve
+$$
+ u_t+\nu(-\Delta_\Gamma)^{\alpha/2}u=1+g,\qquad u(s,0)=1,
+ \qquad\kappa=0,
+$$
+with continuity and Kirchhoff conditions, where
+$$
+ g=\sum_{j\ge1}j^{-1}\phi_j,\qquad
+ \phi_j=0\text{ on the stem},\qquad
+ \phi_j(x)=\sin(2^j\pi x)\text{ on the loop }[0,2].
+$$
+The rough part is unchanged: $g\in L_2$ but has no positive spectral
+Sobolev regularity. Since every $\phi_j$ has zero spatial mean,
+$$
+ u_{\rm added}(s,t)=u_{\rm rough,zero}(s,t)+1+t,
+ \qquad\bar u(t)=1+t,\qquad M(t)=3(1+t).
+$$
+Adding a smooth constant changes neither the forcing's rough regularity
+nor the centered fractional diffusion. It does supply mass at rate 3.
+
+## Running and knitting
+
+Run setup, parameters, and the computation chunk manually to save results.
+Knitting only loads that saved file, checks its parameters, and displays
+results. The computation chunk has `eval=FALSE`; missing or incompatible
+results stop knitting without launching a solver.
+
+By default the manual computation recomputes the centered rough PDE at
+the refined settings, saving it to this experiment's own centered file.
+It then adds the exact constant component as explained below. To reuse
+that centered file on a later run, set `recompute_centered <- FALSE`;
+all scientific parameters must still match. The mean-zero study's files
+are unchanged. Worker count affects execution only. Internal checks belong
+in `DOCS/NAP`.
+
+```{r nonzero-mean-rough-setup}
+knitr::opts_chunk$set(message=FALSE,warning=TRUE,error=FALSE,cache=FALSE,
+                      dev="png",fig.width=8,fig.height=5)
+if(!requireNamespace("ggplot2",quietly=TRUE)) stop("Install ggplot2 for figures.")
+```
+
+## Explicit full-run parameters
+
+The rough forcing, $J=5:9$, $K=16$, $J_\star=18$, $\nu=1$,
+and $\gamma_*=1/3$ are retained. Relative to the first added-mean run,
+the solver time step decreases tenfold to $8\cdot10^{-8}$, reference
+time step decreases to $5\cdot10^{-6}$, and rational order increases
+from 14 to 16. These changes target the high-alpha, fine-mesh temporal
+floor. The sampled norm and the full constant error are retained.
+A maximum mean squared-error fraction of 0.02 is enforced in the
+experiment, so that the mean increases the centered error by less than
+about 1.02%. This budget does not replace independent time-refinement
+checks, which remain in `DOCS/NAP`.
+
+The rational order 16 passes the coefficient admissibility conditions for
+all nine exponents in the installed tables. Higher orders are not assumed
+to be available uniformly. This full run advances 12500000 backward Euler
+steps per case at T=1; `workers` parallelizes cases. The earlier, cheaper
+run is retained under its original filename.
+
+```{r nonzero-mean-rough-parameters}
+T_final <- 1
+kappa <- 0
+gamma_star <- 1/3
+alpha_vector <- seq(0.9,1.7,0.1)
+diffusion <- 1
+J_vector <- 5:9
+time_step <- 8e-8
+m_fixed <- 16L
+reference_cutoff <- 16L
+reference_J <- 18L
+reference_time_step <- 5e-6
+max_tail_squared_fraction <- 0.002
+workers <- 9L
+initial_mean <- 1
+forcing_mean <- 1
+graph_length <- 3
+max_mean_squared_fraction <- 0.02
+recompute_centered <- TRUE
+centered_file <- "data_files/nonzero_mean_rough_centered_publication.rds"
+output_file <- "data_files/nonzero_mean_cov_in_h_rough_as_in_mat_publication.rds"
+
+# Bundle only the visible parameters above for the shared runner.
+settings <- list(study="rough_h",T_final=T_final,kappa=kappa,gamma_star=gamma_star,
+    alpha=alpha_vector,diffusion=diffusion,workers=workers,J=J_vector,tau=time_step,m=m_fixed,
+    cutoff=reference_cutoff,reference_J=reference_J,reference_tau=reference_time_step,
+    max_tail_squared_fraction=max_tail_squared_fraction)
+centered_settings <- settings
+settings$initial_mean <- initial_mean
+settings$forcing_mean <- forcing_mean
+settings$graph_length <- graph_length
+settings$max_mean_squared_fraction <- max_mean_squared_fraction
+settings_table <- data.frame(parameter=names(settings),
+    value=vapply(settings,function(x) paste(x,collapse=", "),character(1)))
+knitr::kable(settings_table)
+```
+
+## Direct sum of the rough subspace and the constant mode
+
+The centered solver uses the same quarter-loop interval $[0,1/2]$, zero
+endpoint values, odd reflection, and period-one extension as the mean-zero
+rough notebook. Four copies reconstruct the full loop; the centered
+solution is zero on the stem. Its reduced mass matrix is four times the
+interval mass matrix. On aligned meshes $h=2^{-J}$ the infinite forcing
+has the exact FEM load $\sum_{j=1}^{J-1}j^{-1}(\phi_j,\psi_i)$; these
+integrals are assembled analytically, without sampling the rough series.
+
+A constant does not belong to that reduced space. The **total** solution
+therefore lives in the direct sum of the antisymmetric subspace and the
+full-graph constant space:
+$$
+ U_{\rm added}^k=\mathcal E U_{\rm red}^k+a_k\mathbf1,
+ \qquad a_0=1,\qquad a_{k+1}=a_k+\tau,
+ \qquad a_k=1+t_k.
+$$
+Here $\mathcal E$ is the reflection/extension operator. We evaluate this
+scalar recurrence by its closed form, so no accumulated time-stepping
+roundoff is introduced. BRASIL and all shifted sparse solves act only on
+$U_{\rm red}^k$, with `split_mean=FALSE` there. No quarter-interval mean
+is subtracted. The constant is included on **both the stem and loop**;
+the total solution no longer has the centered solution's odd symmetry.
+
+This is the paper's zero-shift mean splitting on this invariant subspace:
+$\bar U^k=1+t_k$, $\bar f^k=1$, and
+$F_Q^k=F^k-C\mathbf1=F_g$. Consequently the centered evolution is exactly
+the saved mean-zero rough evolution. Combining it with the separate mean
+is the numerical scheme itself, without another rational approximation
+or a new PDE solve. The saved result records the centered result's file
+hash, generation date, original source hashes, and parameters separately
+from this notebook's generation date and source hashes.
+
+## Reference solution and the measured total error
+
+The same reference cutoff is used for the centered continuum solution:
+$$
+ u_K(s,t)=\sum_{j=1}^{K}\frac{1-e^{-\nu(\pi2^j)^\alpha t}}
+ {j\nu(\pi2^j)^\alpha}\phi_j(s).
+$$
+The added reference is $u_K+1+t$. Its omitted rough tail has the same bound
+$$
+ B_K=\frac{T}{\nu^2\pi^{2\alpha}}
+ \frac{2^{-2\alpha(K+1)}}{(K+1)^2(1-2^{-2\alpha})}.
+$$
+We retain the tail check against the **centered** error, so adding the
+constant cannot make an inadequate rough reference appear acceptable.
+Both centered and total tail fractions are reported.
+
+The numerical reconstruction is right-constant in time: on
+$(t_{k-1},t_k]$ its constant coefficient is $1+t_k$, while the reference
+has $1+t$. The centered error is orthogonal to constants, including under
+the consistent reference mass matrix by antisymmetry. Thus the actual
+sampled error is computed exactly by
+$$
+ E_{\rm added}^2=E_{\rm centered}^2+
+ |\Gamma|\sum_\ell w_\ell
+ [\bar f(t_{k(\ell)}-t_\ell^\star)]^2,
+ \qquad |\Gamma|=3,\quad\bar f=1.
+$$
+The weights and step indices below match `kappa0_sampled_error()`:
+$w_\ell=t_\ell^\star-t_{\ell-1}^\star$ and $k(\ell)$ selects the first
+solver time at or after the reference time. The factor is the full length
+3, **not** the loop length 2 or quarter-loop length 1/2. For an exact time
+integral and uniform steps the added squared term would be $T\tau^2$;
+we instead use the study's actual sampled quadrature, preserving its norm.
+The shared constant initial mean cancels from this error.
+
+Raw errors, $J E_h$, fitted slopes, and $h^\alpha$ guides are reported as
+in the mean-zero notebook. The extra temporal term can eventually cause
+a floor under spatial refinement; it is retained in every total error.
+`mass_by_antisymmetry=0` describes only the centered component. Total
+initial/final masses and the closed-form mean recurrence are saved separately.
+
+## Manual computation
+
+```{r nonzero-mean-rough-recompute, eval=FALSE}
+started <- proc.time()[["elapsed"]]
+if(recompute_centered) {
+    for(package in c("Matrix","rSPDE","Rcpp","RcppEigen"))
+        if(!requireNamespace(package,quietly=TRUE)) stop("Missing package: ",package)
+    true_diff <- local({
+        extracted <- tempfile("nonzero_mean_rough_",fileext=".R")
+        on.exit(unlink(extracted),add=TRUE)
+        knitr::purl("kappa0func.Rmd",output=extracted,quiet=TRUE,documentation=0L)
+        functions <- new.env(parent=globalenv())
+        sys.source(extracted,envir=functions)
+        functions
+    })
+    centered_source <- centered_file
+    centered <- true_diff$kappa0_compute_study(centered_settings,
+        "nonzero_mean_cov_in_h_rough_as_in_mat.Rmd",centered_source)
+} else {
+    centered_source <- centered_file
+    if(!file.exists(centered_source)) stop("Missing centered result; set recompute_centered=TRUE and run manually.")
+    centered <- readRDS(centered_source)
+}
+scientific <- setdiff(names(centered_settings),"workers")
+bad <- scientific[!vapply(scientific,function(name)
+    isTRUE(all.equal(centered$parameters[[name]],centered_settings[[name]],tolerance=1e-12)),logical(1))]
+if(length(bad)) stop("Centered result differs for: ",paste(bad,collapse=", "))
+stopifnot(is.finite(initial_mean),is.finite(forcing_mean),graph_length==3)
+# Identical time-grid and index conventions to the shared sampled solver.
+N <- max(1,ceiling(T_final/time_step))
+solver_times <- seq(0,T_final,length.out=N+1)
+N_reference <- max(1,ceiling(T_final/reference_time_step))
+reference_times <- seq(0,T_final,length.out=N_reference+1)
+times <- reference_times[-1L]
+targets <- findInterval(times,solver_times,left.open=TRUE)
+mean_error_squared <- graph_length*sum(diff(reference_times)*
+    (forcing_mean*(solver_times[targets+1L]-times))^2)
+result <- centered
+result$centered_provenance <- list(file=centered_source,
+    md5=tools::md5sum(centered_source),generated_at=centered$generated_at,
+    source_hashes=centered$source_hashes,parameters=centered$parameters,
+    elapsed_seconds=centered$elapsed_seconds)
+d <- result$results
+d$centered_error <- d$error
+d$centered_tail_squared_fraction <- d$tail_squared_fraction
+stopifnot(all(d$centered_tail_squared_fraction<=max_tail_squared_fraction))
+d$mean_error_squared <- mean_error_squared
+d$error <- sqrt(d$centered_error^2+mean_error_squared)
+d$corrected_error <- d$J*d$error
+d$tail_squared_fraction <- d$cutoff_squared_bound/d$error^2
+d$mean_squared_error_fraction <- mean_error_squared/d$error^2
+if(any(d$mean_squared_error_fraction>max_mean_squared_fraction))
+    stop("Mean error budget exceeded: reduce time_step, recompute centered PDE, and rerun.")
+d$initial_mass <- graph_length*initial_mean
+d$final_mass <- graph_length*(initial_mean+forcing_mean*T_final)
+result$results <- d
+result$rates <- do.call(rbind,lapply(alpha_vector,function(a) {
+    x <- d[d$alpha==a,]
+    data.frame(alpha=a,reference=a,
+        raw=unname(coef(lm(log(error)~log(axis),data=x))[2L]),
+        observed=unname(coef(lm(log(corrected_error)~log(axis),data=x))[2L]))
+}))
+result$mean_recurrence <- list(initial=initial_mean,forcing=forcing_mean,
+    graph_length=graph_length,steps=N,time_step=T_final/N,
+    formula="a_k = initial_mean + forcing_mean * t_k",
+    sampled_squared_error=mean_error_squared)
+result$parameters <- settings
+result$source_hashes <- tools::md5sum(c("kappa0func.Rmd","nonzero_mean_cov_in_h_rough_as_in_mat.Rmd"))
+result$generated_at <- format(Sys.time(),"%Y-%m-%d %H:%M:%S %Z",tz="Asia/Riyadh")
+result$elapsed_seconds <- proc.time()[["elapsed"]]-started
+result$error_definition <- "sampled full-graph continuum-reference error: centered rough error plus exact constant contribution"
+dir.create(dirname(output_file),recursive=TRUE,showWarnings=FALSE)
+saveRDS(result,output_file)
+```
+
+## Load saved results
+
+```{r nonzero-mean-rough-load-results}
+if(!file.exists(output_file)) stop("Saved result missing. Run setup, parameters, and recompute manually before knitting.")
+result <- readRDS(output_file)
+scientific <- setdiff(names(settings),"workers")
+bad <- scientific[!vapply(scientific,function(name)
+    isTRUE(all.equal(result$parameters[[name]],settings[[name]],tolerance=1e-12)),logical(1))]
+if(length(bad)) stop("Saved result differs for: ",paste(bad,collapse=", "),". Recompute manually.")
+cat("Added-mean result generated:",result$generated_at,
+    "\nCentered full PDE run generated:",result$centered_provenance$generated_at,
+    "\nCentered result:",result$centered_provenance$file,"\n")
+knitr::kable(result$rates,digits=6)
+cat("Sampled squared error from the mean:",result$mean_recurrence$sampled_squared_error,
+    "\nLargest fraction of total squared error from the mean:",
+    max(result$results$mean_squared_error_fraction),"\n")
+```
+
+## Raw and logarithmically corrected spatial convergence
+
+```{r nonzero-mean-rough-plot-results}
+d <- result$results
+d$alpha_label <- factor(d$alpha,levels=settings$alpha)
+if (settings$study=="m") {
+    p <- ggplot2::ggplot(d,ggplot2::aes(sqrt(m),error,colour=alpha_label,group=alpha_label))+
+        ggplot2::geom_line()+ggplot2::geom_point(ggplot2::aes(shape=resolved))+
+        ggplot2::scale_y_log10()+ggplot2::labs(x="sqrt(m)",y="Isolated space-time L2 error",
+            colour="alpha",shape="Resolved",title="Zero-shift rational convergence")
+} else {
+    p <- ggplot2::ggplot(d,ggplot2::aes(axis,error,colour=alpha_label,group=alpha_label))+
+        ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::scale_x_log10()+
+        ggplot2::scale_y_log10()+ggplot2::labs(x=if(settings$study=="tau") "tau" else "h",
+            y="Sampled space-time L2 error",colour="alpha",title="Zero-shift rough convergence: nonzero mean")
+}
+# Reference curves retain their prescribed slope and are geometrically
+# anchored to the data. They are guides, not additional computed errors.
+guides <- do.call(rbind,lapply(settings$alpha,function(a) {
+    x <- d[d$alpha==a,]
+    power <- if(settings$study=="m") -2*pi*sqrt(a/2) else if(settings$study=="tau") 1 else 2
+    xx <- if(settings$study=="m") sqrt(x$m) else log(x$axis)
+    if(settings$study=="rough_h") power <- a
+    x$guide <- exp(mean(log(x$error)-power*xx)+power*xx)
+    x
+}))
+guides$alpha_label <- factor(guides$alpha,levels=settings$alpha)
+p <- p+ggplot2::geom_line(data=guides,ggplot2::aes(y=guide),linetype="dashed",alpha=0.6)+
+    ggplot2::theme_minimal(base_size=12)+ggplot2::labs(subtitle=sprintf("kappa=0; gamma*=%g",settings$gamma_star))
+print(p)
+figure_dir <- "data_files/nonzero_mean_cov_in_h_rough_as_in_mat_publication"
+dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
+ggplot2::ggsave(file.path(figure_dir,"convergence.pdf"),p,width=8,height=5)
+```
+
+### Logarithmically corrected spatial errors
+
+The raw-error plot above includes h-to-the-alpha guides for context;
+the theoretical logarithmic correction is assessed in this second plot.
+The corrected slopes are the `observed` column of the rate table.
+
+```{r nonzero-mean-rough-corrected-figure}
+corrected_plot <- ggplot2::ggplot(d,ggplot2::aes(axis,corrected_error,colour=alpha_label))+
+    ggplot2::geom_line()+ggplot2::geom_point()+ggplot2::scale_x_log10()+ggplot2::scale_y_log10()+
+    ggplot2::labs(x="h",y="J times sampled space-time L2 error",colour="alpha")+
+    ggplot2::theme_minimal(base_size=12)
+corrected_guides <- do.call(rbind,lapply(settings$alpha,function(a) {
+    x <- d[d$alpha==a,]; x$guide <- exp(mean(log(x$corrected_error)-a*log(x$axis)))*x$axis^a; x
+}))
+corrected_plot <- corrected_plot+ggplot2::geom_line(data=corrected_guides,
+    ggplot2::aes(y=guide),linetype="dashed",alpha=0.6)
+print(corrected_plot)
+ggplot2::ggsave(file.path(figure_dir,"corrected_convergence.pdf"),corrected_plot,width=8,height=5)
+cat("Largest centered squared-tail fraction:",max(d$centered_tail_squared_fraction),"\n")
+```
+
+## Numerical values and reproducibility
+
+```{r nonzero-mean-rough-error-table}
+knitr::kable(result$results,digits=12)
+knitr::kable(data.frame(package=names(result$package_versions),
+                        version=unname(result$package_versions)))
+```
+
+The `.rds` file contains the saved settings, errors, rates, source hashes,
+package versions, and generation timestamp. Figures are redrawn from the
+saved values when knitting and written to the full-run figure directory.
+To change the experiment, edit its parameter chunk and run the computation
+chunk manually before knitting again. Setting `NAP.true_diff.recompute`
+or any previous profile option has no effect on knitting these notebooks.
+Internal tests and smaller exploratory runs belong in `DOCS/NAP`, not in
+these report notebooks.
