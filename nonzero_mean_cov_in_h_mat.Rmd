@@ -169,6 +169,19 @@ true_diff <- local({
     functions
 })
 result <- true_diff$kappa0_compute_study(settings,"nonzero_mean_cov_in_h_mat.Rmd",output_file)
+# Use the same right-endpoint weights and floating-point grid mapping as the solver.
+sample_mean_square <- function(dt) {
+    grid <- true_diff$kappa0_time_grid(T_final,dt)
+    ref <- true_diff$kappa0_time_grid(T_final,settings$reference_tau)$times
+    times <- ref[-1L]
+    k <- findInterval(times,grid$times,left.open=TRUE)
+    3*sum(diff(ref)*(forcing_mean*(grid$times[k+1L]-times))^2)
+}
+dt <- if(settings$study=="h") rep(time_step,nrow(result$results)) else result$results$axis
+mean_square <- vapply(unique(dt),sample_mean_square,numeric(1))
+result$results$mean_error_squared <- mean_square[match(dt,unique(dt))]
+result$results$mean_squared_error_fraction <- result$results$mean_error_squared/result$results$error^2
+saveRDS(result,output_file)
 ```
 
 ## Load saved results

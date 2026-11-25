@@ -1,5 +1,5 @@
 ---
-title: "Restored nonzero-mean zero-shift convergence in m"
+title: "Nonzero-mean zero-shift convergence in m"
 output:
   html_document:
     toc: true
@@ -12,14 +12,13 @@ output:
 
 [Experiment index](index.html) · [Zero-shift functions](kappa0func.html) · [m](nonzero_mean_conv_in_m_isolated.html) · [tau](nonzero_mean_conv_in_tau_mat.html) · [h](nonzero_mean_cov_in_h_mat.html) · [rough h](nonzero_mean_cov_in_h_rough_as_in_mat.html) · [Mean-zero counterpart](true_diff_conv_in_m_isolated.html) · [Single-mode benchmark](true_diff_zero_shift_benchmark.html)
 
-## Restored experiment and its relation to the mean-zero studies
+## Experiment and its relation to the mean-zero studies
 
-This notebook restores a previously computed **nonzero-mean** zero-shift
+This notebook computes a **nonzero-mean** zero-shift
 experiment. It is separate from the corrected mean-zero `true_diff_*`
 notebooks and from the single-sine zero-shift benchmark. It uses all nine
 exponents $\alpha=0.9,\ldots,1.7$ and the same connected length-(1,2) tadpole.
-The full archived numerical results are copied to a distinct filename;
-restoring and knitting do not rerun the PDE computation.
+The full sparse run has its own dataset. Knitting loads the saved result.
 
 Let $u_{\rm zero}$ denote the solution with the original smooth mean-zero data.
 Here the initial condition and forcing are
@@ -62,7 +61,7 @@ knitr::opts_chunk$set(message=FALSE,warning=TRUE,error=FALSE,cache=FALSE,
 if(!requireNamespace("ggplot2",quietly=TRUE)) stop("Install ggplot2 for the figures.")
 ```
 
-## Explicit parameters of the restored full run
+## Explicit parameters of the full run
 
 The defaults below match the archived numerical run. They are not silently
 replaced with the current mean-zero study's defaults. `workers` affects
@@ -87,7 +86,7 @@ forcing_mean <- 1
 AAA <- 1
 OMEGA <- pi
 stopifnot(length(initial_modes)==K,!(7L %in% initial_modes))
-output_file <- "data_files/nonzero_mean_conv_in_m_isolated.rds"
+output_file <- "data_files/nonzero_mean_conv_in_m_isolated_publication.rds"
 
 # Bundle only the visible parameters above for the shared runner.
 settings <- list(study="m",T_final=T_final,kappa=kappa,gamma_star=gamma_star,
@@ -142,8 +141,7 @@ to make fitted slopes match the root-exponential reference guide.
 
 ## Computation
 
-This is an optional explicit rerun, not part of knitting. The saved
-restored result is already available. A rerun writes only this notebook's
+This is an optional explicit rerun, not part of knitting. The report uses the fresh sparse production dataset. A rerun writes only this notebook's
 own output path, leaving the mean-zero experiments and the archive intact.
 
 ```{r nonzero-mean-conv-in-m-isolated-recompute, eval=FALSE}
@@ -214,7 +212,7 @@ guides$alpha_label <- factor(guides$alpha,levels=settings$alpha)
 p <- p+ggplot2::geom_line(data=guides,ggplot2::aes(y=guide),linetype="dashed",alpha=0.6)+
     ggplot2::theme_minimal(base_size=12)+ggplot2::labs(subtitle=sprintf("kappa=0; gamma*=%g",settings$gamma_star))
 print(p)
-figure_dir <- "data_files/nonzero_mean_conv_in_m_isolated"
+figure_dir <- "data_files/nonzero_mean_conv_in_m_isolated_publication"
 dir.create(figure_dir,recursive=TRUE,showWarnings=FALSE)
 ggplot2::ggsave(file.path(figure_dir,"convergence.pdf"),p,width=8,height=5)
 ```
@@ -242,15 +240,4 @@ knitr::kable(data.frame(package=names(result$package_versions),
                         version=unname(result$package_versions)))
 ```
 
-The restored RDS is a byte-for-byte copy of the archived full result,
-including its original computation timestamp, source hashes, and package
-versions. The original source hashes refer to the earlier notebook names;
-they are retained as historical provenance and are not relabeled as a new
-computation. The restoration manifest is in
-`DOCS/NAP/true_diff_internal/restored_nonzero_mean_checks`.
-
-If you edit parameters, run the manual computation chunk to generate a new
-result at this notebook's own output path, then knit again. A new run will
-record the current helper and this notebook as its sources. The archive is
-retained, so the original computation remains recoverable. No profile or
-recompute option causes simulations to run while knitting.
+The production dataset records its settings, source hashes, package versions and computation date.
