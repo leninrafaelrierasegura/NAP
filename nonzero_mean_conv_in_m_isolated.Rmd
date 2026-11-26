@@ -177,8 +177,13 @@ cat(if(restored_archive) "Restored archived computation; original generation tim
 
 The benchmark slopes describe the theoretical rate scale. The observed
 fits use the computed data below; they are not replaced by the benchmark.
-For smooth data, `max_mass_error` is the maximum absolute discrepancy from
-the discrete mass recurrence over the entire trajectory. Here the expected mass grows as 3(1+t); the diagnostic checks its balance, not conservation.
+For these data, the direct mass-balance diagnostic is
+$\max_{0\leq k\leq N}|\mathbf1^T C U^k-3(1+t_k)|$.
+The column `max_exact_mass_error` records this maximum over every solver
+node, including the initial projection. It compares with the analytic
+mass law evaluated directly, without an accumulated reference recurrence.
+The column `max_mass_error` retains the original recurrence diagnostic
+for comparison. Both measure mass balance under forcing.
 
 ```{r nonzero-mean-conv-in-m-isolated-rates}
 knitr::kable(result$rates,digits=6)

@@ -1288,7 +1288,8 @@ Rcpp::List kappa0_sampled_evolve_cpp(
     const Eigen::MappedSparseMatrix<double>& metric_in,
     MatrixXd residual_gram, MatrixXd exact_gram, MatrixXd coefficients,
     Rcpp::IntegerVector target_steps, VectorXd weights,
-    double tau, int n_steps, double forcing_mean, bool split_mean) {
+    double tau, int n_steps, double forcing_mean, bool split_mean,
+    double exact_mass_initial, double exact_mass_rate) {
     Eigen::setNbThreads(1);
     SparseMatrix<double> C=C_in, metric=metric_in;
     const int n=C.rows(), modes=projection.cols();
@@ -1321,6 +1322,8 @@ Rcpp::List kappa0_sampled_evolve_cpp(
     VectorXd c_one=C*VectorXd::Ones(n);
     const double volume=c_one.sum();
     double expected_mass=c_one.dot(initial), max_mass_error=0;
+    const bool exact_mass_checked=std::isfinite(exact_mass_initial) && std::isfinite(exact_mass_rate);
+    double max_exact_mass_error=exact_mass_checked ? std::abs(expected_mass-exact_mass_initial) : NA_REAL;
     VectorXd anchor(modes), shift(modes), mean(modes), centered(modes);
     VectorXd deviation(modes), residual_product(modes);
     MatrixXd scatter(modes,modes);
@@ -1354,6 +1357,11 @@ Rcpp::List kappa0_sampled_evolve_cpp(
             u.swap(next);
             if (split_mean)
                 max_mass_error=std::max(max_mass_error,std::abs(c_one.dot(u)-expected_mass));
+            if (exact_mass_checked) {
+                // Direct analytic law at t_k, not an accumulated recurrence.
+                const double exact_mass=exact_mass_initial+exact_mass_rate*(step*tau);
+                max_exact_mass_error=std::max(max_exact_mass_error,std::abs(c_one.dot(u)-exact_mass));
+            }
         }
         int last=first+1;
         while (last<samples && target_steps[last]==goal) ++last;
@@ -1399,6 +1407,8 @@ Rcpp::List kappa0_sampled_evolve_cpp(
     return Rcpp::List::create(Rcpp::Named("error")=std::sqrt(total),
         Rcpp::Named("final_state")=u, Rcpp::Named("solver_steps")=step,
         Rcpp::Named("max_mass_error")=max_mass_error,
+        Rcpp::Named("max_exact_mass_error")=max_exact_mass_error,
+        Rcpp::Named("exact_mass_checked")=exact_mass_checked,
         Rcpp::Named("final_mass")=c_one.dot(u),
         Rcpp::Named("mass_checked")=split_mean);
 }
@@ -1554,7 +1564,8 @@ kappa0_smooth_reference <- function(reference_mesh, data, alpha, diffusion, A=1,
 
 kappa0_sampled_error <- function(op, grid, initial, load, forcing, reference_grid,
                                  coefficients, projection, forcing_mean=0,
-                                 split_mean=TRUE, engine=c("cpp","R")) {
+                                 split_mean=TRUE, engine=c("cpp","R"),
+                                 exact_mass_initial=NA_real_, exact_mass_rate=NA_real_) {
     engine <- match.arg(engine)
     stopifnot(length(initial)==nrow(op$C), length(load)==length(initial),
               length(forcing)==length(grid$times),
@@ -1573,6 +1584,8 @@ kappa0_sampled_error <- function(op, grid, initial, load, forcing, reference_gri
         step <- 0L
         one <- rep(1,length(u)); c_one <- as.numeric(op$C %*% one)
         expected <- sum(c_one*u); mass_error <- 0
+        exact_checked <- is.finite(exact_mass_initial) && is.finite(exact_mass_rate)
+        exact_error <- if(exact_checked) abs(expected-exact_mass_initial) else NA_real_
         runs <- rle(targets); first <- 1L
         for (run in seq_along(runs$values)) {
             while (step<runs$values[run]) {
@@ -1582,6 +1595,8 @@ kappa0_sampled_error <- function(op, grid, initial, load, forcing, reference_gri
                 u <- if (split_mean) my.solver.kappa0(op,rhs) else kappa0_restricted_solve(op,rhs)
                 expected <- expected+grid$time_step*sum(F)
                 if (split_mean) mass_error <- max(mass_error,abs(sum(c_one*u)-expected))
+                if (exact_checked) exact_error <- max(exact_error,
+                    abs(sum(c_one*u)-(exact_mass_initial+exact_mass_rate*grid$times[step+1L])))
             }
             last <- first+runs$lengths[run]-1L
             columns <- seq.int(first,last)
@@ -1592,7 +1607,8 @@ kappa0_sampled_error <- function(op, grid, initial, load, forcing, reference_gri
             first <- last+1L
         }
         return(list(error=sqrt(total),final_state=u,solver_steps=step,
-                    max_mass_error=mass_error,final_mass=sum(c_one*u),mass_checked=split_mean))
+                    max_mass_error=mass_error,max_exact_mass_error=exact_error,
+                    exact_mass_checked=exact_checked,final_mass=sum(c_one*u),mass_checked=split_mean))
     }
     kappa0_compile_sampled_solver()
     matrices <- if(op$beta==1) list(op$LHS) else op$partial_fraction_terms
@@ -1602,7 +1618,8 @@ kappa0_sampled_error <- function(op, grid, initial, load, forcing, reference_gri
     kappa0_sampled_evolve_cpp(general(op$C),lapply(matrices,general),residues,remainder,
         as.numeric(initial),as.numeric(load),as.numeric(forcing),projection$projection,
         general(projection$metric),projection$residual_gram,projection$exact_gram,coef,
-        targets,weights,grid$time_step,grid$N,forcing_mean,split_mean)
+        targets,weights,grid$time_step,grid$N,forcing_mean,split_mean,
+        exact_mass_initial,exact_mass_rate)
 }
 ```
 
@@ -1708,9 +1725,11 @@ kappa0_run_smooth_study <- function(cfg) {
             op <- my.fractional.operators.kappa0(data$G,alpha/2,data$C,
                       cfg$gamma_star,cfg$m,grid$time_step,cfg$diffusion)
             value <- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,forcing,
-                       ref_grid,ref$coefficients,projection,forcing_mean=cfg$forcing_mean)
+                       ref_grid,ref$coefficients,projection,forcing_mean=cfg$forcing_mean,
+                       exact_mass_initial=3*cfg$initial_mean,exact_mass_rate=3*cfg$forcing_mean)
             data.frame(alpha=alpha,axis=if(cfg$study=="h") data$mesh$h else grid$time_step,
                 error=value$error,max_mass_error=value$max_mass_error,
+                max_exact_mass_error=value$max_exact_mass_error,
                 steps=grid$N,unknowns=nrow(data$C))
         },cfg$workers)
         rows[[i]] <- do.call(rbind,values)
@@ -1786,7 +1805,8 @@ kappa0_isolated_m_case <- function(data,spectrum,grid,reference,alpha,m,diffusio
     # The reference samples are the BE vectors at these very same time nodes.
     lookup <- function(t) reference$coefficients[,pmin(grid$N,as.integer(round(t/grid$time_step)))+1L,drop=FALSE]
     value <- kappa0_sampled_error(op,grid,data$initial,data$spatial_load,reference$forcing,
-               grid,lookup,projection,forcing_mean=data$forcing_mean)
+               grid,lookup,projection,forcing_mean=data$forcing_mean,
+               exact_mass_initial=3*data$initial_mean,exact_mass_rate=3*data$forcing_mean)
     H <- rep(1,n)
     if(alpha==2) H <- 1/(1+grid$time_step*diffusion*spectrum$values)
     else {
@@ -1803,7 +1823,7 @@ kappa0_isolated_m_case <- function(data,spectrum,grid,reference,alpha,m,diffusio
     gap <- kappa0_l2_norm(data$C,value$final_state-as.numeric(spectrum$vectors %*% y))
     data.frame(alpha=alpha,m=m,axis=m,error=value$error,product_error=modal_error,
         absolute_error_disagreement=abs(value$error-modal_error),final_state_gap_C=gap,
-        max_mass_error=value$max_mass_error)
+        max_mass_error=value$max_mass_error,max_exact_mass_error=value$max_exact_mass_error)
 }
 
 kappa0_run_m_study <- function(cfg) {
@@ -1869,6 +1889,9 @@ kappa0_compute_study <- function(cfg,notebook_file,output_file) {
     started <- proc.time()[["elapsed"]]
     result <- switch(cfg$study,m=kappa0_run_m_study(cfg),h=kappa0_run_smooth_study(cfg),
                      tau=kappa0_run_smooth_study(cfg),rough_h=kappa0_run_rough_study(cfg))
+    result$mass_error_definition <- list(
+        max_mass_error="maximum absolute mass residual against accumulated discrete recurrence",
+        max_exact_mass_error="max over every time node including t0 of abs(1^T C U_k - 3*(initial_mean+forcing_mean*t_k))")
     result$parameters <- cfg
     result$source_hashes <- tools::md5sum(c("kappa0func.Rmd",notebook_file))
     result$package_versions <- versions
